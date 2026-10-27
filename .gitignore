@@ -1,0 +1,7 @@
+# build outputs
+*.o
+/st
+/test_vm
+# per-user state
+changes.st
+.claude/
