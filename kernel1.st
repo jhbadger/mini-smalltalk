@@ -33,7 +33,8 @@ Number subclass: #Integer instanceVariableNames: '' classVariableNames: '' categ
 Integer subclass: #SmallInteger instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Numbers'!
 Number variableByteSubclass: #Float instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Numbers'!
 Magnitude subclass: #Character instanceVariableNames: 'value' classVariableNames: '' category: 'Kernel-Magnitudes'!
-Magnitude subclass: #Association instanceVariableNames: 'key value' classVariableNames: '' category: 'Kernel-Objects'!
+Magnitude subclass: #LookupKey instanceVariableNames: 'key' classVariableNames: '' category: 'Kernel-Objects'!
+LookupKey subclass: #Association instanceVariableNames: 'value' classVariableNames: '' category: 'Kernel-Objects'!
 Object subclass: #Point instanceVariableNames: 'x y' classVariableNames: '' category: 'Graphics-Primitives'!
 Object subclass: #Time instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Magnitudes'!
 
@@ -875,33 +876,49 @@ displayString
 shallowCopy
 	^self! !
 
+!LookupKey class methodsFor: 'instance creation'!
+key: aKey
+	^self new key: aKey! !
+
+!LookupKey methodsFor: 'accessing'!
+key
+	^key!
+key: aKey
+	key := aKey! !
+
+!LookupKey methodsFor: 'comparing'!
+< aLookupKey
+	^key < aLookupKey key!
+= aLookupKey
+	^(aLookupKey isKindOf: LookupKey) and: [key = aLookupKey key]!
+hash
+	^key hash! !
+
+!LookupKey methodsFor: 'printing'!
+printOn: aStream
+	aStream print: key! !
+
 !Association class methodsFor: 'instance creation'!
 key: aKey value: aValue
 	^self new key: aKey value: aValue! !
 
 !Association methodsFor: 'accessing'!
-key
-	^key!
 value
 	^value!
-key: aKey
-	key := aKey!
 value: aValue
 	value := aValue!
 key: aKey value: aValue
 	key := aKey. value := aValue! !
 
 !Association methodsFor: 'comparing'!
-< anAssociation
-	^key < anAssociation key!
 = anAssociation
-	^(anAssociation isKindOf: Association) and: [key = anAssociation key and: [value = anAssociation value]]!
-hash
-	^key hash! !
+	^(anAssociation isKindOf: Association) and: [key = anAssociation key and: [value = anAssociation value]]! !
 
 !Association methodsFor: 'printing'!
 printOn: aStream
-	aStream print: key; nextPutAll: '->'; print: value! !
+	aStream print: key; nextPutAll: '->'; print: value!
+storeOn: aStream
+	aStream nextPut: $(; store: key; nextPutAll: '->'; store: value; nextPut: $)! !
 
 !Point class methodsFor: 'instance creation'!
 x: xNumber y: yNumber

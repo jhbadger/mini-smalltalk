@@ -15,6 +15,12 @@ static void usage(void) {
                     "  with no -e, starts the interactive TUI environment\n");
     exit(1);
 }
+static void show_background_error(void) {
+    char *buf = malloc(strlen(interp.error) + strlen(interp.walkback) + 64);
+    sprintf(buf, "%s\n\n%s", interp.error, interp.walkback);
+    char title[200]; snprintf(title, sizeof title, "Error in background process: %.120s", interp.error);
+    dialog_text(title, buf); free(buf); interp.failed = false;
+}
 
 int main(int argc, char **argv) {
     const char *kdir = "."; const char **evals = NULL; int nevals = 0; const char **files = NULL; int nfiles = 0;
@@ -27,11 +33,10 @@ int main(int argc, char **argv) {
     }
     st_init();
     gc_add_root(&pending_inspect);
-    char err[512]; char path[1024];
-    const char *kernels[] = { "kernel1.st", "kernel2.st", "kernel3.st" };
-    for (int i = 0; i < 3; i++) {
-        snprintf(path, sizeof path, "%s/%s", kdir, kernels[i]);
-        if (!file_in(path, err, sizeof err)) { fprintf(stderr, "%s: %s\n", path, err); if (access(path, R_OK)) { fprintf(stderr, "kernel sources not found; use -k to point at the source directory\n"); return 1; } }
+    char err[512];
+    if (!load_kernel(kdir, err, sizeof err)) {
+        fprintf(stderr, "%s\n", err);
+        if (!strncmp(err, "cannot open", 11)) { fprintf(stderr, "kernel sources not found; use -k to point at the source directory\n"); return 1; }
     }
     if (access(changes_path, R_OK) == 0 && !file_in(changes_path, err, sizeof err)) fprintf(stderr, "%s: %s\n", changes_path, err);
     for (int i = 0; i < nfiles; i++) if (!file_in(files[i], err, sizeof err)) fprintf(stderr, "%s: %s\n", files[i], err);
@@ -58,7 +63,11 @@ int main(int argc, char **argv) {
     while (!ui_quit && !quit_requested) {
         ui_draw(); tui_flush();
         if (headless && tui_eof()) { tui_dump(stdout); break; }
-        if (!tui_read_event(&ev, 250)) continue;
+        bool busy = interp_has_background();
+        if (!tui_read_event(&ev, busy ? 10 : 250)) {
+            if (busy && interp_run_background(30)) { if (interp.failed) { show_background_error(); } tools_after_eval(); }
+            continue;
+        }
         if (ev.type == EV_KEY && (ev.mods & MOD_CTRL) && ev.key == 'q') {
             if (dialog_confirm("Quit", "Quit Smalltalk? (changes are already logged to the changes file)")) break; else continue;
         }

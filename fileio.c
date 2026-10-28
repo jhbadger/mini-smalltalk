@@ -74,6 +74,19 @@ bool file_in(const char *path, char *err, int errlen) {
     bool r = file_in_string(buf, err, errlen); free(buf); return r;
 }
 
+bool load_kernel(const char *dir, char *err, int errlen) {
+    bool ok = true; err[0] = 0; char first[512] = "";
+    for (int i = 1; i < 100; i++) {
+        char path[1024]; snprintf(path, sizeof path, "%s/kernel%d.st", dir, i);
+        FILE *f = fopen(path, "rb"); if (!f) { if (i == 1) { snprintf(err, errlen, "cannot open %s", path); return false; } break; }
+        fclose(f);
+        char e[512];
+        if (!file_in(path, e, sizeof e)) { ok = false; if (!first[0]) snprintf(first, sizeof first, "%s: %s", path, e); }
+    }
+    if (!ok) snprintf(err, errlen, "%s", first);
+    return ok;
+}
+
 /* ---- file out ---- */
 typedef struct { char *s; size_t n, cap; } Buf;
 static void badd(Buf *b, const char *s) { size_t l = strlen(s); if (b->n + l + 1 > b->cap) { b->cap = (b->n + l + 1) * 2 + 1024; b->s = realloc(b->s, b->cap); } memcpy(b->s + b->n, s, l + 1); b->n += l; }

@@ -10,9 +10,12 @@ oop classObject, classBehavior, classClass, classMetaclass, classUndefinedObject
     classSmallInteger, classFloat, classCharacter, classString, classSymbol, classArray,
     classByteArray, classDictionary, classAssociation, classCompiledMethod, classBlockClosure,
     classContext, classMessage, classCollection, classSequenceableCollection, classArrayedCollection,
-    classOrderedCollection, classPoint;
+    classOrderedCollection, classPoint, classSet, classIdentitySet, classIdentityDictionary,
+    classLargePositiveInteger, classLargeNegativeInteger, classMethodContext, classBlockContext,
+    classProcess, classSemaphore, classProcessorScheduler, classLinkedList, classLink;
 oop smalltalk;
-oop symDoesNotUnderstand, symDoIt, symValue, symPrintString, symError, symMustBeBoolean, symNew, symPrintOn;
+oop processor, main_process;
+oop symDoesNotUnderstand, symDoIt, symValue, symPrintString, symError, symMustBeBoolean, symNew, symPrintOn, symHash, symEquals;
 oop charTable[256];
 
 /* ---------- allocation & GC ---------- */
@@ -110,6 +113,7 @@ static void mark_drain(void) {
 }
 void gc_collect(void) {
     mark_push(nilobj); mark_push(trueobj); mark_push(falseobj); mark_push(smalltalk);
+    mark_push(processor); mark_push(main_process);
     for (int i = 0; i < 256; i++) mark_push(charTable[i]);
     for (int i = 0; i < symcap; i++) if (symtab[i]) mark_push(symtab[i]);
     for (int i = 0; i < nroots; i++) mark_push(*roots[i]);
@@ -125,10 +129,22 @@ void gc_collect(void) {
 }
 
 /* ---------- dictionaries (keys Array, values Array of Associations) ---------- */
+/* hash and equality: C fast paths for literals; other objects defer to Smalltalk #hash / #= when overridden */
+static bool is_large(oop o) { return !IS_INT(o) && (o->cls == classLargePositiveInteger || o->cls == classLargeNegativeInteger); }
+static bool overrides_object(oop o, oop sel) {
+    oop m = lookup_method(CLASS_OF(o), sel);
+    return m && SLOT(m, M_CLASS) != classObject;
+}
 uint32_t obj_hash(oop o) {
     if (IS_INT(o)) return (uint32_t)INT_VAL(o) * 2654435761u;
-    if (o->cls == classString) return str_hash(BYTES(o), o->size);
+    if (o->cls == classString || o->cls == classSymbol) return str_hash(BYTES(o), o->size);
     if (o->cls == classFloat) { double d = FLOATVAL(o); if (d == (double)(long)d) return (uint32_t)(long)d * 2654435761u; uint64_t b; memcpy(&b, &d, 8); return (uint32_t)(b ^ (b >> 32)); }
+    if (is_large(o)) return bn_hash(o);
+    if (o->cls == classCharacter || o->cls == nilobj || o->cls->cls == classMetaclass || o->cls == classMetaclass) return o->hash * 2654435761u;
+    if (symHash && overrides_object(o, symHash)) {
+        oop h = interp_send(o, symHash, NULL, 0);
+        if (IS_INT(h)) return (uint32_t)INT_VAL(h) * 2654435761u;
+    }
     return o->hash * 2654435761u;
 }
 bool obj_equal(oop a, oop b) {
@@ -141,6 +157,17 @@ bool obj_equal(oop a, oop b) {
     if (a->cls == classString && b->cls == classString)
         return a->size == b->size && memcmp(BYTES(a), BYTES(b), a->size) == 0;
     if (a->cls == classFloat && b->cls == classFloat) return FLOATVAL(a) == FLOATVAL(b);
+    if (is_large(a) && is_large(b)) return a->cls == b->cls && a->size == b->size && memcmp(BYTES(a), BYTES(b), a->size) == 0;
+    if (a->cls == classString || a->cls == classSymbol || a->cls == classCharacter || a->cls == classFloat || is_large(a)) return false;
+    if (a->cls->cls == classMetaclass || a->cls == classMetaclass) return false;
+    if (symEquals && overrides_object(a, symEquals)) {
+        oop args[1] = { b };
+        return interp_send(a, symEquals, args, 1) == trueobj;
+    }
+    return false;
+}
+static bool dict_identity(oop d) {
+    for (oop c = d->cls; c != nilobj && c; c = SLOT(c, C_SUPER)) if (c == classIdentitySet || c == classIdentityDictionary) return true;
     return false;
 }
 oop new_dict(void) {
@@ -149,25 +176,34 @@ oop new_dict(void) {
     return d;
 }
 static int dict_find(oop d, oop key) {
+    bool ident = dict_identity(d);
+    uint32_t h;
+    if (!ident) h = obj_hash(key);
+    else if (IS_INT(key)) h = (uint32_t)INT_VAL(key) * 2654435761u;
+    else if (key->cls == classSymbol || key->cls == classString) h = str_hash(BYTES(key), key->size);   /* same as obj_hash, so symbol tables survive a class change */
+    else h = key->hash * 2654435761u;
     oop keys = SLOT(d, D_KEYS); int cap = keys->size;
-    uint32_t i = obj_hash(key) & (cap - 1);
+    uint32_t i = h & (cap - 1);
     for (;;) {
         oop k = SLOT(keys, i);
         if (k == nilobj) return -(int)i - 1;
-        if (obj_equal(k, key)) return (int)i;
+        if (ident ? k == key : obj_equal(k, key)) return (int)i;
         i = (i + 1) & (cap - 1);
+        keys = SLOT(d, D_KEYS);   /* may have been reloaded by Smalltalk code? never resized here, but stay safe */
     }
 }
 oop dict_assoc_at(oop d, oop key) { int i = dict_find(d, key); return i >= 0 ? SLOT(SLOT(d, D_VALUES), i) : NULL; }
 oop dict_at(oop d, oop key) { oop a = dict_assoc_at(d, key); return a ? SLOT(a, A_VALUE) : NULL; }
 static void dict_grow(oop d) {
     oop okeys = SLOT(d, D_KEYS), ovals = SLOT(d, D_VALUES); int cap = okeys->size;
+    gc_add_root(&okeys); gc_add_root(&ovals);   /* Smalltalk #hash may run (and collect) during re-insertion */
     oop nkeys = new_array(cap * 2), nvals = new_array(cap * 2);
     SLOT(d, D_KEYS) = nkeys; SLOT(d, D_VALUES) = nvals;
     for (int i = 0; i < cap; i++) if (SLOT(okeys, i) != nilobj) {
         int j = dict_find(d, SLOT(okeys, i)); j = -j - 1;
         SLOT(nkeys, j) = SLOT(okeys, i); SLOT(nvals, j) = SLOT(ovals, i);
     }
+    gc_remove_root(&okeys); gc_remove_root(&ovals);
 }
 oop dict_at_put(oop d, oop key, oop value) {
     int i = dict_find(d, key);
@@ -189,13 +225,22 @@ bool dict_remove(oop d, oop key) {
     for (uint32_t j = (i + 1) & (cap - 1); SLOT(keys, j) != nilobj; j = (j + 1) & (cap - 1)) {
         oop k = SLOT(keys, j), v = SLOT(vals, j);
         SLOT(keys, j) = nilobj; SLOT(vals, j) = nilobj;
+        gc_add_root(&k); gc_add_root(&v);
         int n = dict_find(d, k); n = -n - 1; SLOT(keys, n) = k; SLOT(vals, n) = v;
+        gc_remove_root(&k); gc_remove_root(&v);
     }
     return true;
 }
 oop dict_keys(oop d) {
     int tally = INT_VAL(SLOT(d, D_TALLY)); oop r = new_array(tally); oop keys = SLOT(d, D_KEYS); int n = 0;
     for (uint32_t i = 0; i < keys->size; i++) if (SLOT(keys, i) != nilobj) SLOT(r, n++) = SLOT(keys, i);
+    return r;
+}
+oop all_instances(oop cls) {
+    int n = 0;
+    for (struct Obj *o = all_objects; o; o = o->next) if (o->cls == cls) n++;
+    oop r = new_array(n); n = 0;
+    for (struct Obj *o = all_objects; o; o = o->next) if (o->cls == cls && o != r && n < (int)r->size) SLOT(r, n++) = o;
     return r;
 }
 
@@ -333,12 +378,13 @@ void st_init(void) {
     classSequenceableCollection = def("SequenceableCollection", classCollection, 0, KIND_POINTERS);
     classArrayedCollection = def("ArrayedCollection", classSequenceableCollection, 0, KIND_POINTERS);
     /* fix the raw early classes: give them metaclasses and names by re-making over the same objects */
+    classSet = def("Set", classCollection, DICT_SIZE, KIND_POINTERS);
     struct { oop *c; const char *n; oop super; int size; int kind; } early[] = {
         { &classArray, "Array", classArrayedCollection, 0, KIND_INDEXED },
         { &classString, "String", classArrayedCollection, 0, KIND_BYTES },
         { &classSymbol, "Symbol", NULL, 0, KIND_BYTES },
         { &classAssociation, "Association", classMagnitude, ASSOC_SIZE, KIND_POINTERS },
-        { &classDictionary, "Dictionary", classCollection, DICT_SIZE, KIND_POINTERS } };
+        { &classDictionary, "Dictionary", classSet, DICT_SIZE, KIND_POINTERS } };
     for (int i = 0; i < 5; i++) {
         oop c = *early[i].c; oop super = early[i].super ? early[i].super : classString;
         oop meta = raw_class(METACLASS_SIZE); meta->cls = classMetaclass; c->cls = meta;
@@ -353,15 +399,35 @@ void st_init(void) {
     classOrderedCollection = def("OrderedCollection", classSequenceableCollection, 3, KIND_POINTERS);
     classCompiledMethod = def("CompiledMethod", classObject, METHOD_SIZE, KIND_POINTERS);
     classBlockClosure = def("BlockClosure", classObject, BLOCK_SIZE, KIND_POINTERS);
-    classContext = def("Context", classObject, CTX_FIXED, KIND_INDEXED);
+    classContext = def("ContextPart", classObject, CTX_FIXED, KIND_INDEXED);
+    classMethodContext = def("MethodContext", classContext, CTX_FIXED, KIND_INDEXED);
+    classBlockContext = def("BlockContext", classContext, CTX_FIXED, KIND_INDEXED);
     classMessage = def("Message", classObject, MSG_SIZE, KIND_POINTERS);
     classPoint = def("Point", classObject, 2, KIND_POINTERS);
-    oop sysdict = def("SystemDictionary", classDictionary, DICT_SIZE, KIND_POINTERS);
+    classIdentitySet = def("IdentitySet", classSet, DICT_SIZE, KIND_POINTERS);
+    classIdentityDictionary = def("IdentityDictionary", classDictionary, DICT_SIZE, KIND_POINTERS);
+    oop sysdict = def("SystemDictionary", classIdentityDictionary, DICT_SIZE, KIND_POINTERS);
     smalltalk->cls = sysdict;
+    classLargePositiveInteger = def("LargePositiveInteger", classInteger, 0, KIND_BYTES);
+    classLargeNegativeInteger = def("LargeNegativeInteger", classLargePositiveInteger, 0, KIND_BYTES);
+    classLink = def("Link", classObject, LINK_SIZE, KIND_POINTERS);
+    classProcess = def("Process", classLink, PROCESS_SIZE, KIND_POINTERS);
+    classLinkedList = def("LinkedList", classSequenceableCollection, LINKEDLIST_SIZE, KIND_POINTERS);
+    classSemaphore = def("Semaphore", classLinkedList, SEMAPHORE_SIZE, KIND_POINTERS);
+    classProcessorScheduler = def("ProcessorScheduler", classObject, PS_SIZE, KIND_POINTERS);
+    /* the scheduler and the main (user interface) process */
+    processor = new_object(classProcessorScheduler, 0);
+    oop lists = new_array(NUM_PRIORITIES);
+    for (int i = 0; i < NUM_PRIORITIES; i++) SLOT(lists, i) = new_object(classLinkedList, 0);
+    SLOT(processor, PS_LISTS) = lists;
+    main_process = new_object(classProcess, 0); SLOT(main_process, PR_PRIORITY) = MK_INT(4); SLOT(main_process, PR_NAME) = new_string("user interface");
+    SLOT(processor, PS_ACTIVE) = main_process;
+    dict_at_put(smalltalk, new_symbol("Processor"), processor);
     for (int i = 0; i < 256; i++) { charTable[i] = new_object(classCharacter, 0); SLOT(charTable[i], CH_VALUE) = MK_INT(i); }
     dict_at_put(smalltalk, new_symbol("Smalltalk"), smalltalk);
     dict_at_put(smalltalk, new_symbol("Transcript"), nilobj);
     symDoesNotUnderstand = new_symbol("doesNotUnderstand:"); symDoIt = new_symbol("DoIt");
     symValue = new_symbol("value"); symPrintString = new_symbol("printString"); symError = new_symbol("error:");
     symMustBeBoolean = new_symbol("mustBeBoolean"); symNew = new_symbol("new"); symPrintOn = new_symbol("printOn:");
+    symHash = new_symbol("hash"); symEquals = new_symbol("=");
 }

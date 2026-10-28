@@ -4,6 +4,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <math.h>
+#include <time.h>
 #include <sys/time.h>
 
 char *transcript_text = NULL; size_t transcript_len = 0; static size_t transcript_cap = 0;
@@ -165,6 +166,37 @@ oop call_primitive(int n, oop *args, int nargs, bool *ok) {
     case 120: { if (!is_bytes(A(1))) FAIL; char err[512]; char *src = str_cstr(A(1)); oop r = interp_eval(self, src, err, sizeof err); free(src); return r; }
     case 121: { if (!is_bytes(A(1))) FAIL; char err[512]; char *src = str_cstr(A(1)); bool r = file_in_string(src, err, sizeof err); free(src);
         if (!r) { interp_signal_error(err); return nilobj; } return self; }
+    /* ---- large integers (any Integer receiver/argument) ---- */
+    case 130: return bn_arith('+', self, A(1), ok);
+    case 131: return bn_arith('-', self, A(1), ok);
+    case 132: return bn_arith('*', self, A(1), ok);
+    case 133: return bn_arith('/', self, A(1), ok);
+    case 134: return bn_arith('%', self, A(1), ok);
+    case 135: return bn_arith('q', self, A(1), ok);
+    case 136: return bn_arith('r', self, A(1), ok);
+    case 137: return bn_arith('c', self, A(1), ok);
+    case 138: { if (!bn_is_integer(self) || !IS_INT(A(1)) || INT_VAL(A(1)) < 2 || INT_VAL(A(1)) > 36) FAIL; return bn_print(self, (int)INT_VAL(A(1))); }
+    case 139: return bn_to_float(self, ok);
+    case 150: return bn_arith('&', self, A(1), ok);
+    case 151: return bn_arith('|', self, A(1), ok);
+    case 152: return bn_arith('^', self, A(1), ok);
+    case 153: return bn_arith('s', self, A(1), ok);
+    case 155: { if (!is_num(self)) FAIL; double d = num_val(self); if (isnan(d) || isinf(d)) FAIL; return bn_from_double(trunc(d)); }
+    /* ---- time, files, instances ---- */
+    case 118: { /* local seconds since 1 January 1901 (Smalltalk-80 epoch) */
+        time_t t = time(NULL); struct tm lt; localtime_r(&t, &lt);
+        return MK_INT((intptr_t)t + lt.tm_gmtoff + 2177452800LL); }
+    case 160: if (IS_INT(self)) FAIL; return all_instances(self);
+    case 170: { /* file contents or nil */
+        if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); FILE *f = fopen(p, "rb"); free(p); if (!f) return nilobj;
+        fseek(f, 0, SEEK_END); long len = ftell(f); fseek(f, 0, SEEK_SET); if (len < 0) len = 0;
+        oop s = new_string_n("", 0); s = new_bytes(classString, (int)len); size_t got = fread(BYTES(s), 1, len, f); fclose(f);
+        if ((long)got != len) s->size = (uint32_t)got; return s; }
+    case 171: { /* primWrite: contents to: name append: aBoolean */
+        if (!is_bytes(A(1)) || !is_bytes(A(2))) FAIL; char *p = str_cstr(A(2)); FILE *f = fopen(p, A(3) == trueobj ? "ab" : "wb"); free(p);
+        if (!f) return falseobj; fwrite(BYTES(A(1)), 1, A(1)->size, f); fclose(f); return trueobj; }
+    case 172: { if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); int r = remove(p); free(p); return r == 0 ? trueobj : falseobj; }
+    case 173: { if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); FILE *f = fopen(p, "rb"); free(p); if (f) fclose(f); return f ? trueobj : falseobj; }
     }
     FAIL;
 }

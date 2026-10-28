@@ -1,8 +1,10 @@
-/* interp.c - bytecode interpreter with heap-allocated contexts */
+/* interp.c - bytecode interpreter with heap-allocated contexts and a cooperative process scheduler */
 #include "st.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
+#include <sys/time.h>
 
 Interp interp;
 
@@ -21,7 +23,7 @@ static oop cached_lookup(oop cls, oop sel) {
 static oop new_context(oop method, oop receiver, oop sender, oop home, oop outer) {
     oop h = SLOT(method, M_HEADER);
     int ntemps = HDR_TEMPS(h), nstack = HDR_STACK(h);
-    oop ctx = new_object(classContext, ntemps + nstack);
+    oop ctx = new_object(home != nilobj ? classBlockContext : classMethodContext, ntemps + nstack);
     SLOT(ctx, CTX_SENDER) = sender; SLOT(ctx, CTX_PC) = MK_INT(0); SLOT(ctx, CTX_SP) = MK_INT(CTX_FIXED + ntemps);
     SLOT(ctx, CTX_METHOD) = method; SLOT(ctx, CTX_RECEIVER) = receiver; SLOT(ctx, CTX_HOME) = home; SLOT(ctx, CTX_OUTER) = outer;
     return ctx;
@@ -51,20 +53,90 @@ void interp_signal_error(const char *msg) {
     }
 }
 
-static oop run(oop base) {
+/* ---------- processes: linked lists, run queues, delays ---------- */
+static long now_ms(void) { struct timeval tv; gettimeofday(&tv, NULL); return tv.tv_sec * 1000L + tv.tv_usec / 1000; }
+static void ll_add_last(oop list, oop p) {
+    SLOT(p, PR_LIST) = list; SLOT(p, PR_NEXT) = nilobj;
+    if (SLOT(list, LL_FIRST) == nilobj) SLOT(list, LL_FIRST) = p; else SLOT(SLOT(list, LL_LAST), PR_NEXT) = p;
+    SLOT(list, LL_LAST) = p;
+}
+static void ll_add_first(oop list, oop p) {
+    SLOT(p, PR_LIST) = list; SLOT(p, PR_NEXT) = SLOT(list, LL_FIRST); SLOT(list, LL_FIRST) = p;
+    if (SLOT(list, LL_LAST) == nilobj) SLOT(list, LL_LAST) = p;
+}
+static oop ll_remove_first(oop list) {
+    oop p = SLOT(list, LL_FIRST); if (p == nilobj) return nilobj;
+    SLOT(list, LL_FIRST) = SLOT(p, PR_NEXT); if (SLOT(list, LL_FIRST) == nilobj) SLOT(list, LL_LAST) = nilobj;
+    SLOT(p, PR_NEXT) = nilobj; SLOT(p, PR_LIST) = nilobj; return p;
+}
+static void ll_remove(oop list, oop p) {
+    oop prev = nilobj;
+    for (oop q = SLOT(list, LL_FIRST); q != nilobj; prev = q, q = SLOT(q, PR_NEXT)) {
+        if (q != p) continue;
+        if (prev == nilobj) SLOT(list, LL_FIRST) = SLOT(q, PR_NEXT); else SLOT(prev, PR_NEXT) = SLOT(q, PR_NEXT);
+        if (SLOT(list, LL_LAST) == q) SLOT(list, LL_LAST) = prev;
+        SLOT(q, PR_NEXT) = nilobj; SLOT(q, PR_LIST) = nilobj; return;
+    }
+}
+static int proc_prio(oop p) { oop v = SLOT(p, PR_PRIORITY); int pr = IS_INT(v) ? (int)INT_VAL(v) : 4; return pr < 1 ? 1 : pr > NUM_PRIORITIES ? NUM_PRIORITIES : pr; }
+static oop run_queue(int prio) { return SLOT(SLOT(processor, PS_LISTS), prio - 1); }
+static void make_runnable(oop p) { ll_add_last(run_queue(proc_prio(p)), p); }
+
+#define MAX_DELAYS 128
+static oop delay_procs = NULL; static long delay_wake[MAX_DELAYS];
+static void delays_init(void) { if (!delay_procs) { delay_procs = new_array(MAX_DELAYS); gc_add_root(&delay_procs); } }
+static bool add_delay(oop p, long wake) {
+    delays_init();
+    for (int i = 0; i < MAX_DELAYS; i++) if (SLOT(delay_procs, i) == nilobj) { SLOT(delay_procs, i) = p; delay_wake[i] = wake; return true; }
+    return false;
+}
+static void remove_delay(oop p) { if (delay_procs) for (int i = 0; i < MAX_DELAYS; i++) if (SLOT(delay_procs, i) == p) SLOT(delay_procs, i) = nilobj; }
+/* make due processes runnable; return the earliest pending wake time or -1 */
+static long wake_delays(void) {
+    if (!delay_procs) return -1;
+    long now = now_ms(), earliest = -1;
+    for (int i = 0; i < MAX_DELAYS; i++) {
+        oop p = SLOT(delay_procs, i); if (p == nilobj) continue;
+        if (delay_wake[i] <= now) { SLOT(delay_procs, i) = nilobj; make_runnable(p); }
+        else if (earliest < 0 || delay_wake[i] < earliest) earliest = delay_wake[i];
+    }
+    return earliest;
+}
+static oop pick_runnable(void) {
+    wake_delays();
+    for (int prio = NUM_PRIORITIES; prio >= 1; prio--) { oop q = run_queue(prio); if (SLOT(q, LL_FIRST) != nilobj) return ll_remove_first(q); }
+    return NULL;
+}
+bool interp_has_background(void) {
+    for (int prio = 1; prio <= NUM_PRIORITIES; prio++) if (SLOT(run_queue(prio), LL_FIRST) != nilobj) return true;
+    if (delay_procs) for (int i = 0; i < MAX_DELAYS; i++) if (SLOT(delay_procs, i) != nilobj) return true;
+    return false;
+}
+
+/* run bytecodes. base: the context whose return ends this run (NULL = background slice for forked processes).
+   deadline: wall-clock ms after which a background slice is preempted (0 = never). */
+static oop run(oop base, long deadline) {
     static int trace = -1; if (trace < 0) trace = getenv("ST_TRACE") != NULL;
     oop saved = interp.active; gc_add_root(&saved);
-    interp.active = base; interp.failed = false;
-    oop ctx, method, rcvr, lits; unsigned char *code; int pc, sp; oop *slots; oop result = nilobj;
+    oop owner = SLOT(processor, PS_ACTIVE); gc_add_root(&owner);
+    interp.failed = false;
+    oop ctx = NULL, method = NULL, rcvr = NULL, lits = NULL; unsigned char *code = NULL; int pc = 0, sp = 0; oop *slots = NULL; oop result = nilobj;
+    bool need_switch = base == NULL; unsigned icount = 0;
 #define LOAD() do { ctx = interp.active; method = SLOT(ctx, CTX_METHOD); rcvr = SLOT(ctx, CTX_RECEIVER); lits = SLOT(method, M_LITERALS); \
         code = BYTES(SLOT(method, M_BYTECODES)); pc = (int)INT_VAL(SLOT(ctx, CTX_PC)); sp = (int)INT_VAL(SLOT(ctx, CTX_SP)); slots = ctx->slots; } while (0)
 #define SAVE() do { SLOT(ctx, CTX_PC) = MK_INT(pc); SLOT(ctx, CTX_SP) = MK_INT(sp); } while (0)
 #define PUSH(v) (slots[sp++] = (v))
 #define POP() (slots[--sp])
-    LOAD();
+#define CUR() SLOT(processor, PS_ACTIVE)
+#define PARK_CURRENT() do { SAVE(); SLOT(CUR(), PR_CONTEXT) = ctx; } while (0)   /* save the running process so it can be resumed */
+    if (base) { interp.active = base; LOAD(); }
     oop sel = nilobj; int n = 0, super = 0;
     for (;;) {
+        if (need_switch) { need_switch = false; goto switch_process; }
         if (gc_alloc_since > gc_threshold) { SAVE(); gc_collect(); LOAD(); }
+        if (deadline && (++icount & 1023) == 0 && now_ms() > deadline) {   /* preempt the background slice */
+            PARK_CURRENT(); ll_add_first(run_queue(proc_prio(CUR())), CUR()); CUR() = main_process; result = nilobj; goto done;
+        }
         int op = code[pc++];
         switch (op) {
         case OP_PUSH_INST: PUSH(SLOT(rcvr, code[pc++])); break;
@@ -96,18 +168,20 @@ static oop run(oop base) {
             SLOT(b, B_OUTER) = ctx; SLOT(b, B_METHOD) = bm; SLOT(b, B_RECEIVER) = rcvr; SLOT(b, B_NUMARGS) = MK_INT(HDR_ARGS(SLOT(bm, M_HEADER)));
             PUSH(b); break; }
         case OP_RETURN: {
-            oop v = POP(); oop target;
+            oop v = POP(); oop target; oop origin = ctx;
             if (SLOT(ctx, CTX_HOME) == nilobj) { target = SLOT(ctx, CTX_SENDER); SLOT(ctx, CTX_PC) = MK_INT(-1); }
             else {
-                oop home = SLOT(ctx, CTX_HOME);
+                oop home = SLOT(ctx, CTX_HOME); origin = home;
                 if (INT_VAL(SLOT(home, CTX_PC)) < 0) { SAVE(); interp_signal_error("Block cannot return: home context has already returned"); goto abort; }
                 target = SLOT(home, CTX_SENDER); SLOT(home, CTX_PC) = MK_INT(-1);
             }
-            if (target == nilobj || ctx == base) { result = v; goto done; }
+            if (base && origin == base) { result = v; goto done; }
+            if (target == nilobj) { SLOT(CUR(), PR_CONTEXT) = nilobj; goto switch_process; }   /* a forked process finished */
             interp.active = target; LOAD(); PUSH(v); break; }
         case OP_BLOCK_RETURN: {
             oop v = POP(); oop target = SLOT(ctx, CTX_SENDER);
-            if (target == nilobj || ctx == base) { result = v; goto done; }
+            if (base && ctx == base) { result = v; goto done; }
+            if (target == nilobj) { SLOT(CUR(), PR_CONTEXT) = nilobj; goto switch_process; }
             interp.active = target; LOAD(); PUSH(v); break; }
         case OP_SEND: sel = SLOT(lits, code[pc++]); n = code[pc++]; super = 0; goto send;
         case OP_SUPER_SEND: sel = SLOT(lits, code[pc++]); n = code[pc++]; super = 1; goto send;
@@ -163,6 +237,65 @@ static oop run(oop base) {
                         sp -= 2; for (uint32_t i = 0; i < arr->size; i++) PUSH(SLOT(arr, i));
                         n = arr->size; sel = s; super = 0; goto send;
                     }
+                } else if (prim >= 140 && prim <= 148) {   /* processes and semaphores */
+                    oop cur = CUR();
+                    switch (prim) {
+                    case 140:   /* BlockClosure>>newProcess */
+                        if (CLASS_OF(recv) == classBlockClosure && INT_VAL(SLOT(recv, B_NUMARGS)) == 0) {
+                            SAVE();
+                            oop outer = SLOT(recv, B_OUTER);
+                            oop home = SLOT(outer, CTX_HOME) != nilobj ? SLOT(outer, CTX_HOME) : outer;
+                            oop nctx = new_context(SLOT(recv, B_METHOD), SLOT(recv, B_RECEIVER), nilobj, home, outer);
+                            oop proc = new_object(classProcess, 0); SLOT(proc, PR_CONTEXT) = nctx; SLOT(proc, PR_PRIORITY) = SLOT(cur, PR_PRIORITY);
+                            sp -= n + 1; PUSH(proc); continue;
+                        }
+                        break;
+                    case 141:   /* Process>>resume */
+                        if (CLASS_OF(recv) == classProcess && SLOT(recv, PR_CONTEXT) != nilobj && SLOT(recv, PR_LIST) == nilobj && recv != cur) {
+                            sp -= n + 1; PUSH(recv);
+                            if (proc_prio(recv) > proc_prio(cur)) { PARK_CURRENT(); ll_add_first(run_queue(proc_prio(cur)), cur); CUR() = recv; interp.active = SLOT(recv, PR_CONTEXT); LOAD(); }
+                            else make_runnable(recv);
+                            continue;
+                        }
+                        break;
+                    case 142: case 143:   /* suspend / terminate */
+                        if (CLASS_OF(recv) == classProcess) {
+                            if (recv == cur) {
+                                sp -= n + 1; PUSH(recv); PARK_CURRENT();
+                                if (prim == 143) { SLOT(cur, PR_CONTEXT) = nilobj; if (cur == owner) { result = nilobj; goto done; } }
+                                goto switch_process;
+                            }
+                            if (SLOT(recv, PR_LIST) != nilobj) ll_remove(SLOT(recv, PR_LIST), recv);
+                            remove_delay(recv);
+                            if (prim == 143) SLOT(recv, PR_CONTEXT) = nilobj;
+                            sp -= n + 1; PUSH(recv); continue;
+                        }
+                        break;
+                    case 144: {   /* ProcessorScheduler>>yield */
+                        sp -= n + 1; PUSH(recv);
+                        oop q = run_queue(proc_prio(cur));
+                        if (SLOT(q, LL_FIRST) != nilobj) { PARK_CURRENT(); ll_add_last(q, cur); goto switch_process; }
+                        continue; }
+                    case 145: {   /* Semaphore>>wait */
+                        if (CLASS_OF(recv) != classSemaphore && !(!IS_INT(recv) && recv->size >= SEMAPHORE_SIZE)) break;
+                        oop ex = SLOT(recv, SEM_EXCESS); intptr_t excess = IS_INT(ex) ? INT_VAL(ex) : 0;
+                        sp -= n + 1; PUSH(recv);
+                        if (excess > 0) { SLOT(recv, SEM_EXCESS) = MK_INT(excess - 1); continue; }
+                        PARK_CURRENT(); ll_add_last(recv, cur); goto switch_process; }
+                    case 146: {   /* Semaphore>>signal */
+                        if (IS_INT(recv) || recv->size < SEMAPHORE_SIZE) break;
+                        sp -= n + 1; PUSH(recv);
+                        if (SLOT(recv, LL_FIRST) == nilobj) { oop ex = SLOT(recv, SEM_EXCESS); SLOT(recv, SEM_EXCESS) = MK_INT((IS_INT(ex) ? INT_VAL(ex) : 0) + 1); continue; }
+                        oop proc = ll_remove_first(recv);
+                        if (proc_prio(proc) > proc_prio(cur)) { PARK_CURRENT(); ll_add_first(run_queue(proc_prio(cur)), cur); CUR() = proc; interp.active = SLOT(proc, PR_CONTEXT); LOAD(); }
+                        else make_runnable(proc);
+                        continue; }
+                    case 148: {   /* Delay>>primWait: milliseconds */
+                        oop msArg = slots[sp - 1]; if (!IS_INT(msArg)) break;
+                        sp -= n + 1; PUSH(recv); PARK_CURRENT();
+                        if (!add_delay(cur, now_ms() + INT_VAL(msArg))) { make_runnable(cur); }
+                        goto switch_process; }
+                    }
                 } else {
                     bool ok = false; SAVE();
                     oop r = call_primitive(prim, &slots[sp - n - 1], n, &ok);
@@ -175,23 +308,54 @@ static oop run(oop base) {
             for (int i = 0; i < n; i++) SLOT(nctx, CTX_FIXED + i) = slots[sp - n + i];
             sp -= n + 1; SAVE();
             interp.active = nctx; LOAD();
+            continue;
+        }
+    switch_process: {
+            oop next;
+            for (;;) {
+                next = pick_runnable();
+                if (next) break;
+                long w = wake_delays();
+                if (!base) { CUR() = main_process; result = nilobj; goto done; }
+                if (w < 0) { interp_signal_error("deadlock: every process is waiting"); goto abort; }
+                long d = w - now_ms(); if (d > 50) d = 50; if (d > 0) usleep((useconds_t)d * 1000);
+            }
+            CUR() = next; interp.active = SLOT(next, PR_CONTEXT); LOAD();
+            continue;
         }
     }
 abort:
     result = nilobj;
+    if (CUR() != owner) {                 /* a forked process died: drop it, and unblock the owner if it was waiting */
+        SLOT(CUR(), PR_CONTEXT) = nilobj;
+        if (base) { if (SLOT(owner, PR_LIST) != nilobj) ll_remove(SLOT(owner, PR_LIST), owner); remove_delay(owner); }
+        CUR() = base ? owner : main_process;
+    }
 done:
-    interp.active = saved; gc_remove_root(&saved);
+    interp.active = saved; gc_remove_root(&saved); gc_remove_root(&owner);
     return result;
 #undef LOAD
 #undef SAVE
 #undef PUSH
 #undef POP
+#undef CUR
+#undef PARK_CURRENT
+}
+
+bool interp_run_background(int max_ms) {
+    if (!interp_has_background()) return false;
+    if (wake_delays() >= 0) { /* delays pending; something may be runnable now */ }
+    bool any = false;
+    for (int prio = 1; prio <= NUM_PRIORITIES; prio++) if (SLOT(run_queue(prio), LL_FIRST) != nilobj) any = true;
+    if (!any) return false;
+    run(NULL, now_ms() + max_ms);
+    return true;
 }
 
 oop interp_run_method(oop method, oop receiver, oop *args, int nargs) {
     oop ctx = new_context(method, receiver, nilobj, nilobj, nilobj);
     for (int i = 0; i < nargs; i++) SLOT(ctx, CTX_FIXED + i) = args[i];
-    return run(ctx);
+    return run(ctx, 0);
 }
 
 oop interp_send(oop receiver, oop selector, oop *args, int nargs) {

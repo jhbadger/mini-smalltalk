@@ -2,7 +2,7 @@ CC ?= cc
 CFLAGS ?= -O2 -Wall -Wno-unused-result -Wno-unused-function
 LDFLAGS ?= -lm
 
-VM_SRCS = object.c lex.c parse.c compiler.c interp.c prims.c fileio.c
+VM_SRCS = object.c lex.c parse.c compiler.c interp.c prims.c fileio.c bignum.c
 UI_SRCS = tui.c widgets.c tools.c
 VM_OBJS = $(VM_SRCS:.c=.o)
 UI_OBJS = $(UI_SRCS:.c=.o)

@@ -10,11 +10,12 @@ ArrayedCollection variableByteSubclass: #ByteArray instanceVariableNames: '' cla
 SequenceableCollection subclass: #Interval instanceVariableNames: 'start stop step' classVariableNames: '' category: 'Collections-Sequenceable'!
 SequenceableCollection subclass: #OrderedCollection instanceVariableNames: 'firstIndex lastIndex array' classVariableNames: '' category: 'Collections-Sequenceable'!
 OrderedCollection subclass: #SortedCollection instanceVariableNames: 'sortBlock' classVariableNames: '' category: 'Collections-Sequenceable'!
-Collection subclass: #Dictionary instanceVariableNames: 'tally keys values' classVariableNames: '' category: 'Collections-Unordered'!
+Collection subclass: #Set instanceVariableNames: 'tally keys values' classVariableNames: '' category: 'Collections-Unordered'!
+Set subclass: #IdentitySet instanceVariableNames: '' classVariableNames: '' category: 'Collections-Unordered'!
+Set subclass: #Dictionary instanceVariableNames: '' classVariableNames: '' category: 'Collections-Unordered'!
 Dictionary subclass: #IdentityDictionary instanceVariableNames: '' classVariableNames: '' category: 'Collections-Unordered'!
-Dictionary subclass: #SystemDictionary instanceVariableNames: '' classVariableNames: '' category: 'System-Support'!
-Collection subclass: #Set instanceVariableNames: 'dict' classVariableNames: '' category: 'Collections-Unordered'!
-Set subclass: #Bag instanceVariableNames: '' classVariableNames: '' category: 'Collections-Unordered'!
+IdentityDictionary subclass: #SystemDictionary instanceVariableNames: '' classVariableNames: '' category: 'System-Support'!
+Collection subclass: #Bag instanceVariableNames: 'contents' classVariableNames: '' category: 'Collections-Unordered'!
 
 !Collection class methodsFor: 'instance creation'!
 with: a
@@ -646,15 +647,79 @@ at: i put: v
 median
 	^self at: self size + 1 // 2! !
 
-!Dictionary class methodsFor: 'instance creation'!
+!Set class methodsFor: 'instance creation'!
 new
 	^self basicNew init!
 new: n
 	^self new! !
 
-!Dictionary methodsFor: 'private'!
+!Set methodsFor: 'private'!
 init
-	tally := 0. keys := Array new: 16. values := Array new: 16! !
+	tally := 0. keys := Array new: 16. values := Array new: 16!
+primAt: key ifAbsent: aBlock
+	<primitive: 90>
+	^aBlock value!
+primAt: key put: anObject
+	<primitive: 91>
+	^self error: 'cannot store'!
+primRemoveKey: key ifAbsent: aBlock
+	<primitive: 92>
+	^aBlock value!
+primKeys
+	<primitive: 93>
+	^#()!
+primIncludesKey: key
+	<primitive: 94>
+	^false! !
+
+!Set methodsFor: 'accessing'!
+size
+	^tally!
+anyOne
+	self do: [:e | ^e].
+	^self error: 'collection is empty'! !
+
+!Set methodsFor: 'adding/removing'!
+add: anObject
+	anObject isNil ifTrue: [^anObject].
+	self primAt: anObject put: anObject.
+	^anObject!
+remove: anObject ifAbsent: aBlock
+	^self primRemoveKey: anObject ifAbsent: aBlock!
+removeAll
+	self init! !
+
+!Set methodsFor: 'testing'!
+includes: anObject
+	^self primIncludesKey: anObject!
+occurrencesOf: anObject
+	^(self includes: anObject) ifTrue: [1] ifFalse: [0]! !
+
+!Set methodsFor: 'enumerating'!
+do: aBlock
+	self primKeys do: aBlock!
+collect: aBlock
+	| r |
+	r := Set new.
+	self do: [:e | r add: (aBlock value: e)].
+	^r! !
+
+!Set methodsFor: 'copying'!
+postCopy
+	keys := keys copy.
+	values := values collect: [:a | a isNil ifTrue: [nil] ifFalse: [a copy]]! !
+
+!Set methodsFor: 'comparing'!
+= aSet
+	self class == aSet class ifFalse: [^false].
+	self size = aSet size ifFalse: [^false].
+	self do: [:e | (aSet includes: e) ifFalse: [^false]].
+	^true!
+hash
+	| h |
+	h := self size.
+	self do: [:e | h := h bitXor: e hash].
+	^h! !
 
 !Dictionary methodsFor: 'accessing'!
 at: key
@@ -674,12 +739,12 @@ associationAt: key
 	<primitive: 95>
 	^self error: 'key not found'!
 keys
-	<primitive: 93>
-	^#()!
+	"Answer a Set of the keys"
+	^Set withAll: self primKeys!
 values
-	^self keys collect: [:k | self at: k]!
+	^self primKeys collect: [:k | self at: k]!
 associations
-	^self keys collect: [:k | self associationAt: k]!
+	^self primKeys collect: [:k | self associationAt: k]!
 size
 	^tally!
 keyAtValue: value
@@ -713,18 +778,18 @@ includes: anObject
 
 !Dictionary methodsFor: 'enumerating'!
 do: aBlock
-	self keys do: [:k | aBlock value: (self at: k)]!
+	self primKeys do: [:k | aBlock value: (self at: k)]!
 keysDo: aBlock
-	self keys do: aBlock!
+	self primKeys do: aBlock!
 valuesDo: aBlock
 	self do: aBlock!
 keysAndValuesDo: aBlock
-	self keys do: [:k | aBlock value: k value: (self at: k)]!
+	self primKeys do: [:k | aBlock value: k value: (self at: k)]!
 associationsDo: aBlock
-	self keys do: [:k | aBlock value: (self associationAt: k)]!
+	self primKeys do: [:k | aBlock value: (self associationAt: k)]!
 collect: aBlock
 	| r |
-	r := OrderedCollection new.
+	r := Bag new.
 	self do: [:v | r add: (aBlock value: v)].
 	^r!
 select: aBlock
@@ -733,19 +798,21 @@ select: aBlock
 	self keysAndValuesDo: [:k :v | (aBlock value: v) ifTrue: [r at: k put: v]].
 	^r!
 keysSortedSafely
-	^self keys asSortedCollection: [:a :b | a printString <= b printString]! !
+	^self primKeys asSortedCollection: [:a :b | a printString <= b printString]! !
 
 !Dictionary methodsFor: 'printing'!
 printOn: aStream
 	aStream nextPutAll: self class name; nextPutAll: ' ('.
-	self keys doWithIndex: [:k :i | i <= 50 ifTrue: [aStream print: k; nextPutAll: '->'; print: (self at: k); space]].
+	self primKeys doWithIndex: [:k :i | i <= 50 ifTrue: [aStream print: k; nextPutAll: '->'; print: (self at: k); space]].
 	tally > 50 ifTrue: [aStream nextPutAll: '...'].
 	aStream nextPut: $)! !
 
-!Dictionary methodsFor: 'copying'!
-postCopy
-	keys := keys copy.
-	values := values collect: [:a | a isNil ifTrue: [nil] ifFalse: [a copy]]! !
+!Dictionary methodsFor: 'comparing'!
+= aDictionary
+	self class == aDictionary class ifFalse: [^false].
+	self size = aDictionary size ifFalse: [^false].
+	self keysAndValuesDo: [:k :v | (aDictionary at: k ifAbsent: [^false]) = v ifFalse: [^false]].
+	^true! !
 
 !SystemDictionary methodsFor: 'classes'!
 allClasses
@@ -753,6 +820,10 @@ allClasses
 	r := OrderedCollection new.
 	self do: [:v | v isClass ifTrue: [r add: v]].
 	^r asSortedCollection: [:a :b | a name <= b name]!
+allClassesDo: aBlock
+	self allClasses do: aBlock!
+allClassNames
+	^self allClasses collect: [:c | c name]!
 classNamed: aString
 	^self at: aString asSymbol ifAbsent: [nil]!
 classCategories
@@ -781,43 +852,52 @@ flushCache
 version
 	^'Mini Smalltalk-80 TUI 1.0'! !
 
-!Set class methodsFor: 'instance creation'!
+!Bag class methodsFor: 'instance creation'!
 new
-	^self basicNew init!
-new: n
-	^self new! !
+	^self basicNew init! !
 
-!Set methodsFor: 'private'!
+!Bag methodsFor: 'private'!
 init
-	dict := Dictionary new! !
-
-!Set methodsFor: 'accessing'!
-size
-	^dict size!
-add: anObject
-	dict at: anObject put: anObject.
-	^anObject!
-remove: anObject ifAbsent: aBlock
-	^dict removeKey: anObject ifAbsent: aBlock!
-includes: anObject
-	^dict includesKey: anObject!
-do: aBlock
-	dict keysDo: aBlock!
-postCopy
-	dict := dict copy! !
+	contents := Dictionary new! !
 
 !Bag methodsFor: 'accessing'!
-add: anObject
-	dict at: anObject put: (dict at: anObject ifAbsent: [0]) + 1.
-	^anObject!
-occurrencesOf: anObject
-	^dict at: anObject ifAbsent: [0]!
 size
-	^dict inject: 0 into: [:a :b | a + b]!
-do: aBlock
-	dict keysAndValuesDo: [:k :n | n timesRepeat: [aBlock value: k]]!
+	| n |
+	n := 0.
+	contents do: [:c | n := n + c].
+	^n!
+occurrencesOf: anObject
+	^contents at: anObject ifAbsent: [0]!
+asSet
+	^contents keys!
+sortedCounts
+	^(contents associations collect: [:a | a value -> a key]) asSortedCollection: [:x :y | x key >= y key]! !
+
+!Bag methodsFor: 'adding/removing'!
+add: anObject
+	^self add: anObject withOccurrences: 1!
+add: anObject withOccurrences: anInteger
+	anObject isNil ifTrue: [^anObject].
+	contents at: anObject put: (contents at: anObject ifAbsent: [0]) + anInteger.
+	^anObject!
 remove: anObject ifAbsent: aBlock
 	| n |
-	n := dict at: anObject ifAbsent: [^aBlock value].
-	n = 1 ifTrue: [dict removeKey: anObject] ifFalse: [dict at: anObject put: n - 1].
+	n := contents at: anObject ifAbsent: [^aBlock value].
+	n = 1 ifTrue: [contents removeKey: anObject] ifFalse: [contents at: anObject put: n - 1].
 	^anObject! !
+
+!Bag methodsFor: 'testing'!
+includes: anObject
+	^contents includesKey: anObject! !
+
+!Bag methodsFor: 'enumerating'!
+do: aBlock
+	contents keysAndValuesDo: [:k :n | n timesRepeat: [aBlock value: k]]! !
+
+!Bag methodsFor: 'copying'!
+postCopy
+	contents := contents copy! !
+
+!Bag methodsFor: 'comparing'!
+= aBag
+	^(aBag isKindOf: Bag) and: [self size = aBag size and: [contents keys allSatisfy: [:k | (self occurrencesOf: k) = (aBag occurrencesOf: k)]]]! !

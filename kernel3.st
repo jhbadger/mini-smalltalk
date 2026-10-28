@@ -8,11 +8,13 @@ WriteStream subclass: #ReadWriteStream instanceVariableNames: '' classVariableNa
 Stream subclass: #TranscriptStream instanceVariableNames: '' classVariableNames: '' category: 'System-Support'!
 Object subclass: #BlockClosure instanceVariableNames: 'outerContext method receiver numArgs' classVariableNames: '' category: 'Kernel-Methods'!
 Object subclass: #CompiledMethod instanceVariableNames: 'header literals bytecodes selector methodClass sourceCode primitive category' classVariableNames: '' category: 'Kernel-Methods'!
-Object variableSubclass: #Context instanceVariableNames: 'sender pc stackp method receiver home outer closure' classVariableNames: '' category: 'Kernel-Methods'!
+Object variableSubclass: #ContextPart instanceVariableNames: 'sender pc stackp method receiver home outer closure' classVariableNames: '' category: 'Kernel-Methods'!
+ContextPart variableSubclass: #MethodContext instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Methods'!
+ContextPart variableSubclass: #BlockContext instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Methods'!
 Object subclass: #Exception instanceVariableNames: 'messageText' classVariableNames: '' category: 'Kernel-Exceptions'!
 Exception subclass: #Error instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Exceptions'!
 Object subclass: #Compiler instanceVariableNames: '' classVariableNames: '' category: 'System-Compiler'!
-Object subclass: #Random instanceVariableNames: 'seed' classVariableNames: '' category: 'Kernel-Numbers'!
+Stream subclass: #Random instanceVariableNames: 'seed' classVariableNames: '' category: 'Kernel-Numbers'!
 
 !Stream methodsFor: 'accessing'!
 next
@@ -24,6 +26,8 @@ nextPutAll: aCollection
 	^aCollection!
 print: anObject
 	anObject printOn: self!
+store: anObject
+	anObject storeOn: self!
 display: anObject
 	self nextPutAll: anObject displayString!
 << anObject
@@ -144,7 +148,9 @@ next
 	^collection at: position!
 peek
 	position >= readLimit ifTrue: [^nil].
-	^collection at: position + 1! !
+	^collection at: position + 1!
+reset
+	position := 0! !
 
 !TranscriptStream methodsFor: 'accessing'!
 show: anObject
@@ -273,7 +279,7 @@ numTemps
 printOn: aStream
 	aStream nextPutAll: methodClass name; nextPutAll: '>>'; nextPutAll: (selector isNil ifTrue: ['[]'] ifFalse: [selector])! !
 
-!Context methodsFor: 'accessing'!
+!ContextPart methodsFor: 'accessing'!
 sender
 	^sender!
 receiver
@@ -284,14 +290,22 @@ home
 	^home!
 pc
 	^pc!
+stackPointer
+	^stackp!
 isBlockContext
 	^home notNil!
 selector
 	^home isNil ifTrue: [method selector] ifFalse: [home method selector]!
 methodClass
-	^method methodClass! !
+	^method methodClass!
+tempAt: index
+	^self basicAt: index!
+tempAt: index put: value
+	^self basicAt: index put: value!
+numTemps
+	^method numTemps! !
 
-!Context methodsFor: 'printing'!
+!ContextPart methodsFor: 'printing'!
 printOn: aStream
 	home notNil ifTrue: [aStream nextPutAll: '[] in '].
 	aStream nextPutAll: receiver class name.
@@ -301,7 +315,17 @@ backtrace
 	| s c |
 	s := WriteStream on: String new. c := self.
 	[c notNil] whileTrue: [s print: c; cr. c := c sender].
-	^s contents! !
+	^s contents!
+shortStack
+	^self backtrace! !
+
+!MethodContext methodsFor: 'testing'!
+isBlockContext
+	^false! !
+
+!BlockContext methodsFor: 'testing'!
+isBlockContext
+	^true! !
 
 !Exception class methodsFor: 'signalling'!
 signal
@@ -347,7 +371,13 @@ next
 between: low and: high
 	^low + (self next * (high - low + 1)) truncated!
 nextInt: n
-	^self between: 1 and: n! !
+	^self between: 1 and: n!
+atEnd
+	^false!
+nextPut: anObject
+	^self shouldNotImplement!
+contents
+	^self shouldNotImplement! !
 
 !Object methodsFor: 'evaluating'!
 evaluate: aString

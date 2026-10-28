@@ -51,6 +51,13 @@ enum { A_KEY = 0, A_VALUE, ASSOC_SIZE };
 enum { D_TALLY = 0, D_KEYS, D_VALUES, DICT_SIZE };
 enum { MSG_SELECTOR = 0, MSG_ARGS, MSG_SIZE };
 enum { CH_VALUE = 0, CHAR_SIZE };
+/* processes: Link, Process, LinkedList, Semaphore, ProcessorScheduler */
+enum { LINK_NEXT = 0, LINK_SIZE };
+enum { PR_NEXT = 0, PR_CONTEXT, PR_PRIORITY, PR_LIST, PR_NAME, PROCESS_SIZE };
+enum { LL_FIRST = 0, LL_LAST, LINKEDLIST_SIZE };
+enum { SEM_EXCESS = 2, SEMAPHORE_SIZE };
+enum { PS_LISTS = 0, PS_ACTIVE, PS_SIZE };
+#define NUM_PRIORITIES 8
 
 /* bytecodes */
 enum {
@@ -68,9 +75,12 @@ extern oop classObject, classBehavior, classClass, classMetaclass, classUndefine
     classSmallInteger, classFloat, classCharacter, classString, classSymbol, classArray,
     classByteArray, classDictionary, classAssociation, classCompiledMethod, classBlockClosure,
     classContext, classMessage, classCollection, classSequenceableCollection, classArrayedCollection,
-    classOrderedCollection, classPoint;
+    classOrderedCollection, classPoint, classSet, classIdentitySet, classIdentityDictionary,
+    classLargePositiveInteger, classLargeNegativeInteger, classMethodContext, classBlockContext,
+    classProcess, classSemaphore, classProcessorScheduler, classLinkedList, classLink;
 extern oop smalltalk;            /* the global Dictionary */
-extern oop symDoesNotUnderstand, symDoIt, symValue, symPrintString, symError, symMustBeBoolean, symNew, symPrintOn;
+extern oop processor, main_process;
+extern oop symDoesNotUnderstand, symDoIt, symValue, symPrintString, symError, symMustBeBoolean, symNew, symPrintOn, symHash, symEquals;
 extern oop charTable[256];
 
 /* object.c */
@@ -101,6 +111,7 @@ bool dict_remove(oop d, oop key);
 oop dict_keys(oop d);                   /* Array of keys */
 uint32_t obj_hash(oop o);
 bool obj_equal(oop a, oop b);
+oop all_instances(oop cls);             /* Array of all instances of a class */
 /* gc */
 void gc_add_root(oop *p);
 void gc_remove_root(oop *p);
@@ -126,6 +137,17 @@ oop interp_eval(oop receiver, const char *src, char *err, int errlen); /* compil
 oop interp_run_method(oop method, oop receiver, oop *args, int nargs);
 oop interp_print_string(oop o);                    /* printString as C-accessible String oop */
 void interp_signal_error(const char *msg);
+bool interp_run_background(int max_ms);            /* give forked processes a time slice; true if any ran */
+bool interp_has_background(void);
+/* bignum.c: arbitrary precision integers (LargePositiveInteger / LargeNegativeInteger) */
+oop bn_arith(int op, oop a, oop b, bool *ok);      /* op: + - * / % q r c & | ^ s(hift) */
+oop bn_print(oop a, int base);
+oop bn_to_float(oop a, bool *ok);
+oop bn_from_double(double d);
+oop bn_from_string(const char *digits, int radix);
+oop bn_negate(oop a);
+bool bn_is_integer(oop o);
+uint32_t bn_hash(oop o);
 /* prims.c */
 oop call_primitive(int n, oop *args, int nargs, bool *ok); /* args[0] is receiver */
 /* transcript buffer */
@@ -136,6 +158,7 @@ extern size_t transcript_len;
 /* fileio.c */
 bool file_in(const char *path, char *err, int errlen);
 bool file_in_string(const char *src, char *err, int errlen);
+bool load_kernel(const char *dir, char *err, int errlen);   /* files kernel1.st, kernel2.st, ... in order */
 char *file_out_class(oop cls);          /* malloc'd chunk-format text */
 void changes_log(const char *text);     /* append chunk text to changes file */
 extern const char *changes_path;

@@ -32,7 +32,7 @@ struct Window {
 
 /* colours */
 enum { C_DESKTOP_BG = 237, C_WIN_BG = 255, C_WIN_FG = 16, C_TITLE_BG = 24, C_TITLE_FG = 231, C_TITLE_INACTIVE_BG = 250,
-    C_FRAME = 240, C_SEL_BG = 153, C_MENU_BG = 230, C_MENU_HI_BG = 24, C_LIST_SEL_BG = 16, C_LIST_SEL_FG = 255, C_DIM_FG = 244 };
+    C_FRAME = 240, C_SEL_BG = 110, C_MENU_BG = 230, C_MENU_HI_BG = 24, C_LIST_SEL_BG = 16, C_LIST_SEL_FG = 255, C_DIM_FG = 244 };
 
 /* window manager */
 extern Window *windows[64]; extern int nwindows;

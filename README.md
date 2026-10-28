@@ -42,20 +42,36 @@ make check      # headless VM test-suite
 
 | File | Role |
 |------|------|
-| `object.c` | object memory (tagged SmallIntegers, non-moving mark/sweep GC), symbols, C-level dictionaries, class bootstrap with real metaclasses |
+| `object.c` | object memory (tagged SmallIntegers, non-moving mark/sweep GC), symbols, C-level hashed collections that defer to Smalltalk `=`/`hash` for user objects, class bootstrap with real metaclasses |
+| `bignum.c` | arbitrary-precision arithmetic behind LargePositiveInteger / LargeNegativeInteger |
 | `lex.c`, `parse.c`, `compiler.c` | Smalltalk-80 syntax → bytecode; full closures, non-local return, cascades, literal arrays, inlined `ifTrue:`/`and:`/`whileTrue:` family |
-| `interp.c` | bytecode interpreter with heap contexts, method cache, `perform:`, `doesNotUnderstand:`, walkbacks |
-| `prims.c` | ~90 primitives (arithmetic, floats, strings, dictionaries, classes, Transcript) |
+| `interp.c` | bytecode interpreter with heap contexts, method cache, `perform:`, `doesNotUnderstand:`, walkbacks, and a priority process scheduler (Semaphore, Delay, yield, preemption by priority) |
+| `prims.c` | ~120 primitives (arithmetic, floats, large integers, strings, dictionaries, classes, time, files, Transcript) |
 | `fileio.c` | chunk ("bang") format file-in / file-out, changes log |
-| `kernel1-3.st` | the class library in Smalltalk (Object, Boolean, Magnitude, Number, Collections, Streams, Blocks, …) |
+| `kernel1-6.st` | the class library in Smalltalk |
 | `tui.c` | raw terminal, cell double-buffer, SGR mouse, key decoding |
 | `widgets.c` | windows, list/text/button panes, pop-up menus, dialogs |
 | `tools.c` | System Browser, Workspace, Transcript, Inspector, system menu |
 
-Deliberate simplifications: no LargeIntegers (overflow goes to Float), no
-Fractions (`1/3` is a Float), no exception handling (`on:do:` just evaluates
-the block; `error:` aborts to the top level with a walkback), no processes,
-no binary image (the kernel sources plus the changes file are the image).
+## The class library
+
+The Smalltalk-80 ("Blue Book") classes, except the graphics ones:
+
+* **Kernel-Objects**: Object (with dependents: `changed`/`update:`), UndefinedObject, Boolean, True, False, LookupKey, Association, Message
+* **Kernel-Classes**: Behavior, ClassDescription, Class, Metaclass, ClassOrganizer
+* **Kernel-Methods**: CompiledMethod, ContextPart, MethodContext, BlockContext, BlockClosure
+* **Kernel-Processes**: Process, ProcessorScheduler (`Processor`), Semaphore, Delay, SharedQueue. Forked processes run cooperatively (`yield`, `wait`, `Delay`) and keep running in the background while the user interface is idle.
+* **Kernel-Magnitudes**: Magnitude, Character, Date, Time
+* **Kernel-Numbers**: Number, Integer, SmallInteger, LargePositiveInteger, LargeNegativeInteger, Fraction, Float, Random. Arithmetic is exact: `1/3` is a Fraction, `100 factorial` is a LargePositiveInteger, and mixed operands coerce by generality.
+* **Collections**: Collection, Bag, Set, IdentitySet, Dictionary, IdentityDictionary, SystemDictionary (`Smalltalk`), SequenceableCollection, LinkedList, Link, Interval, ArrayedCollection, Array, ByteArray, String, Symbol, Text, RunArray, OrderedCollection, SortedCollection, MappedCollection. Sets and Dictionaries honour user-defined `=` and `hash`.
+* **Streams**: Stream, PositionableStream, ReadStream, WriteStream, ReadWriteStream, FileStream (whole-file read on open, write on `close`)
+* **Graphics-Primitives**: Point and Rectangle (the arithmetic parts only)
+* **System**: SystemDictionary, Compiler (evaluate:), TranscriptStream, Exception/Error (minimal: `signal:` reports an error)
+
+Deliberate simplifications: no exception handling beyond `error:` aborting to a
+walkback (`on:do:` just evaluates the block), no `become:`, no class-side
+instance variables, bit operations are not defined on negative LargeIntegers,
+and there is no binary image (the kernel sources plus the changes file are the image).
 
 ## Testing the UI without a terminal
 

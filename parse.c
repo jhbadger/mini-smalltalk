@@ -37,7 +37,7 @@ static oop parse_literal_array(P *p) {
         if (at(p, T_EOF)) fail(p, "unterminated literal array");
         Token *t = cur(p); oop v = NULL; int consumed = 0;
         switch (t->type) {
-        case T_INT: v = MK_INT(t->ival); break;
+        case T_INT: v = t->big ? bn_from_string(t->text, t->radix) : MK_INT(t->ival); break;
         case T_FLOAT: v = new_float(t->fval); break;
         case T_STRING: v = new_string(t->text); break;
         case T_SYMBOL: v = new_symbol(t->text); break;
@@ -81,7 +81,7 @@ static Node *parse_primary(P *p) {
     Token *t = cur(p); Node *n;
     switch (t->type) {
     case T_IDENT: n = node(p, N_VAR); n->name = strdup(t->text); advance(p); return n;
-    case T_INT: n = node(p, N_LIT); n->lit = MK_INT(t->ival); advance(p); return n;
+    case T_INT: n = node(p, N_LIT); n->lit = t->big ? bn_from_string(t->text, t->radix) : MK_INT(t->ival); advance(p); return n;
     case T_FLOAT: n = node(p, N_LIT); n->lit = new_float(t->fval); advance(p); return n;
     case T_STRING: n = node(p, N_LIT); n->lit = new_string(t->text); advance(p); return n;
     case T_SYMBOL: n = node(p, N_LIT); n->lit = new_symbol(t->text); advance(p); return n;
@@ -100,7 +100,7 @@ static Node *parse_primary(P *p) {
     case T_BINARY:
         if (!strcmp(t->text, "-") && (peek(p, 1)->type == T_INT || peek(p, 1)->type == T_FLOAT)) {
             advance(p); t = cur(p); n = node(p, N_LIT);
-            n->lit = t->type == T_INT ? MK_INT(-t->ival) : new_float(-t->fval); advance(p); return n;
+            n->lit = t->type == T_INT ? (t->big ? bn_negate(bn_from_string(t->text, t->radix)) : MK_INT(-t->ival)) : new_float(-t->fval); advance(p); return n;
         }
         fail(p, "unexpected binary selector");
     default: { char b[128]; snprintf(b, sizeof b, "unexpected %s", lex_name(t->type)); fail(p, b); }

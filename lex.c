@@ -10,7 +10,7 @@ static void push(TokList *l, Token t) {
     l->toks[l->n++] = t;
 }
 static Token mk(enum TokType ty, const char *s, int n, int pos) {
-    Token t = { ty, NULL, pos, 0, 0 }; t.text = malloc(n + 1); memcpy(t.text, s, n); t.text[n] = 0; return t;
+    Token t = { ty, NULL, pos, 0, 0, 0, 10 }; t.text = malloc(n + 1); memcpy(t.text, s, n); t.text[n] = 0; return t;
 }
 static int isbin(int c) { return c && strchr("+-*/\\<>=~@%&?,|", c) != NULL; }
 
@@ -22,31 +22,33 @@ const char *lex_name(enum TokType t) {
 
 /* parse number starting at s; returns chars consumed, fills t */
 static int lex_number(const char *s, Token *t, int pos) {
-    const char *p = s; int radix = 10;
+    const char *p = s; int radix = 10; int big = 0;
     while (isdigit(*p)) p++;
     if (*p == 'r' && isalnum(p[1])) { radix = atoi(s); p++; } else p = s;
+    const char *digits = p;
     intptr_t v = 0; int isfloat = 0; double fv = 0;
     for (;;) {
         int c = *p, d;
         if (isdigit(c)) d = c - '0'; else if (isupper(c)) d = c - 'A' + 10; else break;
         if (d >= radix) break;
+        if (v > (((intptr_t)1 << 61) - 1 - d) / radix) big = 1;   /* overflows a SmallInteger: parser builds a LargeInteger from the text */
         v = v * radix + d; p++;
     }
     if (radix == 10 && *p == '.' && isdigit(p[1])) {
-        isfloat = 1; fv = (double)v; double scale = 0.1; p++;
-        while (isdigit(*p)) { fv += (*p - '0') * scale; scale /= 10; p++; }
+        isfloat = 1; p++;
+        while (isdigit(*p)) p++;
     }
     if (radix == 10 && *p == 'e' && (isdigit(p[1]) || (p[1] == '-' && isdigit(p[2])))) {
-        p++; int neg = 0; if (*p == '-') { neg = 1; p++; }
+        const char *e0 = p; p++; int neg = 0; if (*p == '-') { neg = 1; p++; }
         int e = 0; while (isdigit(*p)) e = e * 10 + (*p++ - '0');
-        if (neg) { isfloat = 1; if (!fv) fv = (double)v; fv *= pow(10, -e); }
-        else {
-            double r = (isfloat ? fv : (double)v) * pow(10, e);
-            if (isfloat || r > 1e17) { isfloat = 1; fv = r; } else v = (intptr_t)r;
-        }
+        if (neg) isfloat = 1;
+        else if (!isfloat) { double r = (double)v * pow(10, e); if (big || r > 1e17) isfloat = 1; else v = (intptr_t)r; }
+        (void)e0;
     }
+    if (isfloat) { char buf[128]; int n = (int)(p - s); if (n > 127) n = 127; memcpy(buf, s, n); buf[n] = 0; fv = strtod(buf, NULL); big = 0; }
     *t = mk(isfloat ? T_FLOAT : T_INT, s, (int)(p - s), pos);
-    t->ival = v; t->fval = fv;
+    t->ival = v; t->fval = fv; t->big = big; t->radix = radix;
+    if (big) { free(t->text); int n = (int)(p - digits); t->text = malloc(n + 1); memcpy(t->text, digits, n); t->text[n] = 0; }
     return (int)(p - s);
 }
 

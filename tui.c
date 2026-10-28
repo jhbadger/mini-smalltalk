@@ -132,7 +132,9 @@ void tui_flush(void) {
         *f = *b; lx = x + tui_cell_width(b->ch); ly = y;
         if (tui_cell_width(b->ch) == 2 && x + 1 < tui_cols) { front[y * tui_cols + x + 1] = back[y * tui_cols + x + 1]; x++; }
     }
-    if (cur_x >= 0 && cur_y >= 0) { char m[32]; snprintf(m, sizeof m, "\x1b[%d;%dH\x1b[?25h", cur_y + 1, cur_x + 1); outs(m); }
+    /* the terminal's own (blinking) cursor stays hidden: the screen draws a steady block cursor itself;
+       we still park it at the insertion point so screen readers and copy tools can find it */
+    if (cur_x >= 0 && cur_y >= 0) { char m[32]; snprintf(m, sizeof m, "\x1b[%d;%dH", cur_y + 1, cur_x + 1); outs(m); }
     if (!headless) write(STDOUT_FILENO, obuf, olen);
 }
 
