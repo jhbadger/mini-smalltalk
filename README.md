@@ -13,6 +13,13 @@ make check      # headless VM test-suite
 ./st -e '3 + 4' # evaluate expressions without the UI
 ```
 
+The kernel sources (`kernel1.st` … `kernel6.st`) are loaded from the directory
+containing the `st` executable, so you can put that directory on your `PATH`
+(or symlink `st` into one) and run it from anywhere. The changes file
+(`changes.st`, or the file named with `-c`) and any `-f` files are taken
+relative to the directory you run it from, so each project gets its own
+changes. `-k dir` overrides where the kernel is looked for.
+
 ## Using it
 
 * **Mouse**: left click selects / positions the cursor, drag selects text,

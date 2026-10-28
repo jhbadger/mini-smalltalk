@@ -6,12 +6,36 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <limits.h>
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
 extern oop pending_inspect;
 extern bool quit_requested;
 
+/* directory containing the running executable (symlinks resolved); falls back to argv[0]'s directory, then "." */
+static void executable_dir(const char *argv0, char *out, size_t outlen) {
+    char path[PATH_MAX] = "";
+#ifdef __APPLE__
+    uint32_t n = sizeof path;
+    if (_NSGetExecutablePath(path, &n) != 0) path[0] = 0;
+#else
+    ssize_t n = readlink("/proc/self/exe", path, sizeof path - 1);
+    if (n > 0) path[n] = 0; else path[0] = 0;
+#endif
+    if (!path[0]) snprintf(path, sizeof path, "%s", argv0);
+    char real[PATH_MAX];
+    if (realpath(path, real)) snprintf(path, sizeof path, "%s", real);
+    char *slash = strrchr(path, '/');
+    if (slash) { *slash = 0; snprintf(out, outlen, "%s", path[0] ? path : "/"); }
+    else snprintf(out, outlen, ".");
+}
+
 static void usage(void) {
     fprintf(stderr, "usage: st [-e 'expression'] [-f file.st] [-c changes.st] [-k kerneldir]\n"
+                    "  kernel sources are read from the executable's directory unless -k is given;\n"
+                    "  the changes file and -f files are relative to the current directory.\n"
                     "  with no -e, starts the interactive TUI environment\n");
     exit(1);
 }
@@ -23,7 +47,7 @@ static void show_background_error(void) {
 }
 
 int main(int argc, char **argv) {
-    const char *kdir = "."; const char **evals = NULL; int nevals = 0; const char **files = NULL; int nfiles = 0;
+    const char *kdir = NULL; const char **evals = NULL; int nevals = 0; const char **files = NULL; int nfiles = 0;
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-e") && i + 1 < argc) { evals = realloc(evals, (nevals + 1) * sizeof(char *)); evals[nevals++] = argv[++i]; }
         else if (!strcmp(argv[i], "-f") && i + 1 < argc) { files = realloc(files, (nfiles + 1) * sizeof(char *)); files[nfiles++] = argv[++i]; }
@@ -31,12 +55,17 @@ int main(int argc, char **argv) {
         else if (!strcmp(argv[i], "-k") && i + 1 < argc) kdir = argv[++i];
         else usage();
     }
+    char exedir[PATH_MAX]; executable_dir(argv[0], exedir, sizeof exedir);
     st_init();
     gc_add_root(&pending_inspect);
     char err[512];
+    if (!kdir) {   /* default: next to the executable, else the current directory */
+        char probe[PATH_MAX + 32]; snprintf(probe, sizeof probe, "%s/kernel1.st", exedir);
+        kdir = access(probe, R_OK) == 0 ? exedir : ".";
+    }
     if (!load_kernel(kdir, err, sizeof err)) {
         fprintf(stderr, "%s\n", err);
-        if (!strncmp(err, "cannot open", 11)) { fprintf(stderr, "kernel sources not found; use -k to point at the source directory\n"); return 1; }
+        if (!strncmp(err, "cannot open", 11)) { fprintf(stderr, "kernel sources (kernel1.st ...) not found in %s; use -k to point at the source directory\n", kdir); return 1; }
     }
     if (access(changes_path, R_OK) == 0 && !file_in(changes_path, err, sizeof err)) fprintf(stderr, "%s: %s\n", changes_path, err);
     for (int i = 0; i < nfiles; i++) if (!file_in(files[i], err, sizeof err)) fprintf(stderr, "%s: %s\n", files[i], err);
