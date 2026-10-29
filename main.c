@@ -83,6 +83,7 @@ int main(int argc, char **argv) {
     }
     bool headless = getenv("ST_HEADLESS") != NULL;
     if (!headless && !isatty(STDIN_FILENO)) { fprintf(stderr, "st: stdin is not a terminal; use -e to evaluate expressions\n"); return 1; }
+    changes_logging = true;   /* from here on every class, method and removal is appended to the changes file */
     tui_init();
     tools_system_menu_install();
     /* initial desk: browser across the top, workspace bottom-left, transcript bottom-right */
@@ -101,7 +102,8 @@ int main(int argc, char **argv) {
             continue;
         }
         if (ev.type == EV_KEY && (ev.mods & MOD_CTRL) && ev.key == 'q') {
-            if (dialog_confirm("Quit", "Quit Smalltalk? (changes are already logged to the changes file)")) break; else continue;
+            char qmsg[1200]; snprintf(qmsg, sizeof qmsg, "Quit Smalltalk?  Code changes are saved in %s", changes_abs_path());
+            if (dialog_confirm("Quit", qmsg)) break; else continue;
         }
         ui_handle(&ev);
         tools_after_eval();

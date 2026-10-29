@@ -286,6 +286,31 @@ int main(int argc, char **argv) {
     check("Tutorial goOn: 99. Tutorial lessonNumber", "27");
     check("Tutorial lessonSelectors asSet size", "27");
     check("Tutorial tutorial size", "27");
+    /* ---- the changes file: every route that changes code is logged, and replays ---- */
+    {
+        changes_path = "test_changes.st"; remove(changes_path);
+        changes_logging = true; int before = changes_count;
+        check("Object subclass: #Logged instanceVariableNames: 'a' classVariableNames: '' category: 'T'. Logged compile: 'a ^a ifNil: [7]' classified: 'x'. Logged new a", "7");
+        check("Logged class compile: 'make ^self new' classified: 'y'. Logged make a", "7");
+        check("Logged compile: 'gone ^1' classified: 'x'. Logged removeSelector: #gone. Logged includesSelector: #gone", "false");
+        check("Smalltalk fileInString: '!Logged methodsFor: ''z''!\nb ^self a + 1! !'. Logged new b", "8");
+        changes_logging = false;
+        int logged = changes_count - before;
+        printf("%s  changes logged: %d (expected 6: class, 2 compiles, 1 compile+1 removal, file-in method)\n", logged == 6 ? "ok  " : "FAIL", logged);
+        if (logged != 6) failures++;
+        FILE *f = fopen(changes_path, "rb"); char buf[4096] = ""; size_t got = f ? fread(buf, 1, sizeof buf - 1, f) : 0; buf[got] = 0; if (f) fclose(f);
+        const char *want[] = { "Object subclass: #Logged", "instanceVariableNames: 'a'", "!Logged methodsFor: 'x'!\na ^a ifNil: [7]! !", "!Logged class methodsFor: 'y'!", "Logged removeSelector: #gone!", "!Logged methodsFor: 'z'!", "b ^self a + 1! !" };
+        for (int i = 0; i < 6; i++) { int ok = strstr(buf, want[i]) != NULL; printf("%s  changes file contains: %s\n", ok ? "ok  " : "FAIL", want[i]); if (!ok) failures++; }
+        /* with logging off (kernel load, -e scripts) nothing is written */
+        int c0 = changes_count; check("Object subclass: #NotLogged instanceVariableNames: '' classVariableNames: '' category: 'T'. 1", "1");
+        printf("%s  nothing logged while logging is off\n", changes_count == c0 ? "ok  " : "FAIL"); if (changes_count != c0) failures++;
+        /* an unwritable changes file is reported, not silently ignored */
+        changes_path = "/nonexistent-dir/changes.st"; changes_logging = true; int f0 = changes_failures;
+        check("Object subclass: #Lost instanceVariableNames: '' classVariableNames: '' category: 'T'. 2", "2");
+        changes_logging = false;
+        printf("%s  failed write is counted (%d)\n", changes_failures > f0 ? "ok  " : "FAIL", changes_failures - f0); if (changes_failures <= f0) failures++;
+        remove("test_changes.st");
+    }
     printf("\n%d failures\n", failures);
     printf("Transcript:\n%s", transcript_text ? transcript_text : "");
     return failures ? 1 : 0;

@@ -161,7 +161,15 @@ bool file_in(const char *path, char *err, int errlen);
 bool file_in_string(const char *src, char *err, int errlen);
 bool load_kernel(const char *dir, char *err, int errlen);   /* files kernel1.st, kernel2.st, ... in order */
 char *file_out_class(oop cls);          /* malloc'd chunk-format text */
-void changes_log(const char *text);     /* append chunk text to changes file */
+/* the changes file: all code changes are appended here while changes_logging is on (interactive use) */
+extern bool changes_logging;
+extern int changes_count, changes_failures;    /* chunks written / write attempts that failed */
 extern const char *changes_path;
+const char *changes_abs_path(void);
+bool changes_log(const char *text);
+void changes_log_method(oop cls, const char *category, const char *src);
+void changes_log_class(oop super, const char *name, const char *ivars, const char *cvars, const char *category, int kind);
+void changes_log_remove_method(oop cls, oop selector);
+void changes_log_comment(oop cls, const char *text);
 
 #endif

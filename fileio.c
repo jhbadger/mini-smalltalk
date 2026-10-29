@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 
 const char *changes_path = "changes.st";
 
@@ -53,7 +54,7 @@ bool file_in_string(const char *src, char *err, int errlen) {
                 if (c != nilobj && !IS_INT(c)) {
                     char e[512]; oop cm = compile_method(c, m, cat, e, sizeof e);
                     if (!cm) { if (!err[0]) snprintf(err, errlen, "line %d: %s", lineno, e); ok = false; }
-                    else dict_at_put(SLOT(c, C_METHODS), SLOT(cm, M_SELECTOR), cm);
+                    else { dict_at_put(SLOT(c, C_METHODS), SLOT(cm, M_SELECTOR), cm); changes_log_method(c, cat, m); }
                 }
                 free(m);
             }
@@ -150,7 +151,65 @@ char *file_out_class(oop cls) {
     return b.s ? b.s : strdup("");
 }
 
-void changes_log(const char *text) {
-    FILE *f = fopen(changes_path, "ab"); if (!f) return;
-    fputs(text, f); fputs("\n", f); fclose(f);
+/* ---- the changes file: every code change is appended in chunk format, replayed at the next start ---- */
+bool changes_logging = false;      /* off while the kernel, the changes file and -f files load; on for interactive use */
+int changes_count = 0, changes_failures = 0;
+static char abs_path[4096];
+
+const char *changes_abs_path(void) {
+    if (changes_path[0] == '/') snprintf(abs_path, sizeof abs_path, "%s", changes_path);
+    else { char cwd[2048]; if (!getcwd(cwd, sizeof cwd)) strcpy(cwd, "."); snprintf(abs_path, sizeof abs_path, "%s/%s", cwd, changes_path); }
+    return abs_path;
+}
+
+bool changes_log(const char *text) {
+    FILE *f = fopen(changes_path, "ab");
+    if (!f) { changes_failures++; return false; }
+    bool ok = fputs(text, f) >= 0 && fputs("\n", f) >= 0;
+    if (fclose(f) != 0) ok = false;
+    if (ok) changes_count++; else changes_failures++;
+    return ok;
+}
+
+/* append s to out, doubling every ! (chunk escape) and, when quote is set, every ' as well */
+static void esc_into(Buf *out, const char *s, bool quote) {
+    for (; *s; s++) { char t[3] = { *s, 0, 0 }; if (*s == '!' || (quote && *s == '\'')) t[1] = *s; badd(out, t); }
+}
+
+void changes_log_method(oop cls, const char *category, const char *src) {
+    if (!changes_logging) return;
+    bool meta = cls->cls == classMetaclass;
+    char *cn = str_cstr(class_name_of(meta ? SLOT(cls, MC_THISCLASS) : cls));
+    Buf b = { 0, 0, 0 };
+    badd(&b, "!"); badd(&b, cn); badd(&b, meta ? " class" : ""); badd(&b, " methodsFor: '"); esc_into(&b, category ? category : "as yet unclassified", true); badd(&b, "'!\n");
+    esc_into(&b, src, false); badd(&b, "! !\n");
+    changes_log(b.s); free(b.s); free(cn);
+}
+
+void changes_log_class(oop super, const char *name, const char *ivars, const char *cvars, const char *category, int kind) {
+    if (!changes_logging) return;
+    char *sn = super == nilobj ? strdup("nil") : str_cstr(SLOT(super, C_NAME));
+    Buf b = { 0, 0, 0 };
+    badd(&b, sn); badd(&b, kind == KIND_BYTES ? " variableByteSubclass: #" : kind == KIND_INDEXED ? " variableSubclass: #" : " subclass: #"); badd(&b, name);
+    badd(&b, "\n\tinstanceVariableNames: '"); esc_into(&b, ivars, true);
+    badd(&b, "'\n\tclassVariableNames: '"); esc_into(&b, cvars, true);
+    badd(&b, "'\n\tcategory: '"); esc_into(&b, category ? category : "", true); badd(&b, "'!\n");
+    changes_log(b.s); free(b.s); free(sn);
+}
+
+void changes_log_remove_method(oop cls, oop selector) {
+    if (!changes_logging) return;
+    bool meta = cls->cls == classMetaclass;
+    char *cn = str_cstr(class_name_of(meta ? SLOT(cls, MC_THISCLASS) : cls)); char *sel = str_cstr(selector);
+    Buf b = { 0, 0, 0 };
+    badd(&b, cn); badd(&b, meta ? " class" : ""); badd(&b, " removeSelector: #"); badd(&b, sel); badd(&b, "!\n");
+    changes_log(b.s); free(b.s); free(cn); free(sel);
+}
+
+void changes_log_comment(oop cls, const char *text) {
+    if (!changes_logging) return;
+    char *cn = str_cstr(SLOT(cls, C_NAME));
+    Buf b = { 0, 0, 0 };
+    badd(&b, cn); badd(&b, " comment: '"); esc_into(&b, text, true); badd(&b, "'!\n");
+    changes_log(b.s); free(b.s); free(cn);
 }

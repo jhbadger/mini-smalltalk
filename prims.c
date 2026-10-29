@@ -144,12 +144,17 @@ oop call_primitive(int n, oop *args, int nargs, bool *ok) {
     case 95: { oop a = dict_assoc_at(self, A(1)); if (!a) FAIL; return a; }
     /* ---- classes and system ---- */
     case 100: { if (IS_INT(A(1)) || A(1)->cls != classSymbol || !is_bytes(A(2)) || !is_bytes(A(3)) || !IS_INT(A(5))) FAIL;
-        oop c = define_class(self, A(1), A(2), A(3), A(4), (int)INT_VAL(A(5))); interp_flush_cache(); return c; }
+        oop c = define_class(self, A(1), A(2), A(3), A(4), (int)INT_VAL(A(5))); interp_flush_cache();
+        if (changes_logging) { char *nm = str_cstr(A(1)), *iv = str_cstr(A(2)), *cv = str_cstr(A(3)), *ct = is_bytes(A(4)) ? str_cstr(A(4)) : NULL;
+            changes_log_class(self, nm, iv, cv, ct, (int)INT_VAL(A(5))); free(nm); free(iv); free(cv); free(ct); }
+        return c; }
     case 101: { if (IS_INT(self) || !is_bytes(A(1))) FAIL; char err[512]; char *src = str_cstr(A(1)); char *cat = is_bytes(A(2)) ? str_cstr(A(2)) : strdup("as yet unclassified");
-        oop m = compile_method(self, src, cat, err, sizeof err); free(src); free(cat);
-        if (!m) { interp_signal_error(err); return nilobj; }
-        dict_at_put(SLOT(self, C_METHODS), SLOT(m, M_SELECTOR), m); interp_flush_cache(); return SLOT(m, M_SELECTOR); }
-    case 102: if (IS_INT(self)) FAIL; if (!dict_remove(SLOT(self, C_METHODS), A(1))) FAIL; interp_flush_cache(); return A(1);
+        oop m = compile_method(self, src, cat, err, sizeof err);
+        if (!m) { free(src); free(cat); interp_signal_error(err); return nilobj; }
+        dict_at_put(SLOT(self, C_METHODS), SLOT(m, M_SELECTOR), m); interp_flush_cache();
+        changes_log_method(self, cat, src); free(src); free(cat);
+        return SLOT(m, M_SELECTOR); }
+    case 102: if (IS_INT(self)) FAIL; if (!dict_remove(SLOT(self, C_METHODS), A(1))) FAIL; interp_flush_cache(); changes_log_remove_method(self, A(1)); return A(1);
     case 103: if (IS_INT(self)) FAIL; return dict_keys(SLOT(self, C_METHODS));
     case 104: { if (IS_INT(self)) FAIL; oop m = dict_at(SLOT(self, C_METHODS), A(1)); if (!m) FAIL; return m; }
     case 105: if (IS_INT(self)) FAIL; return class_ivar_names(self);

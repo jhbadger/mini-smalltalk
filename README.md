@@ -47,9 +47,16 @@ changes. `-k dir` overrides where the kernel is looked for.
 * **Workspace / Inspector**: evaluate code with the menu or shortcuts.
   In an Inspector, `self` is the inspected object and its instance
   variables are visible by name.
-* Everything you accept in the browser (and class definitions, removals,
-  comments) is appended to `changes.st`, which is filed in again at start-up,
-  so your work persists between sessions. `-c file` picks another changes file.
+* Every change to the code is saved automatically, with nothing to "save": new
+  classes and methods (from the browser, from a workspace, from `compile:`),
+  method and class removals, class comments, and anything you file in. Each is
+  appended to `changes.st` in the directory you started from, and replayed at the
+  next start, so your work persists between sessions. The status bar shows
+  `saved to <path>` after each change; if the file cannot be written (for
+  example a read-only directory) a warning window says so immediately. `-c file`
+  picks another changes file. What is *not* saved: workspace text, window
+  positions and variables; use *file out* in the browser to export a class or
+  category as a `.st` file. Scripted `-e` runs do not write the changes file.
 
 ## Implementation notes
 

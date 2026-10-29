@@ -107,7 +107,10 @@ static void open_tutorial(void) {
     char err[512];
     if (!class_named("Tutorial")) {
         char path[1024]; snprintf(path, sizeof path, "%s/tutorial.st", kernel_dir ? kernel_dir : ".");
-        if (!file_in(path, err, sizeof err)) { dialog_text("Tutorial", err); return; }
+        bool saved = changes_logging; changes_logging = false;     /* the tutorial is part of the system, not the user's changes */
+        bool ok = file_in(path, err, sizeof err);
+        changes_logging = saved;
+        if (!ok) { dialog_text("Tutorial", err); return; }
     }
     bool ok; evaluate("Tutorial go", nilobj, &ok);
 }
@@ -262,12 +265,6 @@ static void side_click(Pane *p) {
     Browser *b = p->win->user; b->meta = !b->meta; snprintf(p->label, sizeof p->label, "%s", b->meta ? "[class]" : "[instance]");
     b->proto[0] = b->sel[0] = 0; if (b->cls[0]) b->mode = 1; br_fill_protos(b); br_fill_sels(b); br_show_code(b); br_set_title(b, p->win);
 }
-static void log_method(oop cls, const char *proto, const char *src) {
-    char *cn = str_cstr(class_name_of(cls->cls == classMetaclass ? SLOT(cls, MC_THISCLASS) : cls));
-    size_t n = strlen(src); char *esc = malloc(n * 2 + 1); char *o = esc; for (const char *s = src; *s; s++) { *o++ = *s; if (*s == '!') *o++ = '!'; } *o = 0;
-    char *buf = malloc(n * 2 + 512); sprintf(buf, "!%s%s methodsFor: '%s'!\n%s! !\n", cn, cls->cls == classMetaclass ? " class" : "", proto, esc);
-    changes_log(buf); free(buf); free(esc); free(cn);
-}
 static void br_accept(Browser *b, Window *w) {
     char *src = text_get(b->code); oop c = browser_class(b); char err[512];
     if (b->mode == 2 && c) {
@@ -276,20 +273,16 @@ static void br_accept(Browser *b, Window *w) {
         if (!m) { ui_status("Compile error: %s", err); dialog_text("Compile error", err); free(src); return; }
         dict_at_put(SLOT(c, C_METHODS), SLOT(m, M_SELECTOR), m); extern void interp_flush_cache(void); interp_flush_cache();
         char *sel = str_cstr(SLOT(m, M_SELECTOR)); snprintf(b->sel, sizeof b->sel, "%s", sel); free(sel);
-        log_method(c, proto, src); b->code->dirty = false;
+        changes_log_method(c, proto, src); b->code->dirty = false;
         br_fill_protos(b); list_select(b->protos, list_find(b->protos, b->proto[0] ? b->proto : proto), false); if (!b->proto[0]) snprintf(b->proto, sizeof b->proto, "%s", proto);
         br_fill_sels(b); list_select(b->sels, list_find(b->sels, b->sel), false); br_set_title(b, w); ui_status("accepted %s", b->sel);
     } else if (b->mode == 3 && c) {
         oop real = c->cls == classMetaclass ? SLOT(c, MC_THISCLASS) : c; SLOT(real, C_COMMENT) = new_string(src);
-        char *cn = str_cstr(SLOT(real, C_NAME)); size_t n = strlen(src); char *esc = malloc(n * 2 + 1); char *o = esc;
-        for (const char *s = src; *s; s++) { if (*s == '\'') *o++ = '\''; if (*s == '!') *o++ = '!'; *o++ = *s; } *o = 0;
-        char *buf = malloc(n * 2 + 256); sprintf(buf, "%s comment: '%s'!\n", cn, esc); changes_log(buf); free(buf); free(esc); free(cn);
+        changes_log_comment(real, src);
         b->code->dirty = false; ui_status("comment accepted");
-    } else {   /* class definition */
+    } else {   /* class definition: evaluating it goes through the class-creation primitive, which logs it */
         bool ok; evaluate(src, nilobj, &ok);
         if (ok) {
-            size_t n = strlen(src); char *esc = malloc(n * 2 + 1); char *o = esc; for (const char *s = src; *s; s++) { *o++ = *s; if (*s == '!') *o++ = '!'; } *o = 0;
-            char *buf = malloc(n * 2 + 16); sprintf(buf, "%s!\n", esc); changes_log(buf); free(buf); free(esc);
             /* find the class name from the source: token after '#' */
             const char *h = strchr(src, '#'); char name[128] = ""; if (h) { int k = 0; h++; while (*h && k < 127 && ((*h >= 'a' && *h <= 'z') || (*h >= 'A' && *h <= 'Z') || (*h >= '0' && *h <= '9') || *h == '_')) name[k++] = *h++; name[k] = 0; }
             oop nc = class_named(name);
@@ -361,7 +354,7 @@ static void class_menu_cb(Pane *p, int i) {
     else if (i == 1) { b->mode = 3; b->sel[0] = 0; br_show_code(b); }
     else if (i == 3) { char fname[256]; snprintf(fname, sizeof fname, "%s.st", b->cls); FILE *f = fopen(fname, "wb"); if (f) { char *t = file_out_class(c); fputs(t, f); free(t); fclose(f); ui_status("filed out to %s", fname); } else ui_status("cannot write %s", fname); }
     else if (i == 4) { char msg[200]; snprintf(msg, sizeof msg, "Remove class %s from the system?", b->cls);
-        if (dialog_confirm("Remove class", msg)) { dict_remove(smalltalk, new_symbol(b->cls)); char buf[256]; snprintf(buf, sizeof buf, "Smalltalk removeKey: #%s!\n", b->cls); changes_log(buf); b->cls[0] = b->proto[0] = b->sel[0] = 0; b->mode = 0; browsers_refresh(); br_show_code(b); br_set_title(b, p->win); } }
+        if (dialog_confirm("Remove class", msg)) { dict_remove(smalltalk, new_symbol(b->cls)); if (changes_logging) { char buf[256]; snprintf(buf, sizeof buf, "Smalltalk removeKey: #%s!\n", b->cls); changes_log(buf); } b->cls[0] = b->proto[0] = b->sel[0] = 0; b->mode = 0; browsers_refresh(); br_show_code(b); br_set_title(b, p->win); } }
 }
 static const char *proto_menu[] = { "add protocol", "remove protocol" };
 static void proto_menu_cb(Pane *p, int i) {
@@ -375,7 +368,7 @@ static void sel_menu_cb(Pane *p, int i) {
     if (i == 0) find_methods(b->sel, true); else if (i == 1) find_methods(b->sel, false);
     else if (i == 3) { char msg[300]; snprintf(msg, sizeof msg, "Remove %s>>%s?", b->cls, b->sel);
         if (dialog_confirm("Remove method", msg)) { oop c = browser_class(b); if (c) { dict_remove(SLOT(c, C_METHODS), new_symbol(b->sel)); extern void interp_flush_cache(void); interp_flush_cache();
-            char buf[512]; snprintf(buf, sizeof buf, "%s%s removeSelector: #%s!\n", b->cls, b->meta ? " class" : "", b->sel); changes_log(buf); }
+            changes_log_remove_method(c, new_symbol(b->sel)); }
             b->sel[0] = 0; br_fill_protos(b); br_fill_sels(b); br_show_code(b); br_set_title(b, p->win); } }
 }
 static void br_close(Window *w) { free(w->user); }
@@ -411,6 +404,16 @@ void tools_system_menu_install(void) { ui_set_desktop_menu(sys_menu, 10, sys_men
 
 void tools_after_eval(void) {
     transcripts_refresh();
+    static int seen_count = 0, seen_failures = 0;
+    if (changes_failures > seen_failures) {
+        seen_failures = changes_failures;
+        char msg[1200]; snprintf(msg, sizeof msg, "WARNING: your changes could NOT be saved.\n\nCannot write the changes file:\n  %s\n\nThey exist only in this session and will be lost when you quit.\nQuit, change to a directory you can write to (or start with -c file), and redo them.", changes_abs_path());
+        ui_status("WARNING: cannot write %s -- changes will be lost on quit", changes_abs_path());
+        dialog_text("Changes not saved", msg);
+    } else if (changes_count > seen_count) {
+        seen_count = changes_count;
+        ui_status("saved to %s  (%d change%s this session)", changes_abs_path(), changes_count, changes_count == 1 ? "" : "s");
+    }
     if (pending_inspect) { oop o = pending_inspect; pending_inspect = NULL; open_inspector(o); }
     if (pending_window_text) { show_lesson_window(pending_window_title, pending_window_text); free(pending_window_title); free(pending_window_text); pending_window_title = pending_window_text = NULL; }
     static size_t last_classes = 0; size_t n = INT_VAL(SLOT(smalltalk, D_TALLY));
