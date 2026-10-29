@@ -9,6 +9,7 @@
 
 char *transcript_text = NULL; size_t transcript_len = 0; static size_t transcript_cap = 0;
 oop pending_inspect = NULL; bool quit_requested = false;
+char *pending_window_title = NULL, *pending_window_text = NULL;   /* set by primitive 180, consumed by the UI */
 void interp_flush_cache(void);
 
 void transcript_append(const char *s, int n) {
@@ -197,6 +198,10 @@ oop call_primitive(int n, oop *args, int nargs, bool *ok) {
         if (!f) return falseobj; fwrite(BYTES(A(1)), 1, A(1)->size, f); fclose(f); return trueobj; }
     case 172: { if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); int r = remove(p); free(p); return r == 0 ? trueobj : falseobj; }
     case 173: { if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); FILE *f = fopen(p, "rb"); free(p); if (f) fclose(f); return f ? trueobj : falseobj; }
+    case 180: { /* openWindowNamed: title contents: text -- shown by the UI (or printed when there is none) */
+        if (!is_bytes(A(1)) || !is_bytes(A(2))) FAIL;
+        free(pending_window_title); free(pending_window_text);
+        pending_window_title = str_cstr(A(1)); pending_window_text = str_cstr(A(2)); return self; }
     }
     FAIL;
 }

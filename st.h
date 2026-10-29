@@ -154,6 +154,7 @@ oop call_primitive(int n, oop *args, int nargs, bool *ok); /* args[0] is receive
 void transcript_append(const char *s, int n);
 extern char *transcript_text;
 extern size_t transcript_len;
+extern char *pending_window_title, *pending_window_text;   /* a window requested by primitive 180 (tutorial lessons) */
 
 /* fileio.c */
 bool file_in(const char *path, char *err, int errlen);

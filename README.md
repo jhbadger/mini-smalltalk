@@ -22,6 +22,12 @@ changes. `-k dir` overrides where the kernel is looked for.
 
 ## Using it
 
+* **Tutorial**: choose *smalltalk tutorial* from the System menu (right-click the
+  desktop), or file in `tutorial.st` and evaluate `Tutorial go`. Twenty-seven
+  short lessons in the style of Pharo's ProfStef open in a live workspace; every
+  example can be evaluated in place. `Tutorial next`, `previous`, `goTo: 7`,
+  `goTo: 'Blocks'` and `contents` move around; the tutorial is itself a Smalltalk
+  class you can browse and extend.
 * **Mouse**: left click selects / positions the cursor, drag selects text,
   double-click selects a word. **Right click** opens the pane's menu
   (the Smalltalk-80 "yellow button"); right click on the desktop opens the

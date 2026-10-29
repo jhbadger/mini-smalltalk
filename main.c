@@ -13,6 +13,7 @@
 
 extern oop pending_inspect;
 extern bool quit_requested;
+const char *kernel_dir = ".";
 
 /* directory containing the running executable (symlinks resolved); falls back to argv[0]'s directory, then "." */
 static void executable_dir(const char *argv0, char *out, size_t outlen) {
@@ -63,6 +64,7 @@ int main(int argc, char **argv) {
         char probe[PATH_MAX + 32]; snprintf(probe, sizeof probe, "%s/kernel1.st", exedir);
         kdir = access(probe, R_OK) == 0 ? exedir : ".";
     }
+    kernel_dir = kdir;
     if (!load_kernel(kdir, err, sizeof err)) {
         fprintf(stderr, "%s\n", err);
         if (!strncmp(err, "cannot open", 11)) { fprintf(stderr, "kernel sources (kernel1.st ...) not found in %s; use -k to point at the source directory\n", kdir); return 1; }
@@ -74,6 +76,7 @@ int main(int argc, char **argv) {
             oop r = interp_eval(nilobj, evals[i], err, sizeof err);
             if (interp.failed) { printf("Error: %s\n%s", interp.error, interp.walkback); interp.failed = false; }
             else { char *s = str_cstr(interp_print_string(r)); printf("%s\n", s); free(s); }
+            if (pending_window_text) { printf("---- %s ----\n%s\n", pending_window_title, pending_window_text); free(pending_window_title); free(pending_window_text); pending_window_title = pending_window_text = NULL; }
         }
         if (transcript_len) fputs(transcript_text, stdout);
         return 0;

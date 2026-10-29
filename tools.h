@@ -10,4 +10,5 @@ void open_inspector(oop obj);
 void tools_after_eval(void);          /* refresh transcript windows, open pending inspectors, update browsers */
 void tools_system_menu_install(void);
 extern bool ui_quit;
+extern const char *kernel_dir;        /* where kernel*.st and tutorial.st live */
 #endif

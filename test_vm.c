@@ -276,6 +276,16 @@ int main(int argc, char **argv) {
     check("Process superclass", "Link");
     check("Smalltalk allClasses size > 70", "true");
     check("| o | o := Object new. o addDependent: 3. o dependents size", "1");
+    /* ---- the tutorial ---- */
+    check("Smalltalk fileIn: 'tutorial.st'. Tutorial lessons size", "27");
+    check("Tutorial lessons allSatisfy: [:l | l text size > 100 and: [l title size > 0]]", "true");
+    check("Tutorial reset. Tutorial go title", "'Welcome'");
+    check("Tutorial next title", "'Printing and doing'");
+    check("Tutorial goTo: 'blocks'. Tutorial lessonNumber", "13");
+    check("Tutorial last; previous. Tutorial lesson title", "'Processes'");
+    check("Tutorial goOn: 99. Tutorial lessonNumber", "27");
+    check("Tutorial lessonSelectors asSet size", "27");
+    check("Tutorial tutorial size", "27");
     printf("\n%d failures\n", failures);
     printf("Transcript:\n%s", transcript_text ? transcript_text : "");
     return failures ? 1 : 0;

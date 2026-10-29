@@ -7,7 +7,7 @@
 
 extern oop pending_inspect;
 bool ui_quit = false;
-enum { W_BROWSER = 1, W_WORKSPACE, W_TRANSCRIPT, W_INSPECTOR };
+enum { W_BROWSER = 1, W_WORKSPACE, W_TRANSCRIPT, W_INSPECTOR, W_LESSON };
 static void browsers_refresh(void);
 
 /* ---------- helpers ---------- */
@@ -90,6 +90,26 @@ static void transcripts_refresh(void) {
         Pane *t = windows[i]->panes[0];
         if ((size_t)t->len != transcript_len || (transcript_text && memcmp(t->text, transcript_text, transcript_len))) { text_set(t, transcript_text ? transcript_text : ""); text_scroll_to_end(t); }
     }
+}
+
+/* ---------- lesson window (opened by Smalltalk code through primitive 180, e.g. the Tutorial) ---------- */
+static void show_lesson_window(const char *title, const char *text) {
+    Window *w = NULL;
+    for (int i = 0; i < nwindows; i++) if (windows[i]->kind == W_LESSON) w = windows[i];
+    if (!w) {
+        int ww = tui_cols - 2 < 84 ? tui_cols - 2 : 84, wh = tui_rows - 3;   /* lesson lines are at most 80 columns */
+        w = win_new(title, (tui_cols - ww) / 2, 1, ww, wh); w->kind = W_LESSON; w->layout = single_layout;
+        Pane *t = win_add_text(w, false); t->menu = ws_menu; t->nmenu = 8; t->on_menu = ws_menu_cb; t->on_key = code_key;
+    }
+    win_set_title(w, title); text_set(w->panes[0], text); win_raise(w); w->focus = w->panes[0];
+}
+static void open_tutorial(void) {
+    char err[512];
+    if (!class_named("Tutorial")) {
+        char path[1024]; snprintf(path, sizeof path, "%s/tutorial.st", kernel_dir ? kernel_dir : ".");
+        if (!file_in(path, err, sizeof err)) { dialog_text("Tutorial", err); return; }
+    }
+    bool ok; evaluate("Tutorial go", nilobj, &ok);
 }
 
 /* ---------- Inspector ---------- */
@@ -377,21 +397,22 @@ void open_browser_on(const char *className) {
 }
 
 /* ---------- system menu ---------- */
-static const char *sys_menu[] = { "system browser", "workspace", "system transcript", "-", "file in...", "browse class...", "collect garbage", "-", "quit" };
+static const char *sys_menu[] = { "system browser", "workspace", "system transcript", "smalltalk tutorial", "-", "file in...", "browse class...", "collect garbage", "-", "quit" };
 static void sys_menu_cb(int i) {
     switch (i) {
-    case 0: open_browser(); break; case 1: open_workspace(); break; case 2: open_transcript(); break;
-    case 4: { char *f = dialog_prompt("File in (path to .st file)", ""); if (f && f[0]) { char err[512]; if (file_in(f, err, sizeof err)) ui_status("filed in %s", f); else { ui_status("file in failed: %s", err); dialog_text("File in failed", err); } browsers_refresh(); } free(f); break; }
-    case 5: { char *n = dialog_prompt("Browse class", ""); if (n && n[0]) { if (class_named(n)) open_browser_on(n); else ui_status("no class named %s", n); } free(n); break; }
-    case 6: gc_collect(); ui_status("garbage collected"); break;
-    case 8: if (dialog_confirm("Quit", "Quit Smalltalk?")) ui_quit = true; break;
+    case 0: open_browser(); break; case 1: open_workspace(); break; case 2: open_transcript(); break; case 3: open_tutorial(); break;
+    case 5: { char *f = dialog_prompt("File in (path to .st file)", ""); if (f && f[0]) { char err[512]; if (file_in(f, err, sizeof err)) ui_status("filed in %s", f); else { ui_status("file in failed: %s", err); dialog_text("File in failed", err); } browsers_refresh(); } free(f); break; }
+    case 6: { char *n = dialog_prompt("Browse class", ""); if (n && n[0]) { if (class_named(n)) open_browser_on(n); else ui_status("no class named %s", n); } free(n); break; }
+    case 7: gc_collect(); ui_status("garbage collected"); break;
+    case 9: if (dialog_confirm("Quit", "Quit Smalltalk?")) ui_quit = true; break;
     }
 }
-void tools_system_menu_install(void) { ui_set_desktop_menu(sys_menu, 9, sys_menu_cb); }
+void tools_system_menu_install(void) { ui_set_desktop_menu(sys_menu, 10, sys_menu_cb); }
 
 void tools_after_eval(void) {
     transcripts_refresh();
     if (pending_inspect) { oop o = pending_inspect; pending_inspect = NULL; open_inspector(o); }
+    if (pending_window_text) { show_lesson_window(pending_window_title, pending_window_text); free(pending_window_title); free(pending_window_text); pending_window_title = pending_window_text = NULL; }
     static size_t last_classes = 0; size_t n = INT_VAL(SLOT(smalltalk, D_TALLY));
     if (n != last_classes) { last_classes = n; browsers_refresh(); }
 }
