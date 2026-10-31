@@ -29,7 +29,7 @@ changes. `-k dir` overrides where the kernel is looked for.
   `goTo: 'Blocks'` and `contents` move around; the tutorial is itself a Smalltalk
   class you can browse and extend.
 * **Mouse**: left click selects / positions the cursor, drag selects text,
-  double-click selects a word. **Right click** opens the pane's menu
+  double-click selects a word, triple-click a line. **Right click** opens the pane's menu
   (the Smalltalk-80 "yellow button"); right click on the desktop opens the
   **System menu** (browser, workspace, transcript, file in, quit). Drag a
   window by its title bar, resize with the `╯` corner, close with `[x]`.
@@ -37,8 +37,12 @@ changes. `-k dir` overrides where the kernel is looked for.
 * **Keyboard**: `ctrl-D` do it, `ctrl-P` print it, `ctrl-T` inspect it,
   `ctrl-S` accept (browser), `ctrl-L` cancel, `ctrl-A/C/X/V` select-all/copy/cut/paste,
   `Esc` system menu, `Tab` cycles panes (in a text pane it inserts a tab; Shift-Tab cycles),
-  `ctrl-Q` quits. Arrows with Shift extend the selection. In lists, typing a letter
+  `ctrl-O` opens the focused pane's menu, `ctrl-Q` quits. Arrows with Shift extend the selection. In lists, typing a letter
   jumps to the next matching item.
+* **Touch screens** (e.g. Termux, where a finger swipe scrolls and long-press is
+  Termux's own selection): `ctrl-Space` sets a mark at the cursor, then the next
+  tap selects from the mark to the tapped spot. Double-tap selects a word,
+  triple-tap a line, and `ctrl-O` stands in for the right button.
 * **Browser**: category → class → protocol → selector → source. Select a
   category with no class to get a class-definition template; accept it to
   create the class. Select a protocol with no selector to get a method

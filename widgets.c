@@ -13,7 +13,8 @@ static char *clipboard = NULL;
 static struct { Window *w; int mode; int dx, dy; } drag;   /* mode: 1 move, 2 resize */
 static Pane *drag_pane = NULL;
 static Window *modal = NULL;
-static long last_click_ms = 0; static int last_click_pos = -1;
+static long last_click_ms = 0; static int last_click_pos = -1, click_count = 0;
+static Pane *mark_pane = NULL; static int mark_pos;   /* ctrl-Space mark: the next tap selects from it (touch screens) */
 
 static long now_ms(void) { struct timeval tv; gettimeofday(&tv, NULL); return tv.tv_sec * 1000L + tv.tv_usec / 1000; }
 static bool in_rect(Rect r, int x, int y) { return x >= r.x && y >= r.y && x < r.x + r.w && y < r.y + r.h; }
@@ -36,7 +37,7 @@ void win_close(Window *w) {
     memmove(&windows[i], &windows[i + 1], (nwindows - i - 1) * sizeof(Window *)); nwindows--;
     if (w->on_close) w->on_close(w);
     for (int k = 0; k < w->npanes; k++) pane_free(w->panes[k]);
-    if (drag.w == w) drag.w = NULL; if (drag_pane && drag_pane->win == w) drag_pane = NULL; if (modal == w) modal = NULL;
+    if (drag.w == w) drag.w = NULL; if (drag_pane && drag_pane->win == w) drag_pane = NULL; if (mark_pane && mark_pane->win == w) mark_pane = NULL; if (modal == w) modal = NULL;
     free(w);
 }
 void win_raise(Window *w) {
@@ -204,20 +205,26 @@ static void select_word(Pane *p) {
     if (a == b && b < p->len) b++;
     p->anchor = a; p->cursor = b;
 }
+static void pane_menu(Pane *p, int x, int y) {
+    if (p->menu && p->nmenu) { int i = menu_popup(x, y, p->menu, p->nmenu); if (i >= 0 && p->on_menu) p->on_menu(p, i); }
+}
 static void pane_mouse(Pane *p, Event *ev) {
     Window *w = p->win; w->focus = p;
-    if (ev->type == EV_MOUSE_DOWN && ev->button == BTN_RIGHT) {
-        if (p->menu && p->nmenu) { int i = menu_popup(ev->x, ev->y, p->menu, p->nmenu); if (i >= 0 && p->on_menu) p->on_menu(p, i); }
-        return;
-    }
+    if (ev->type == EV_MOUSE_DOWN && mark_pane && mark_pane != p) mark_pane = NULL;
+    if (ev->type == EV_MOUSE_DOWN && ev->button == BTN_RIGHT) { pane_menu(p, ev->x, ev->y); return; }
     if (p->type == PANE_LIST) {
         if (ev->type == EV_MOUSE_DOWN && ev->button == BTN_LEFT) { int i = p->top + ev->y - p->r.y; if (i < p->nitems) list_select(p, i, true); }
     } else if (p->type == PANE_TEXT) {
         int pos; text_mouse_pos(p, ev->x, ev->y, &pos);
         if (ev->type == EV_MOUSE_DOWN && ev->button == BTN_LEFT) {
             long t = now_ms();
-            if (t - last_click_ms < 400 && pos == last_click_pos) { p->cursor = pos; select_word(p); last_click_ms = 0; }
-            else { p->cursor = pos; p->anchor = pos; drag_pane = p; last_click_ms = t; last_click_pos = pos; }
+            if (mark_pane == p) { p->anchor = mark_pos > p->len ? p->len : mark_pos; p->cursor = pos; mark_pane = NULL; last_click_ms = 0; ui_status(""); }
+            else if (t - last_click_ms < 400 && pos == last_click_pos) {
+                click_count++; last_click_ms = t;
+                if (click_count == 2) { p->cursor = pos; select_word(p); }
+                else { p->anchor = line_start(p, pos); p->cursor = line_end(p, pos); last_click_ms = 0; }
+            }
+            else { p->cursor = pos; p->anchor = pos; drag_pane = p; last_click_ms = t; last_click_pos = pos; click_count = 1; }
             p->prefcol = col_of(p, p->cursor);
         } else if (ev->type == EV_MOUSE_DRAG && drag_pane == p) { p->cursor = pos; text_show_cursor(p); }
         else if (ev->type == EV_MOUSE_UP && drag_pane == p) { if (p->anchor == p->cursor) p->anchor = -1; drag_pane = NULL; }
@@ -237,7 +244,8 @@ static void text_key(Pane *p, Event *ev) {
     if (p->on_key && p->on_key(p, ev)) return;
     int k = ev->key;
     if (ev->mods & MOD_CTRL) {
-        switch (k) { case 'a': text_select_all(p); return; case 'c': text_copy(p); return; case 'x': text_cut(p); return; case 'v': text_paste(p); return;
+        switch (k) { case ' ': mark_pane = p; mark_pos = p->cursor; p->anchor = -1; ui_status("mark set -- tap (or click) to select up to there"); return;
+        case 'a': text_select_all(p); return; case 'c': text_copy(p); return; case 'x': text_cut(p); return; case 'v': text_paste(p); return;
         case 'e': move_cursor(p, ev, line_end(p, p->cursor), false); return; case 'k': if (!p->readonly) { int e = line_end(p, p->cursor); if (e == p->cursor && e < p->len) e++; text_delete_range(p, p->cursor, e); } return; }
         return;
     }
@@ -295,6 +303,7 @@ void ui_handle(Event *ev) {
         }
         if (ev->key == 27 && !modal && desk_cb) { int i = menu_popup(2, 1, desk_menu, ndesk); if (i >= 0) desk_cb(i); return; }
         Pane *p = w->focus; if (!p) return;
+        if (ev->key == 'o' && (ev->mods & MOD_CTRL)) { pane_menu(p, p->r.x, p->r.y); return; }   /* the right-button menu without a right button */
         if (p->type == PANE_TEXT) text_key(p, ev); else if (p->type == PANE_LIST) list_key(p, ev);
         else if (p->type == PANE_BUTTON && (ev->key == 13 || ev->key == ' ') && p->on_click) p->on_click(p);
         return;
