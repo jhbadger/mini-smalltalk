@@ -3,7 +3,7 @@
 This folder holds systems that are **not** part of the standard image. Load one when you want it:
 
 ```smalltalk
-Smalltalk availablePackages            "#('Bio' 'Debugger' 'Prolog' 'SUnit')"
+Smalltalk availablePackages            "#('Bio' 'Debugger' 'Prolog' 'Regex' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'        "files it in (once)"
 Smalltalk isPackageLoaded: 'Prolog'
 Smalltalk packageDescription: 'Prolog' "the first comment of its file"
@@ -62,6 +62,8 @@ Keep tests with the package: both packages have a `tests/tests.txt` of `expressi
   runner window. Write tests as methods beginning with `test` in a subclass of `TestCase`.
 * **[Debugger](Debugger/README.md)** — a window on the stack of an error: frames, source with the failing line
   marked, variables by name, and evaluation in a frame. Loading it is enough; unhandled errors open it by themselves.
+* **[Regex](Regex/README.md)** — regular expressions: the usual pattern language matched by backtracking, with
+  searching, replacing and splitting, and String messages such as `matchesRegex:` and `copyWithRegex:replacedWith:`.
 * **[Bio](Bio/README.md)** — bioinformatics: FASTA, FASTQ and GenBank files, sequence and feature objects, translation with
   the NCBI genetic codes, ORFs, composition and assembly statistics, IUPAC pattern search, k-mers, restriction enzymes,
   Needleman-Wunsch and Smith-Waterman alignment, a sequence browser, and (with Prolog loaded) features as Prolog facts.

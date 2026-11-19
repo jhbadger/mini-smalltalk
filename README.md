@@ -142,18 +142,20 @@ case-insensitive, and an image does not hold processes or windows.
 The `packages/` folder holds optional systems that are not in the standard image. Load one on demand:
 
 ```smalltalk
-Smalltalk availablePackages          "#('Bio' 'Debugger' 'Prolog' 'SUnit')"
+Smalltalk availablePackages          "#('Bio' 'Debugger' 'Prolog' 'Regex' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'      "also: System menu -> load package..., or  st -l Prolog"
 ```
 
 The load is recorded in the changes file (one line) so the next session loads it again; saving an image keeps the package in
-that image. Two packages come with the system:
+that image. These come with the system:
 
 * [**Prolog**](packages/Prolog/README.md) — Edinburgh/ISO syntax, a standard library, DCGs, `format`, `assert`/`retract`,
   exceptions, a bridge in both directions between Prolog and Smalltalk objects, and a query window.
 * [**SUnit**](packages/SUnit/README.md) — the testing framework: `TestCase`, assertions, suites and a test runner window.
 * [**Debugger**](packages/Debugger/README.md) — a window on the stack of an error, with the failing line marked and
   variables by name. Load it and unhandled errors open it instead of the walkback.
+* [**Regex**](packages/Regex/README.md) — regular expressions: matching, searching, replacing and splitting, with
+  String messages such as `matchesRegex:`, `allRegexMatches:` and `copyWithRegex:replacedWith:`.
 * [**Bio**](packages/Bio/README.md) — bioinformatics: FASTA, FASTQ and GenBank files, sequences and features, the NCBI genetic
   codes, ORFs, assembly statistics, IUPAC pattern search, k-mers, restriction enzymes, pairwise alignment, a sequence browser,
   and sequence features as Prolog facts.

@@ -1,0 +1,157 @@
+# Tests for the Regex package, run by test_vm after loading it.
+# The package tests itself with SUnit (57 tests); the first lines run that suite, and the rest
+# check the same ground from outside, one expression at a time.
+Smalltalk loadPackage: 'Regex' ==> true
+RegexTest run hasPassed ==> true
+RegexTest run failureCount ==> 0
+RegexTest run errorCount ==> 0
+(RegexTest run runCount > 50) ==> true
+# compiling a pattern
+(Regex on: 'a+b') printString ==> '/a+b/'
+(Regex on: 'x' ignoreCase: true) printString ==> '/x/i'
+(Regex on: '(a)(b)(c)') groupCount ==> 3
+(Regex on: '(?:ab)') groupCount ==> 0
+(Regex on: 'abc') pattern ==> 'abc'
+(Regex on: 'abc') ignoresCase ==> false
+((Regex on: 'a+') == (Regex on: 'a+')) ==> true
+Regex flushCache. ((Regex on: 'a+') == (Regex on: 'a+')) ==> true
+# whole-string matching
+'hello' matchesRegex: 'h.*o' ==> true
+'hello' matchesRegex: 'h.*z' ==> false
+'' matchesRegex: 'a*' ==> true
+'abc' matchesRegex: '[a-c]{3}' ==> true
+'abc' matchesRegex: '[a-c]{4}' ==> false
+'2026-11-19' matchesRegex: '\d{4}-\d\d-\d\d' ==> true
+'a.b' matchesRegex: 'a\.b' ==> true
+'axb' matchesRegex: 'a\.b' ==> false
+'cat' matchesRegex: 'cat|dog' ==> true
+'cow' matchesRegex: 'cat|dog' ==> false
+'ababab' matchesRegex: '(ab)+' ==> true
+'abcabc' matchesRegex: '(abc)\1' ==> true
+'colour' matchesRegex: 'colou?r' ==> true
+'aaaa' matchesRegex: 'a{2,4}' ==> true
+'aaaaa' matchesRegex: 'a{2,4}' ==> false
+'a{b' matchesRegex: 'a{b' ==> true
+'a_1' matchesRegex: '\w+' ==> true
+'a-1' matchesRegex: '\w+' ==> false
+'1a2f' matchesRegex: '[\da-f]+' ==> true
+']' matchesRegex: '[]]' ==> true
+'-a' matchesRegex: '[-a]+' ==> true
+'xAy' matchesRegex: 'x\x41y' ==> true
+'HeLLo' matchesRegexIgnoringCase: 'hello' ==> true
+'HeLLo' matchesRegex: 'hello' ==> false
+'ABC' matchesRegexIgnoringCase: '[a-c]+' ==> true
+'ABC' matchesRegex: 'abc' ==> false
+(Regex on: 'abc') ignoreCase matches: 'ABC' ==> true
+# searching
+('xxabyy' regexMatch: 'ab') value ==> 'ab'
+('xxabyy' regexMatch: 'ab') start ==> 3
+('xxabyy' regexMatch: 'ab') stop ==> 4
+('xxabyy' regexMatch: 'ab') size ==> 2
+('xxabyy' regexMatch: 'ab') prematch ==> 'xx'
+('xxabyy' regexMatch: 'ab') postmatch ==> 'yy'
+('xxabyy' regexMatch: 'ab') isEmpty ==> false
+('hello' regexMatch: 'z+') printString ==> 'nil'
+'hello world' includesRegex: 'o w' ==> true
+'hello world' includesRegex: '\d' ==> false
+((Regex on: '\d+') matchesPrefixOf: '123abc') value ==> '123'
+((Regex on: '\d+') matchesPrefixOf: 'abc123') printString ==> 'nil'
+((Regex on: 'a') search: 'aaa' from: 2) start ==> 2
+('<a><b>' regexMatch: '<.+>') value ==> '<a><b>'
+('<a><b>' regexMatch: '<.+?>') value ==> '<a>'
+('one two' regexMatch: '\w+$') value ==> 'two'
+('the cat sat' regexMatch: '\bs\w+') value ==> 'sat'
+# groups
+('2026-11-19' regexMatch: '(\d{4})-(\d\d)-(\d\d)') groups ==> #('2026' '11' '19')
+('2026-11-19' regexMatch: '(\d{4})-(\d\d)-(\d\d)') groupCount ==> 3
+('2026-11-19' regexMatch: '(\d{4})-(\d\d)-(\d\d)') at: 0 ==> '2026-11-19'
+('2026-11-19' regexMatch: '(\d{4})-(\d\d)-(\d\d)') at: 2 ==> '11'
+(('ac' regexMatch: 'a(b)?c') at: 1) printString ==> 'nil'
+(('ac' regexMatch: 'a(b)?c') startOfGroup: 1) printString ==> 'nil'
+('abc' regexMatch: 'a(b)c') startOfGroup: 1 ==> 2
+('abc' regexMatch: 'a(b)c') stopOfGroup: 1 ==> 2
+('abab' regexMatch: '(?:ab)+') value ==> 'abab'
+('abab' regexMatch: '(?:ab)+') groupCount ==> 0
+(('ab' regexMatch: 'a(b)') printString includesSubstring: 'groups') ==> true
+# all the matches
+('x=1; y=22; z=333' allRegexMatches: '\d+') asArray ==> #('1' '22' '333')
+('aaaa' allRegexMatches: 'aa') asArray ==> #('aa' 'aa')
+('abc' allRegexMatches: 'x*') size ==> 4
+(Regex on: '\d+') occurrencesIn: 'a1b22c333' ==> 3
+(Regex on: '\w+') allMatchesIn: 'a bb' ==> OrderedCollection ('a' 'bb')
+| s | s := OrderedCollection new. (Regex on: '\w+') matchesIn: 'a bb ccc' do: [:m | s add: m start]. s asArray ==> #(1 3 6)
+'hello world' tokensMatchingRegex: '\w+' ==> OrderedCollection ('hello' 'world')
+# replacing
+'a1b2c3' copyWithRegex: '\d' replacedWith: '#' ==> 'a#b#c#'
+'hello' copyWithRegex: 'z' replacedWith: '#' ==> 'hello'
+'John Smith' copyWithRegex: '(\w+) (\w+)' replacedWith: '\2, \1' ==> 'Smith, John'
+'ab' copyWithRegex: 'a' replacedWith: '[\0]' ==> '[a]b'
+'aaa bbb' copyWithFirstRegex: '\w+' replacedWith: 'X' ==> 'X bbb'
+'a1b22' copyWithRegex: '\d+' matchesTranslatedUsing: [:m | m value size] ==> 'a1b2'
+(Regex on: '\s+') replaceAllIn: 'a  b   c' with: ' ' ==> 'a b c'
+# splitting
+('a, b,c ,d' splitOnRegex: '\s*,\s*') asArray ==> #('a' 'b' 'c' 'd')
+('a,,b' splitOnRegex: ',') asArray ==> #('a' '' 'b')
+('one' splitOnRegex: ',') asArray ==> #('one')
+('a1b22c' splitOnRegex: '\d+') asArray ==> #('a' 'b' 'c')
+# the String and Symbol messages
+'\d+' asRegex pattern ==> '\d+'
+#testing asRegex matches: 'testing' ==> true
+# errors the parser gives
+[Regex on: 'a('] on: RegexError do: [:e | 'caught'] ==> 'caught'
+[Regex on: 'a)'] on: RegexError do: [:e | 'caught'] ==> 'caught'
+[Regex on: '*a'] on: RegexError do: [:e | 'caught'] ==> 'caught'
+[Regex on: '[abc'] on: RegexError do: [:e | 'caught'] ==> 'caught'
+[Regex on: 'a{3,1}'] on: RegexError do: [:e | 'caught'] ==> 'caught'
+([Regex on: 'a('] on: RegexError do: [:e | e messageText]) includesSubstring: 'expected )' ==> true
+(RegexError inheritsFrom: Error) ==> true
+# the step budget turns a runaway pattern into an error
+| n | n := Regex stepLimit. Regex stepLimit: 2000. [[(Regex on: '(a+)+b') matches: 'aaaaaaaaaaaaaaaaaaaaaaaaX'] on: RegexError do: [:e | 'gave up']] ensure: [Regex stepLimit: n] ==> 'gave up'
+| n | n := Regex stepLimit. Regex stepLimit: 2000. [((String new: 3000 withAll: $a) allRegexMatches: 'a') size] ensure: [Regex stepLimit: n] ==> 3000
+Regex stepLimit ==> 1000000
+# the pieces the matcher is built from, for anyone taking it apart
+(Regex on: 'abc') root class name ==> #RxSequence
+(Regex on: 'a') root class name ==> #RxChar
+(Regex on: '.') root class name ==> #RxAny
+(Regex on: '[ab]') root class name ==> #RxClass
+(Regex on: 'a|b') root class name ==> #RxAlternation
+(Regex on: 'a*') root class name ==> #RxRepeat
+(Regex on: '(a)') root class name ==> #RxGroup
+(Regex on: '^') root class name ==> #RxAnchor
+(Regex on: 'a*') root isGreedy ==> true
+(Regex on: 'a*?') root isGreedy ==> false
+(Regex on: 'a{2,5}') root min ==> 2
+(Regex on: 'a{2,5}') root max ==> 5
+(Regex on: 'a*') root max printString ==> 'nil'
+(Regex on: 'a') root isSingle ==> true
+(Regex on: '(a)') root isSingle ==> false
+(Regex on: '^') root kind ==> #start
+(Regex on: '$') root kind ==> #end
+(Regex on: '\b') root kind ==> #wordBoundary
+(Regex on: '\B') root kind ==> #notWordBoundary
+(Regex on: '(a)\1') root children last index ==> 1
+(Regex on: '[^a]') root negated ==> true
+# the workspace
+(RegexTool evaluate: '   ') ==> 'select a pattern, and under it the lines to try it on'
+((RegexTool evaluate: 'a(') includesSubstring: 'could not read the pattern') ==> true
+| s | s := 'a+', (String with: Character lf), 'xaaay'. ((RegexTool evaluate: s) includesSubstring: '2..4') ==> true
+| s | s := 'a+', (String with: Character lf), 'xaaay'. ((RegexTool evaluate: s) includesSubstring: '1 match in all') ==> true
+| s | s := '/A+/i', (String with: Character lf), 'xaaay'. ((RegexTool evaluate: s) includesSubstring: '/A+/i') ==> true
+| s | s := '(a)(b)', (String with: Character lf), 'ab'. ((RegexTool evaluate: s) includesSubstring: '2 group(s)') ==> true
+| s | s := '(a)(b)', (String with: Character lf), 'zz'. ((RegexTool evaluate: s) includesSubstring: '(no match)') ==> true
+(RegexTool evaluate: 'a+') includesSubstring: 'nothing under it' ==> true
+(RegexTool regexFor: '/ab/i') ignoresCase ==> true
+(RegexTool regexFor: '/ab/') ignoresCase ==> false
+(RegexTool regexFor: 'a/b') pattern ==> 'a/b'
+(RegexTool welcomeText isEmpty) ==> false
+(RegexTool linesOf: ('a', (String with: Character lf), 'b')) asArray ==> #('a' 'b')
+# a few patterns of the kind people actually write
+'badgerjh@nih.gov' matchesRegex: '[\w.%+-]+@[\w.-]+\.[a-zA-Z]{2,}' ==> true
+'not an address' matchesRegex: '[\w.%+-]+@[\w.-]+\.[a-zA-Z]{2,}' ==> false
+'192.168.0.1' matchesRegex: '(\d{1,3}\.){3}\d{1,3}' ==> true
+| s | s := 'line one', (String with: Character lf), 'line two'. (s allRegexMatches: '^\w+') asArray ==> #('line')
+| s | s := 'line one', (String with: Character lf), 'line two'. (s allRegexMatches: '\w+') size ==> 4
+('key: value' regexMatch: '^(\w+):\s*(.*)$') groups ==> #('key' 'value')
+'ACGTACGT' matchesRegex: '[ACGT]+' ==> true
+('  padded  ' copyWithRegex: '^\s+|\s+$' replacedWith: '') ==> 'padded'
+('camelCaseWord' copyWithRegex: '([a-z])([A-Z])' replacedWith: '\1_\2') asLowercase ==> 'camel_case_word'

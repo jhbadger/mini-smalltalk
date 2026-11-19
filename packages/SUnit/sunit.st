@@ -138,6 +138,9 @@ assert: actual identicalTo: expected
 	self countAssertion.
 	actual == expected ifFalse: [
 		^self signalFailure: 'expected the very object ', (self describe: expected), ' but got ', (self describe: actual)]!
+deny: actual identicalTo: expected
+	self countAssertion.
+	actual == expected ifTrue: [^self signalFailure: 'did not expect the very object ', (self describe: expected)]!
 assert: actual closeTo: expected
 	^self assert: actual closeTo: expected within: 0.0001!
 assert: actual closeTo: expected within: epsilon

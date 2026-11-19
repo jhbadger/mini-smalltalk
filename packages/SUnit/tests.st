@@ -54,7 +54,8 @@ testAssertIdentical
 	| a |
 	a := Object new.
 	self assert: a identicalTo: a.
-	self assert: #sym identicalTo: #sym!
+	self assert: #sym identicalTo: #sym.
+	self deny: a identicalTo: Object new!
 testAssertCloseTo
 	self assert: 0.1 + 0.2 closeTo: 0.3.
 	self assert: 1.0 closeTo: 1.001 within: 0.01!
