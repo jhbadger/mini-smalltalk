@@ -27,9 +27,20 @@ static int run_lib_tests(const char *path) {
     while (fgets(line, sizeof line, f)) {
         size_t len = strlen(line); while (len && (line[len - 1] == '\n' || line[len - 1] == '\r')) line[--len] = 0;
         if (!len || (line[0] == '#' && line[1] == ' ')) continue;   /* a comment starts with '# ' (a literal array or symbol starts with '#' directly) */
+        if (!strncmp(line, "@consult ", 9)) { char expr[4096]; snprintf(expr, sizeof expr, "Prolog consultFile: '%s'", line + 9); check(expr, "true"); n++; continue; }
         char *sep = NULL, *p = line; while ((p = strstr(p, " ==> "))) { sep = p; p += 5; }   /* the last separator */
         if (!sep) { printf("FAIL  bad test line: %s\n", line); failures++; continue; }
-        *sep = 0; check(line, sep + 5); n++;
+        *sep = 0;
+        if (!strncmp(line, "?- ", 3)) {        /* a Prolog goal: compare the text of Prolog answerLine: */
+            char expr[8192], want[8192]; int e = 0, w = 0;
+            e += snprintf(expr + e, sizeof expr - e, "Prolog answerLine: '");
+            for (const char *c = line + 3; *c && e < (int)sizeof expr - 4; c++) { if (*c == '\'') expr[e++] = '\''; expr[e++] = *c; }
+            expr[e++] = '\''; expr[e] = 0;
+            want[w++] = '\''; for (const char *c = sep + 5; *c && w < (int)sizeof want - 4; c++) { if (*c == '\'') want[w++] = '\''; want[w++] = *c; }
+            want[w++] = '\''; want[w] = 0;
+            check(expr, want);
+        } else check(line, sep + 5);
+        n++;
     }
     fclose(f); quiet = 0; return n;
 }
@@ -372,6 +383,10 @@ int main(int argc, char **argv) {
         if (pass == 1) gc_threshold = 2000;
         int n = run_lib_tests("test_lib.txt");
         printf("ok    library tests%s: %d run\n", pass ? " under GC stress" : "", n);
+        check("Smalltalk loadPackage: 'Prolog'", "true");
+        if (pass == 1) gc_threshold = 400000;     /* the package's heap is large: collect often, but not after every few allocations */
+        n = run_lib_tests("packages/Prolog/tests/tests.txt");
+        printf("ok    Prolog package tests%s: %d run\n", pass ? " under GC stress" : "", n);
         gc_threshold = saved_threshold;
     }
     /* ---- the changes file: every route that changes code is logged, and replays ---- */

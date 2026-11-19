@@ -9,7 +9,7 @@ overlapping draggable/resizable windows, and a persistent **changes file**.
 ```
 make            # builds ./st and kernel.image (needs a C compiler, no other dependencies)
 ./st            # start the environment in an xterm-compatible terminal
-make check      # headless VM test-suite (test_vm.c, plus the 389 expression/result pairs in test_lib.txt)
+make check      # headless VM test-suite (test_vm.c, test_lib.txt, and the Prolog package's tests; also run on a system loaded from an image)
 ./st -e '3 + 4' # evaluate expressions without the UI
 ```
 
@@ -19,7 +19,7 @@ containing the `st` executable, so you can put that directory on your `PATH`
 (see [Images](#images)) it is used instead, and the system starts without parsing any source. The changes file
 (`changes.st`, or the file named with `-c`) and any `-f` files are taken
 relative to the directory you run it from, so each project gets its own
-changes. `-k dir` overrides where the kernel sources are looked for (and means: no image).
+changes. `-k dir` overrides where the kernel sources are looked for (and means: no image). `-l package` loads an optional package.
 
 ## Using it
 
@@ -135,6 +135,20 @@ instance variables, no way to run an operating-system command (`system:` is
 deliberately absent), a `FileStream` that is not closed keeps its handle (there are 128;
 use the `...do:` forms), `String` comparison with `<` is by byte value rather than
 case-insensitive, and an image does not hold processes or windows.
+
+## Optional packages
+
+The `packages/` folder holds optional systems that are not in the standard image. Load one on demand:
+
+```smalltalk
+Smalltalk availablePackages          "#('Prolog')"
+Smalltalk loadPackage: 'Prolog'      "also: System menu -> load package..., or  st -l Prolog"
+```
+
+The load is recorded in the changes file (one line) so the next session loads it again; saving an image keeps the package in
+that image. The first package is [Prolog in Smalltalk](packages/Prolog/README.md): Edinburgh/ISO syntax, a standard library, DCGs,
+`format`, `assert`/`retract`, exceptions, a bridge in both directions between Prolog and Smalltalk objects, and a query window.
+See [packages/README.md](packages/README.md) for how packages work and how to write one.
 
 ## Testing the UI without a terminal
 

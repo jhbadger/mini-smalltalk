@@ -75,6 +75,7 @@ bool file_in(const char *path, char *err, int errlen) {
     bool r = file_in_string(buf, err, errlen); free(buf); return r;
 }
 
+const char *kernel_dir = ".";      /* where kernel*.st, tutorial.st and packages/ live */
 bool load_kernel(const char *dir, char *err, int errlen) {
     bool ok = true; err[0] = 0; char first[512] = "";
     for (int i = 1; i < 100; i++) {

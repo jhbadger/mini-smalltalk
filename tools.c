@@ -37,20 +37,33 @@ static oop evaluate(const char *src, oop receiver, bool *ok) {
 }
 
 /* ---------- code pane actions (shared by workspace, browser, inspector) ---------- */
-typedef struct { oop receiver; bool rooted; } EvalCtx;
+typedef struct { oop receiver; bool rooted; char *tool; } EvalCtx;   /* tool: a Smalltalk class whose #evaluate: handles the text (a language workspace) */
 static oop pane_receiver(Pane *p) { EvalCtx *c = p->user; return c && c->receiver ? c->receiver : nilobj; }
-static void do_it(Pane *p) { char *src = text_selection_or_line(p); bool ok; evaluate(src, pane_receiver(p), &ok); free(src); if (ok) ui_status("done"); tools_after_eval(); }
+/* evaluate src for a pane: Smalltalk by default, or through the pane's tool class (#evaluate: answering a String) */
+static oop pane_eval(Pane *p, const char *src, bool *ok, bool *is_text) {
+    EvalCtx *c = p->user; *is_text = false;
+    if (c && c->tool) {
+        oop cls = class_named(c->tool);
+        if (!cls) { ui_status("no class named %s", c->tool); *ok = false; return nilobj; }
+        oop arg = new_string(src);
+        oop r = interp_send(cls, new_symbol("evaluate:"), &arg, 1);
+        if (interp.failed) { show_error(); *ok = false; return nilobj; }
+        *ok = true; *is_text = true; return r;
+    }
+    return evaluate(src, pane_receiver(p), ok);
+}
+static void do_it(Pane *p) { char *src = text_selection_or_line(p); bool ok, txt; pane_eval(p, src, &ok, &txt); free(src); if (ok) ui_status("done"); tools_after_eval(); }
 static void print_it(Pane *p) {
-    char *src = text_selection_or_line(p); bool ok; oop r = evaluate(src, pane_receiver(p), &ok); free(src);
+    char *src = text_selection_or_line(p); bool ok, txt; oop r = pane_eval(p, src, &ok, &txt); free(src);
     if (!ok) return;
-    char *s = str_cstr(interp_print_string(r));
+    char *s = txt ? str_cstr(r) : str_cstr(interp_print_string(r));
     int end = p->anchor >= 0 && p->anchor > p->cursor ? p->anchor : p->cursor;
     if (p->anchor < 0 || p->anchor == p->cursor) { while (end < p->len && p->text[end] != '\n') end++; }
-    char *ins = malloc(strlen(s) + 3); sprintf(ins, " %s", s);
+    char *ins = malloc(strlen(s) + 3); sprintf(ins, txt ? "\n%s" : " %s", s);
     p->anchor = -1; p->cursor = end; text_insert(p, ins); text_select_range(p, end, end + (int)strlen(ins));
     free(ins); free(s); tools_after_eval();
 }
-static void inspect_it(Pane *p) { char *src = text_selection_or_line(p); bool ok; oop r = evaluate(src, pane_receiver(p), &ok); free(src); if (ok) open_inspector(r); tools_after_eval(); }
+static void inspect_it(Pane *p) { char *src = text_selection_or_line(p); bool ok, txt; oop r = pane_eval(p, src, &ok, &txt); free(src); if (ok) open_inspector(r); tools_after_eval(); }
 static bool code_key(Pane *p, Event *ev) {
     if (!(ev->mods & MOD_CTRL)) return false;
     switch (ev->key) { case 'd': do_it(p); return true; case 'p': print_it(p); return true; case 't': inspect_it(p); return true; }
@@ -74,6 +87,15 @@ void open_workspace(void) {
                 "3 + 4 * 2.\n(1 to: 10) inject: 0 into: [:a :b | a + b].\n#(3 1 2) asSortedCollection.\n"
                 "Transcript show: 'Hello from Smalltalk-80'; cr.\n"
                 "Smalltalk allClasses size.\n");
+}
+
+/* a workspace for another language: do it / print it send  toolClass evaluate: text  (see Prolog) */
+static void open_tool_workspace(const char *title, const char *tool, const char *text) {
+    Window *w = win_new(title, 4 + cascade * 3, 2 + cascade, tui_cols * 3 / 5, tui_rows / 2 - 1); cascade = (cascade + 1) % 5;
+    w->kind = W_WORKSPACE; w->layout = single_layout;
+    Pane *t = win_add_text(w, false); t->menu = ws_menu; t->nmenu = 8; t->on_menu = ws_menu_cb; t->on_key = code_key;
+    EvalCtx *c = calloc(1, sizeof *c); c->tool = strdup(tool); t->user = c;
+    text_set(t, text);
 }
 
 /* ---------- Transcript ---------- */
@@ -390,23 +412,64 @@ void open_browser_on(const char *className) {
 }
 
 /* ---------- system menu ---------- */
-static const char *sys_menu[] = { "system browser", "workspace", "system transcript", "smalltalk tutorial", "-", "file in...", "browse class...", "save image", "collect garbage", "-", "quit" };
+/* The System menu: the built-in items, then whatever packages registered with SystemMenu (Smalltalk), then quit. */
+static const char *sys_base[] = { "system browser", "workspace", "system transcript", "smalltalk tutorial", "-", "file in...", "load package...", "browse class...", "save image", "collect garbage" };
+#define NBASE 10
+static const char *sys_items[NBASE + 40]; static int sys_n = 0, sys_extra = 0;   /* sys_extra: how many package items follow the base */
+static char *sys_extra_labels[32];
+static void sys_menu_cb(int i);
+static void sys_menu_rebuild(void) {
+    for (int i = 0; i < sys_extra; i++) { free(sys_extra_labels[i]); sys_extra_labels[i] = NULL; }
+    sys_extra = 0;
+    oop sm = class_named("SystemMenu");
+    if (sm) {
+        oop labels = interp_send(sm, new_symbol("labels"), NULL, 0);
+        if (!interp.failed && !IS_INT(labels) && labels->cls == classArray)
+            for (uint32_t i = 0; i < labels->size && sys_extra < 32; i++) sys_extra_labels[sys_extra++] = oop_str(SLOT(labels, i));
+        interp.failed = false;
+    }
+    sys_n = 0;
+    for (int i = 0; i < NBASE; i++) sys_items[sys_n++] = sys_base[i];
+    if (sys_extra) { sys_items[sys_n++] = "-"; for (int i = 0; i < sys_extra; i++) sys_items[sys_n++] = sys_extra_labels[i]; }
+    sys_items[sys_n++] = "-"; sys_items[sys_n++] = "quit";
+    ui_set_desktop_menu(sys_items, sys_n, sys_menu_cb);
+}
 static void sys_menu_cb(int i) {
+    int extra_first = NBASE + 1, quit = sys_extra ? NBASE + 1 + sys_extra + 1 : NBASE + 1;
+    if (sys_extra && i >= extra_first && i < extra_first + sys_extra) {
+        oop sm = class_named("SystemMenu"); if (!sm) return;
+        oop arg = MK_INT(i - extra_first + 1);
+        interp_send(sm, new_symbol("run:"), &arg, 1);
+        if (interp.failed) show_error();
+        tools_after_eval(); return;
+    }
+    if (i == quit) { if (dialog_confirm("Quit", "Quit Smalltalk?")) ui_quit = true; return; }
     switch (i) {
     case 0: open_browser(); break; case 1: open_workspace(); break; case 2: open_transcript(); break; case 3: open_tutorial(); break;
     case 5: { char *f = dialog_prompt("File in (path to .st file)", ""); if (f && f[0]) { char err[512]; if (file_in(f, err, sizeof err)) ui_status("filed in %s", f); else { ui_status("file in failed: %s", err); dialog_text("File in failed", err); } browsers_refresh(); } free(f); break; }
-    case 6: { char *n = dialog_prompt("Browse class", ""); if (n && n[0]) { if (class_named(n)) open_browser_on(n); else ui_status("no class named %s", n); } free(n); break; }
-    case 7: { char err[512], msg[1200];
+    case 6: { /* load package */
+        oop names = interp_send(smalltalk, new_symbol("availablePackagesString"), NULL, 0);
+        char *list = interp.failed ? strdup("") : oop_str(names); interp.failed = false;
+        char title[1024]; snprintf(title, sizeof title, "Load package (available: %s)", list[0] ? list : "none"); free(list);
+        char *n = dialog_prompt(title, "");
+        if (n && n[0]) {
+            oop arg = new_string(n);
+            interp_send(smalltalk, new_symbol("loadPackage:"), &arg, 1);
+            if (interp.failed) show_error(); else ui_status("loaded package %s", n);
+            browsers_refresh(); tools_after_eval();
+        }
+        free(n); break; }
+    case 7: { char *n = dialog_prompt("Browse class", ""); if (n && n[0]) { if (class_named(n)) open_browser_on(n); else ui_status("no class named %s", n); } free(n); break; }
+    case 8: { char err[512], msg[1200];
         snprintf(msg, sizeof msg, "Save the whole system to %s?\n\nEverything is saved except open windows and processes. The changes file %s is set aside, since the image now contains it.", image_path, changes_abs_path());
         if (!dialog_confirm("Save image", msg)) break;
         if (image_snapshot(image_path, err, sizeof err)) ui_status("saved image %s", image_path);
         else { ui_status("could not save the image: %s", err); dialog_text("Save image failed", err); }
         break; }
-    case 8: gc_collect(); ui_status("garbage collected"); break;
-    case 10: if (dialog_confirm("Quit", "Quit Smalltalk?")) ui_quit = true; break;
+    case 9: gc_collect(); ui_status("garbage collected"); break;
     }
 }
-void tools_system_menu_install(void) { ui_set_desktop_menu(sys_menu, 11, sys_menu_cb); }
+void tools_system_menu_install(void) { sys_menu_rebuild(); }
 
 void tools_after_eval(void) {
     transcripts_refresh();
@@ -421,6 +484,8 @@ void tools_after_eval(void) {
         ui_status("saved to %s  (%d change%s this session)", changes_abs_path(), changes_count, changes_count == 1 ? "" : "s");
     }
     if (pending_inspect) { oop o = pending_inspect; pending_inspect = NULL; open_inspector(o); }
+    if (pending_tool_class) { open_tool_workspace(pending_tool_title, pending_tool_class, pending_tool_text); free(pending_tool_class); free(pending_tool_title); free(pending_tool_text); pending_tool_class = pending_tool_title = pending_tool_text = NULL; }
+    if (menu_items_changed) { menu_items_changed = false; sys_menu_rebuild(); }
     if (pending_window_text) { show_lesson_window(pending_window_title, pending_window_text); free(pending_window_title); free(pending_window_text); pending_window_title = pending_window_text = NULL; }
     static size_t last_classes = 0; size_t n = INT_VAL(SLOT(smalltalk, D_TALLY));
     if (n != last_classes) { last_classes = n; browsers_refresh(); }

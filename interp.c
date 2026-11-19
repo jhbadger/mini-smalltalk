@@ -307,6 +307,14 @@ static oop run(oop base, long deadline) {
                         sp -= 2; for (uint32_t i = 0; i < arr->size; i++) PUSH(SLOT(arr, i));
                         n = arr->size; sel = s; super = 0; goto send;
                     }
+                } else if (prim == 202) {   /* CompiledMethod>>valueWithReceiver: r arguments: anArray -- run the method in this loop, so exception handlers of the caller still apply */
+                    oop argv = slots[sp - 1], rcv2 = slots[sp - 2];
+                    if (!IS_INT(recv) && recv->cls == classCompiledMethod && !IS_INT(argv) && argv->cls == classArray && (int)argv->size == HDR_ARGS(SLOT(recv, M_HEADER))) {
+                        SAVE();
+                        oop nctx = new_context(recv, rcv2, ctx, nilobj, nilobj);
+                        for (uint32_t i = 0; i < argv->size; i++) SLOT(nctx, CTX_FIXED + i) = SLOT(argv, i);
+                        sp -= 3; SAVE(); interp.active = nctx; LOAD(); continue;
+                    }
                 } else if (prim >= 140 && prim <= 149) {   /* processes, semaphores, context transfer */
                     oop cur = CUR();
                     switch (prim) {

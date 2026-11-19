@@ -156,6 +156,8 @@ oop call_primitive(int n, oop *args, int nargs, bool *ok); /* args[0] is receive
 void transcript_append(const char *s, int n);
 extern char *transcript_text;
 extern size_t transcript_len;
+extern char *pending_tool_class, *pending_tool_title, *pending_tool_text;   /* a tool workspace requested by primitive 201 */
+extern bool menu_items_changed;                       /* set by primitive 200: the UI rebuilds the System menu */
 extern char *pending_window_title, *pending_window_text;   /* a window requested by primitive 180 (tutorial lessons) */
 
 /* fileio.c */
@@ -188,6 +190,7 @@ void heap_reset_alloc_counter(void);
 
 /* image.c: binary images. An image holds every object reachable from the system roots; loading one replaces
    st_init() and the kernel sources. Processes and the user interface are not saved. */
+extern const char *kernel_dir;                       /* where kernel*.st, tutorial.st and packages/ live */
 extern const char *image_path;                       /* where Smalltalk snapshot writes (default ./st.image) */
 bool image_save(const char *path, char *err, int errlen);
 bool image_load(const char *path, char *err, int errlen);   /* only into an empty system (before st_init) */

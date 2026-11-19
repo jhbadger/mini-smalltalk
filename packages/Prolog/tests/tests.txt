@@ -1,0 +1,279 @@
+# Prolog package tests, run by test_vm after loading the package.  Lines:
+#   ?- goal ==> answer    the text Prolog answerLine: gives for the goal (all solutions on one line)
+#   @consult path         consult a program file
+#   anything else         a Smalltalk expression ==> the expected printString
+# (a comment starts with "# ")
+Prolog reset class name ==> #PrologEngine
+@consult packages/Prolog/tests/programs.pl
+?- X = 5, Y is X * 2 + 1 ==> X = 5, Y = 11.
+?- X is 7 / 2 ==> X = 3.5.
+?- X is 8 / 2 ==> X = 4.
+?- X is 7 // 2, Y is -7 // 2, Z is -7 mod 3, W is 7 rem -3 ==> X = 3, Y = -3, Z = 2, W = 1.
+?- X is 2 ** 10, Y is 2 ^ 100, Z is 2 ** -1, W is 2.0 ** 3 ==> X = 1024, Y = 1267650600228229401496703205376, Z = 0.5, W = 8.0.
+?- X is max(3, 4.5), Y is min(2, 2.0), Z is abs(-3), W is sign(-2.5) ==> X = 4.5, Y = 2, Z = 3, W = -1.0.
+?- X is sqrt(16), Y is pi, Z is e ==> X = 4.0, Y = 3.141592653589793, Z = 2.718281828459045.
+?- X is truncate(3.7), Y is round(2.5), Z is ceiling(2.1), W is floor(-2.1) ==> X = 3, Y = 3, Z = 3, W = -3.
+?- X is 5 + a ==> ERROR: Arithmetic: evaluable `a/0' does not exist
+?- X is foo(1) ==> ERROR: Arithmetic: evaluable `foo/1' does not exist
+?- X is 1 / 0 ==> ERROR: Arithmetic: evaluation error: zero_divisor
+?- X is Y + 1 ==> ERROR: Arguments are not sufficiently instantiated
+?- 1 < 2, 2 =< 2, 3 > 2, 3 >= 3, 1 =:= 1.0, 1 =\= 2 ==> true.
+?- member(X, [1,2,3]), X > 1, ! ==> X = 2.
+?- member(X, [1,2,3]), X > 1 ==> X = 2 ; X = 3.
+?- ( member(X, [1,2,3]), X > 1 -> Y = yes(X) ; Y = no ) ==> X = 2, Y = yes(2).
+?- ( member(X, [1,2,3]), X > 5 -> Y = yes ; Y = no ) ==> Y = no.
+?- \+ member(4, [1,2,3]) ==> true.
+?- \+ member(2, [1,2,3]) ==> false.
+?- findall(X-Y, (member(X,[1,2]), member(Y,[a,b])), L) ==> L = [1-a,1-b,2-a,2-b].
+?- findall(X, fail, L) ==> L = [].
+?- forall(member(X, [1,2,3]), X > 0) ==> true.
+?- forall(member(X, [1,2,3]), X > 1) ==> false.
+?- once(member(X, [a,b,c])) ==> X = a.
+?- ignore(fail), true ==> true.
+?- catch(throw(my_error), E, (E = my_error)) ==> E = my_error.
+?- catch(X is 1/0, error(E, _), true) ==> E = evaluation_error(zero_divisor).
+?- catch(atom_length(X, Y), error(E, _), true) ==> E = instantiation_error.
+?- catch(foo(1,2), error(existence_error(procedure, PI), _), true) ==> PI = foo/2.
+?- catch((member(X, [1,2,3]), X > 1, throw(found(X))), found(Y), true) ==> Y = 2.
+?- atom_codes(hello, C), atom_chars(hello, Ch), atom_length(hello, N) ==> C = [104,101,108,108,111], Ch = [h,e,l,l,o], N = 5.
+?- atom_codes(A, "abc"), atom_chars(B, [x,y]) ==> A = abc, B = xy.
+?- atom_concat(abc, def, X) ==> X = abcdef.
+?- atom_concat(X, Y, ab) ==> X = '', Y = ab ; X = a, Y = b ; X = ab, Y = ''.
+?- atom_concat(abc, X, abcdef) ==> X = def.
+?- sub_atom(hello, 1, 3, A, S) ==> A = 1, S = ell.
+?- sub_atom(hello, B, 2, 0, S) ==> B = 3, S = lo.
+?- findall(S, sub_atom(abc, _, _, 0, S), L) ==> L = [abc,bc,c,''].
+?- upcase_atom('hello world', U) ==> U = 'HELLO WORLD'.
+?- atom_number('42', N), atom_number(A, 3.5) ==> N = 42, A = '3.5'.
+?- atom_number(abc, N) ==> false.
+?- number_codes(N, "42") ==> N = 42.
+?- atomic_list_concat([a,b,c], X) ==> X = abc.
+?- atomic_list_concat([a,b,c], '-', X) ==> X = 'a-b-c'.
+?- atomic_list_concat(L, ',', 'a,b,c') ==> L = [a,b,c].
+?- split_string("a,b,,c", ",", "", P) ==> P = ["a","b","","c"].
+?- split_string("  hello  ", "", " ", P) ==> P = ["hello"].
+?- string_concat("abc", "def", S), string_length(S, N) ==> S = "abcdef", N = 6.
+?- string_chars(S, [h,i]), string_codes(T, [104,105]) ==> S = "hi", T = "hi".
+?- term_to_atom(f(X, y, "s"), A) ==> A = 'f(_1,y,"s")'.
+?- term_to_atom(T, 'foo(A, B, A)') ==> T = foo(_1,_2,_1).
+?- X = f(a, B, c), X =.. L ==> X = f(a,_1,c), L = [f,a,_1,c].
+?- T =.. [foo, 1, 2], functor(T, N, A), arg(2, T, X) ==> T = foo(1,2), N = foo, A = 2, X = 2.
+?- functor(T, point, 3) ==> T = point(_1,_2,_3).
+?- copy_term(f(X, Y, X), C) ==> C = f(_1,_2,_1).
+?- length(L, 3), L = [a|_] ==> L = [a,_1,_2].
+?- msort([c, a, b, a], L), sort([c, a, b, a], S), sort(0, @>=, [1,3,2,3], D) ==> L = [a,a,b,c], S = [a,b,c], D = [3,3,2,1].
+?- keysort([b-2, a-1, b-1, a-3], S) ==> S = [a-1,a-3,b-2,b-1].
+?- predsort([O,A,B]>>compare(O,A,B), [3,1,2], S) ==> S = [1,2,3].
+?- setof(X, member(X, [c,a,b,a]), L) ==> L = [a,b,c].
+?- bagof(X-Y, member(X-Y, [1-a, 2-b]), L) ==> L = [1-a,2-b].
+?- bagof(X, member(X-Y, [1-a, 2-b, 3-a]), L) ==> Y = a, L = [1,3] ; Y = b, L = [2].
+?- setof(X, Y^member(X-Y, [1-a, 2-b, 3-a]), L) ==> L = [1,2,3].
+?- bagof(X, member(X, []), L) ==> false.
+?- aggregate_all(count, member(_, [a,b,c]), N) ==> N = 3.
+?- aggregate_all(sum(X), member(X, [1,2,3]), S) ==> S = 6.
+?- aggregate_all(max(X), member(X, [1,3,2]), M) ==> M = 3.
+?- between(1, 5, X), X > 3 ==> X = 4 ; X = 5.
+?- findall(X, between(1, 5, X), L) ==> L = [1,2,3,4,5].
+?- numlist(1, 5, L), sum_list(L, S), max_list(L, M), reverse(L, R) ==> L = [1,2,3,4,5], S = 15, M = 5, R = [5,4,3,2,1].
+?- nth0(1, [a,b,c], X), nth1(1, [a,b,c], Y), last([a,b,c], Z) ==> X = b, Y = a, Z = c.
+?- nth1(I, [a,b,c], b) ==> I = 2.
+?- maplist([X,Y]>>(Y is X * 2), [1,2,3], L) ==> L = [2,4,6].
+?- foldl([X,A0,A]>>(A is A0 + X), [1,2,3], 0, S) ==> S = 6.
+?- exclude([X]>>(X > 1), [1,2,3], L), include([X]>>(X > 1), [1,2,3], M) ==> L = [1], M = [2,3].
+?- select(b, [a,b,c], R) ==> R = [a,c].
+?- permutation([1,2,3], P) ==> P = [1,2,3] ; P = [1,3,2] ; P = [2,1,3] ; P = [2,3,1] ; P = [3,1,2] ; P = [3,2,1].
+?- flatten([a,[b,[c,d]],e], F) ==> F = [a,b,c,d,e].
+?- list_to_set([a,b,a,c,b], S) ==> S = [a,b,c].
+?- subtract([a,b,c], [b], R), intersection([a,b,c], [c,a], I), union([a,b], [b,c], U) ==> R = [a,c], I = [a,c], U = [a,b,c].
+?- delete([a,b,a,c], a, R) ==> R = [b,c].
+?- sumlist([1,2], S) ==> S = 3.
+?- assertz(cnt(0)), retract(cnt(N)), N1 is N + 1, assertz(cnt(N1)), cnt(X) ==> N = 0, N1 = 1, X = 1.
+?- assertz(f(1)), assertz(f(2)), asserta(f(0)), findall(X, f(X), L) ==> L = [0,1,2].
+?- retract(f(1)), findall(X, f(X), L) ==> L = [0,2].
+?- retractall(f(_)), findall(X, f(X), L) ==> L = [].
+?- assertz((double(X, Y) :- Y is X * 2)), double(4, Z) ==> Z = 8.
+?- assertz(g(1)), assertz(g(2)), assertz(g(3)), g(X), assertz(g(4)), X >= 3 ==> X = 3.
+?- assertz(h(a)), assertz(h(b)), retract(h(X)), X == a ==> X = a.
+?- assertz(k(1)), assertz(k(2)), forall(retract(k(X)), (write(X), nl)) ==> 1 2 true.
+?- writeq('hello world'), nl, writeq([a, 'B', "str", 1.5, f(x, 'Y z')]), nl ==> 'hello world' [a,'B',"str",1.5,f(x,'Y z')] true.
+?- print(1+2), nl, writeq(- 1), nl, writeq(-(1)), nl, writeq(1 - -1), nl, writeq(a:-b), nl ==> 1+2 - 1 - 1 1- -1 a:-b true.
+?- writeq('\n'), nl, writeq(''), nl, writeq(a*(b+c)), nl, writeq((a,b)), nl, writeq({x}), nl, writeq('[]'), nl, writeq([]) ==> '\n' '' a*(b+c) a,b {x} [] []true.
+?- format("~a~t~15|~a~n", [name, value]) ==> name           value true.
+?- format("~t~a~15|~a~n", [right, x]) ==>           rightx true.
+?- format("~t~d~6|~n", [42]) ==>     42 true.
+?- format("[~t~w~10|]~n", [abc]) ==> [      abc] true.
+?- format("~w ~q ~a~n", ['A b', 'A b', 'A b']) ==> A b 'A b' A b true.
+?- format("~2f ~0f ~e~n", [3.14159, 2.5, 100.0]) ==> 3.14 3 1.000000e+02 true.
+?- format("~d ~D~n", [1234567, 1234567]) ==> 1234567 1,234,567 true.
+?- format("~2d~n", [314]) ==> 314.00 true.
+?- format("~s and ~s~n", ["abc", [100,101]]) ==> abc and de true.
+?- format("~c~c~n", [104, 105]) ==> hi true.
+?- format("~8r ~16r ~8R~n", [64, 255, 64]) ==> 100 ff 100 true.
+?- format("~*c~n", [3, 0'x]) ==> xxx true.
+?- format("~a", [abc]), nl ==> abc true.
+?- format("no args~n"), format("~~ tilde~n", []) ==> no args ~ tilde true.
+?- catch(format("~d~n", [abc]), error(E, _), true) ==> E = type_error(evaluable,abc/0).
+?- catch(format("~w ~w~n", [a]), error(format(M), _), true) ==> M = "not enough arguments".
+?- with_output_to(atom(A), (write(a), write(b))), atom_length(A, N) ==> A = ab, N = 2.
+?- with_output_to(string(S), format("~w-~w", [x, y])) ==> S = "x-y".
+?- format(atom(A), "~w + ~w", [1, 2]) ==> A = '1 + 2'.
+?- sformat(S, "x~w", [1]) ==> S = "x1".
+?- X = "abc", string(X), \+ atom(X), atom(abc), \+ string(abc) ==> X = "abc".
+?- atom(foo), atomic("s"), atomic(3), compound(f(x)), \+ compound(a), callable(a), callable(f(x)), is_list([a]), \+ is_list([a|_]) ==> true.
+?- var(X), X = 1, nonvar(X), integer(X), number(X), \+ float(X), float(1.5) ==> X = 1.
+?- X = f(Y), Y = 1, ground(X), \+ ground(f(_)) ==> X = f(1), Y = 1.
+?- X == X, \+ X == Y, X \== Y, f(A) \= g(A), f(A, b) = f(a, B) ==> A = a, B = b.
+?- compare(O, 1, 2), compare(P, b, a), compare(Q, f(a), f(a)) ==> O = (<), P = (>), Q = (=).
+?- 1 @< a, a @< "s", "s" @< f(x), f(a) @< f(b), 1.0 @< 1, f(x) @< g(x), a @< b ==> true.
+?- findall(X, t1(X), L) ==> L = [2].
+?- findall(X, t2(X), L) ==> L = [2].
+?- findall(X, t3(X), L) ==> L = [2].
+?- t5(X) ==> X = a.
+?- t6(X) ==> true.
+?- findall(X, t7(X), L) ==> L = [1].
+?- findall(X, t8(X), L) ==> L = [1,2,3].
+?- findall(X-Y, t9(X, Y), L) ==> L = [1-a,1-b,2-a,2-b].
+?- t10(X) ==> X = 2.
+?- t11 ==> false.
+?- findall(X, t12(X), L) ==> L = [1].
+?- findall(X, t14(X), L) ==> L = [1,2,3].
+?- findall(X, t15(X), L) ==> L = [2].
+?- t16(R) ==> R = caught(oops).
+?- findall(N, t17(N), L) ==> L = [2,3].
+?- findall(N, t18(N), L) ==> L = [0].
+?- findall(X, t19(X), L) ==> L = [1,3].
+?- t20(L) ==> L = [2-a,2-b].
+?- len([a,b,c,d], N) ==> N = 4.
+?- count(0, 1000) ==> true.
+?- numlist(1, 30, L), nrev(L, R), R = [F|_] ==> L = [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30], R = [30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11,10,9,8,7,6,5,4,3,2,1], F = 30.
+?- fib(15, F) ==> F = 610.
+?- hanoi(8, a, b, c) ==> true.
+?- findall(Q, queens(6, Q), L) ==> L = [[2,4,6,1,3,5],[3,6,2,5,1,4],[4,1,5,2,6,3],[5,3,1,6,4,2]].
+?- qsort([3,1,4,1,5,9,2,6], S) ==> S = [1,1,2,3,4,5,6,9].
+?- gcd_(48, 18, G) ==> G = 6.
+?- fact(20, F) ==> F = 2432902008176640000.
+?- fact(30, F) ==> F = 265252859812191058636308480000000.
+?- findall(X, grandparent(tom, X), L) ==> L = [ann,pat].
+?- findall(X, ancestor(tom, X), L) ==> L = [bob,liz,ann,pat,jim].
+?- findall(X-Y, sibling(X, Y), L) ==> L = [bob-liz,liz-bob,ann-pat,pat-ann].
+?- setof(X-Y, parent(X, Y), L) ==> L = [bob-ann,bob-pat,pat-jim,tom-bob,tom-liz].
+?- setof(P, C^parent(P, C), L) ==> L = [bob,pat,tom].
+?- bagof(C, parent(P, C), L) ==> P = bob, L = [ann,pat] ; P = pat, L = [jim] ; P = tom, L = [bob,liz].
+?- aggregate_all(count, parent(_, _), N) ==> N = 5.
+?- phrase(greeting, [hello, world]) ==> true.
+?- findall(X, phrase(greeting, [hello, X]), L) ==> L = [world,prolog].
+?- phrase(anbn, [a,a,b,b]) ==> true.
+?- \+ phrase(anbn, [a,b,b]) ==> true.
+?- rule(X ===> Y) ==> X = a, Y = b ; X = c, Y = d.
+?- X = (a ===> b), X =.. L ==> X = (a===>b), L = [===>,a,b].
+?- Y = 2 ** 3 ** 2, Z is Y ==> Y = 2**3**2, Z = 512.
+?- init_ran(X) ==> X = yes.
+?- after_error(X) ==> X = 1.
+?- after_failing_directive(X) ==> X = 1.
+?- after_error_directive(X) ==> X = 1.
+?- bump, bump, counter(N) ==> N = 2.
+?- length(L, 3), L = [a|_], length(L, N) ==> L = [a,_1,_2], N = 3.
+?- copy_term(f(X, Y, X), f(A, B, C)), A == C, A \== B ==> true.
+?- X = f(Y), Y = 1, copy_term(X, Z) ==> X = f(1), Y = 1, Z = f(1).
+?- catch(findall(X, (member(X, [1,2,3]), X > 1, throw(stop(X))), _), stop(V), true) ==> V = 2.
+?- catch(catch(throw(inner), outer, fail), inner, R = ok) ==> R = ok.
+?- catch(catch(throw(a), a, throw(b)), b, R = rethrown) ==> R = rethrown.
+?- catch(setup_call, error(existence_error(procedure, PI), _), true) ==> PI = setup_call/0.
+?- G = format("~w~n", [hi]), call(G) ==> hi G = format("~w~n",[hi]).
+?- call(format, "~w-~w~n", [a, b]) ==> a-b true.
+?- G = member(X), call(G, [x, y]) ==> G = member(x), X = x ; G = member(y), X = y.
+?- findall(X, (member(X, [1,2,3]), \+ X = 2), L) ==> L = [1,3].
+?- forall(member(X, [1,2]), (write(X), nl)) ==> 1 2 true.
+?- between(1, 3, X), write(X), nl, fail ; true ==> 1 2 3 true.
+?- string_to_atom(S, abc) ==> S = "abc".
+?- sort(0, @>=, [c, a, b, a], L) ==> L = [c,b,a,a].
+?- last([1,2,3], X), sumlist([1,2,3], S), max_member(M, [3,1,2]), min_member(Mi, [3,1,2]) ==> X = 3, S = 6, M = 3, Mi = 1.
+?- exclude([X]>>(0 is X mod 2), [1,2,3,4,5], L) ==> L = [1,3,5].
+?- partition([X]>>(X < 3), [1,2,3,4], I, E) ==> I = [1,2], E = [3,4].
+?- foldl([X,A0,A]>>(A is max(X, A0)), [3,1,4,1,5], 0, M) ==> M = 5.
+?- atom_string(A, "xyz"), atom(A) ==> A = xyz.
+?- X = "text", string_concat(X, " more", Y), string_length(Y, N) ==> X = "text", Y = "text more", N = 9.
+?- sub_string("hello world", 6, 5, _, S) ==> S = "world".
+?- atomic_list_concat(Parts, ' ', 'the quick brown fox'), length(Parts, N) ==> Parts = [the,quick,brown,fox], N = 4.
+?- char_code(C, 65), char_type(a, alpha), code_type(0'1, digit(W)) ==> C = 'A', W = 1.
+?- succ(X, 4), succ(3, Y), plus(1, 2, Z), plus(1, Y2, 5) ==> X = 3, Y = 4, Z = 3, Y2 = 4.
+?- X is 10 ** 20, Y is 7 ** 0.5, Z is 2 ** 0.5 * 2 ** 0.5 ==> X = 100000000000000000000, Y = 2.6457513110645907, Z = 2.0000000000000004.
+?- X is truncate(1.0e10), Y is integer(2.5), Z is integer(-2.5) ==> X = 10000000000, Y = 3, Z = -3.
+?- tab(3), write(x), nl ==>    x true.
+?- atom_chars(X, [a, b]), atom_chars(abc, Y) ==> X = ab, Y = [a,b,c].
+?- nb_setval(k, 42), nb_getval(k, V) ==> V = 42.
+?- b_setval(v, 1), b_getval(v, X) ==> X = 1.
+?- term_variables(f(X, g(Y, X), Z), Vs), length(Vs, N) ==> Vs = [_1,_2,_3], N = 3.
+?- setof(K-V, member(K-V, [b-1, a-2, c-0]), L) ==> L = [a-2,b-1,c-0].
+?- pairs_keys_values(P, [a,b], [1,2]) ==> P = [a-1,b-2].
+?- length(L, N), N > 2, ! ==> L = [_1,_2,_3], N = 3.
+?- ground(f(a, [b])), \+ ground(f(_)) ==> true.
+?- phrase(expr(X), "12+30-2") ==> X = 40.
+?- phrase(expr(X), `7+8`) ==> X = 15.
+?- phrase(digits(D), "123", Rest), atom_codes(A, D) ==> D = [49,50,51], Rest = [], A = '123' ; D = [49,50], Rest = [51], A = '12' ; D = [49], Rest = [50,51], A = '1'.
+?- phrase(ws, "   ", R) ==> R = [].
+?- atom_to_term('foo(X, Y, X)', T, B) ==> T = foo(_1,_2,_1), B = ['X'=_1,'Y'=_2].
+?- X is cot(1.0), Y is acot(1) ==> X = 0.6420926159343308, Y = 0.7853981633974483.
+?- G = (X = 1 ; X = 2), findall(X, G, L) ==> G = (_1=1;_1=2), L = [1,2].
+?- X = (a ===> b) ==> X = (a===>b).
+?- atom_codes(A, `abc`) ==> A = abc.
+?- catch(smalltalk('1/0', X), error(smalltalk_error(M), _), true) ==> M = "division by zero".
+?- catch(smalltalk('1 +', _), error(E, _), true), functor(E, N, _) ==> E = syntax_error('unexpected end of input (near \'\')'), N = syntax_error.
+?- smalltalk('3 + 4', X) ==> X = 7.
+?- smalltalk('OrderedCollection new add: 1; add: 2; yourself', C) ==> C = [1,2].
+?- smalltalk('#(1 2 3) inject: 0 into: [:a :b | a + b]', S) ==> S = 6.
+?- smalltalk('Date today class name', N) ==> N = 'Date'.
+?- smalltalk('true', X) ==> X = true.
+?- smalltalk('nil', X) ==> X = nil.
+?- smalltalk_send(3, factorial, [], X) ==> X = 6.
+?- smalltalk_send(abc, size, [], N) ==> N = 3.
+?- smalltalk_send("hello", asUppercase, [], U) ==> U = "HELLO".
+?- smalltalk_send(10, 'between:and:', [1, 20], B) ==> B = true.
+?- smalltalk_send([3,1,2], asSortedCollection, [], S0), smalltalk_send(S0, asArray, [], A) ==> S0 = [1,2,3], A = [1,2,3].
+?- smalltalk_send(5, 'max:', [9], M) ==> M = 9.
+?- catch(smalltalk_send(3, noSuchMessage, [], _), error(smalltalk_error(M), _), true) ==> M = "does not understand #noSuchMessage".
+?- catch(smalltalk_send(3, 'max:', [], _), error(domain_error(D, _), _), true) ==> D = selector_arity.
+?- smalltalk('3 @ 4', P), smalltalk_print(P, T) ==> P = 3@4, T = "3@4".
+?- smalltalk('Smalltalk at: #PrologTestGlobal put: 42', _), smalltalk_global('PrologTestGlobal', V) ==> V = 42.
+?- smalltalk_ref('OrderedCollection new', O), smalltalk_send(O, 'add:', [x], _), smalltalk_send(O, 'add:', [y], _), smalltalk_send(O, size, [], N), smalltalk_send(O, asArray, [], A) ==> O = OrderedCollection (#x #y), N = 2, A = [x,y].
+?- smalltalk_ref('OrderedCollection new', O), smalltalk_send(O, 'addAll:', [[1,2,3]], _), smalltalk_send(O, size, [], N) ==> O = OrderedCollection (1 2 3), N = 3.
+?- smalltalk_ref('#(1 2 3)', V), is_list(V) ==> false.
+?- smalltalk_ref('#(1 2 3)', V), \+ is_list(V), smalltalk_send(V, size, [], N) ==> V = #(1 2 3), N = 3.
+?- smalltalk_ref('42', X), integer(X) ==> X = 42.
+?- smalltalk_global('Smalltalk', S), \+ atom(S) ==> S = Smalltalk.
+# ---- the Smalltalk API ----
+(Prolog solve: 'parent(tom, X)') size ==> 2
+((Prolog solve: 'parent(tom, X)') collect: [:d | d at: 'X']) asArray ==> #(#bob #liz)
+((Prolog solveFirst: 'parent(X, ann)') at: 'X') ==> #bob
+(Prolog solveFirst: 'parent(X, nobody)') ==> nil
+Prolog succeeds: 'parent(tom, bob)' ==> true
+Prolog succeeds: 'parent(bob, tom)' ==> false
+(Prolog valueOf: 'X' in: 'X is 6 * 7') ==> 42
+(Prolog valueOf: 'L' in: 'findall(X, member(X, [1,2,3]), L)') ==> #(1 2 3)
+(Prolog valueOf: 'S' in: 'atom_string(abc, S)') ==> 'abc'
+(Prolog valueOf: 'F' in: 'F = foo(1, 2)') printString ==> 'foo(1,2)'
+(Prolog valueOf: 'B' in: 'B = true') ==> true
+| n | n := 0. Prolog solve: 'member(X, [a,b,c])' do: [:d | n := n + 1]. n ==> 3
+Prolog define: #double arity: 2 as: [:e :a | e unify: (a at: 2) with: (e eval: (a at: 1)) * 2]. (Prolog valueOf: 'Y' in: 'double(21, Y)') ==> 42
+Prolog define: #isbig arity: 1 as: [:e :a | (e eval: (a at: 1)) > 100]. (Prolog succeeds: 'isbig(500)') & (Prolog succeeds: 'isbig(5)') not ==> true
+Prolog consult: 'age(peter, 7). age(ann, 11).'. (Prolog solve: 'age(X, A)') size ==> 2
+Prolog assert: 'age(zoe, 5)'. (Prolog valueOf: 'A' in: 'age(zoe, A)') ==> 5
+Prolog answerLine: 'foo(1)' ==> 'ERROR: Unknown procedure: foo/1'
+Prolog answerLine: 'X = 1 ; X = 2' ==> 'X = 1 ; X = 2.'
+Prolog answerLine: 'fail' ==> 'false.'
+Prolog answerLine: 'true' ==> 'true.'
+Prolog answerLine: 'write(hello), nl' ==> 'hello true.'
+(Prolog answer: 'member(X, [a,b,c])' limit: 2) size ==> 14
+((PrologTool evaluate: '?- member(X, [p,q]).') copyReplacing: Character lf with: $ ) ==> 'X = p ; X = q.'
+(PrologTool evaluate: 'tool_fact(1). tool_fact(2).') ==> 'ok.'
+(PrologTool evaluate: '?- findall(X, tool_fact(X), L).') ==> 'L = [1,2].'
+((PrologTool evaluate: '?- foo(') copyFrom: 1 to: 6) ==> 'ERROR:'
+(PrologTool evaluate: '') ==> ''
+Smalltalk isPackageLoaded: 'Prolog' ==> true
+(SystemMenu labels includes: 'prolog workspace') ==> true
+(PrologEngine new solveOnce: #true) ==> true
+((PrologReader on: 'foo(X, Y, X).' ops: PrologOps new flags: Dictionary new) readTerm) args size ==> 3
+(PrologWriter new quoted: true; stringFor: ((PrologReader on: 'a:-b,c.' ops: PrologOps new flags: Dictionary new) readTerm)) ==> 'a:-b,c'
+(Prolog newEngine == Prolog newEngine) ==> false
+| e | e := Prolog newEngine. e consultString: 'only_here(1).'. e solveOnce: (PrologStruct functor: #only_here with: 1) ==> true
+| e | e := Prolog newEngine. e consultString: 'only_here(1).'. [Prolog engine solveOnce: (PrologStruct functor: #only_here with: 1)] on: PrologThrow do: [:x | x return: #unknown] ==> #unknown

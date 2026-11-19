@@ -12,6 +12,7 @@
 
 char *transcript_text = NULL; size_t transcript_len = 0; static size_t transcript_cap = 0;
 oop pending_inspect = NULL; bool quit_requested = false;
+char *pending_tool_class = NULL, *pending_tool_title = NULL, *pending_tool_text = NULL; bool menu_items_changed = false;
 char *pending_window_title = NULL, *pending_window_text = NULL;   /* set by primitive 180, consumed by the UI */
 void interp_flush_cache(void);
 
@@ -284,6 +285,25 @@ oop call_primitive(int n, oop *args, int nargs, bool *ok) {
         bool ok = image_snapshot(p, err, sizeof err); free(p);
         return ok ? trueobj : new_string(err); }
     case 195: return new_string(image_path);   /* imageName: where Smalltalk snapshot saves */
+    /* ---- packages and tools ---- */
+    case 196: return new_string(kernel_dir ? kernel_dir : ".");   /* kernelDirectory */
+    case 197: { /* primLoadFile: path -- file in without logging to the changes file (a package is part of the system); true or an error String */
+        if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); char err[512]; bool saved = changes_logging; changes_logging = false;
+        bool ok = file_in(p, err, sizeof err); changes_logging = saved; free(p);
+        return ok ? trueobj : new_string(err); }
+    case 198: { /* primLogChange: text -- append a line to the changes file (when logging) */
+        if (!is_bytes(A(1))) FAIL; if (changes_logging) { char *t = str_cstr(A(1)); changes_log(t); free(t); } return self; }
+    case 199: { /* primCompile: source -- compile (but do not run) a do-it for the receiver: Array(true, CompiledMethod) or Array(false, message) */
+        if (!is_bytes(A(1))) FAIL; char err[512]; char *src = str_cstr(A(1));
+        oop m = compile_doit(CLASS_OF(self), src, err, sizeof err); free(src);
+        oop a = new_array(2);
+        if (!m) { SLOT(a, 0) = falseobj; SLOT(a, 1) = new_string(err); return a; }
+        SLOT(a, 0) = trueobj; SLOT(a, 1) = m; return a; }
+    case 200: menu_items_changed = true; return self;   /* the System menu's extra items changed */
+    case 201: { /* primOpenTool: className title: aString contents: text -- a workspace whose do it / print it send className evaluate: */
+        if (!is_bytes(A(1)) || !is_bytes(A(2)) || !is_bytes(A(3))) FAIL;
+        free(pending_tool_class); free(pending_tool_title); free(pending_tool_text);
+        pending_tool_class = str_cstr(A(1)); pending_tool_title = str_cstr(A(2)); pending_tool_text = str_cstr(A(3)); return self; }
     }
     FAIL;
 }
