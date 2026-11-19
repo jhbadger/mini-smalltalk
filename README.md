@@ -142,7 +142,7 @@ case-insensitive, and an image does not hold processes or windows.
 The `packages/` folder holds optional systems that are not in the standard image. Load one on demand:
 
 ```smalltalk
-Smalltalk availablePackages          "#('Bio' 'Debugger' 'Phylo' 'Prolog' 'Regex' 'SUnit')"
+Smalltalk availablePackages          "#('Bio' 'Debugger' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'      "also: System menu -> load package..., or  st -l Prolog"
 ```
 
@@ -161,6 +161,8 @@ that image. These come with the system:
   and sequence features as Prolog facts.
 * [**Phylo**](packages/Phylo/README.md) — phylogenetics, built on Bio: distance models, neighbour joining and UPGMA, Newick in
   and out, trees drawn with characters, progressive multiple alignment, the bootstrap, and a tree browser.
+* [**Stats**](packages/Stats/README.md) — tables and statistics: CSV, a DataTable you can select, sort, group and join, the
+  descriptive statistics, t tests, chi-square, the rank tests, analysis of variance, regression, and plots made of characters.
 
 See [packages/README.md](packages/README.md) for how packages work and how to write one.
 

@@ -1,0 +1,176 @@
+# Tests for the Stats package, run by test_vm after loading it.
+# The package tests itself with SUnit (141 tests); the first line runs that suite, and the rest check
+# the same ground from outside, one expression at a time.
+Smalltalk loadPackage: 'Stats' ==> true
+| s | s := (TestSuite forClasses: (Array with: DistributionTest with: StatisticsTest with: InferenceTest with: DataTableTest)) run. s printString ==> '141 run, 141 passed, 0 failed, 0 errors'
+# the distributions, against published values
+(Distribution lnGamma: 0.5) ==> 0.5723649429247004
+(Distribution gamma: 5.0) rounded ==> 24
+(Distribution binomial: 10 choose: 3) ==> 120
+(Distribution erf: 1.0) ==> 0.8427007929497145
+(Distribution normalCDF: 0.0) ==> 0.5
+(Distribution normalCDF: 1.96) ==> 0.9750021048517798
+((Distribution normalQuantile: 0.975) - 1.959963984540054) abs < 1.0e-9 ==> true
+((Distribution tCDF: 2.0 df: 10) - 0.9633059826146299) abs < 1.0e-10 ==> true
+((Distribution tQuantile: 0.975 df: 10) - 2.2281388519649385) abs < 1.0e-8 ==> true
+((Distribution chiSquareQuantile: 0.95 df: 3) - 7.814727903251179) abs < 1.0e-8 ==> true
+((Distribution fQuantile: 0.95 df1: 3 df2: 12) - 3.4902948195) abs < 1.0e-7 ==> true
+(Distribution incompleteBeta: 0.5 a: 2 b: 3) ==> 0.6875000000000007
+[Distribution normalQuantile: 0] on: StatsError do: [:e | 'caught'] ==> 'caught'
+(StatsError inheritsFrom: Error) ==> true
+# descriptive statistics
+#(1 2 3 4) mean ==> 2.5
+#(1 2 3 4) median ==> 2.5
+#(1 2 3) median ==> 2
+#(1 2 2 3) mode ==> 2
+#(1 4 16) geometricMean ==> 4.0
+#(2 4 4 4 5 5 7 9) variance ==> 4.571428571428571
+#(2 4 4 4 5 5 7 9) populationVariance ==> 4.0
+#(2 4 4 4 5 5 7 9) populationStandardDeviation ==> 2.0
+#(1 5 9) range ==> 8
+#(1 2 3 4 5 6 7 8) interquartileRange ==> 3.5
+(#(5.1 4.9 6.2 5.8 5.5 5.3 6.0 5.7) quantile: 0.25) ==> 5.25
+#(5.1 4.9 6.2 5.8 5.5 5.3 6.0 5.7) fiveNumberSummary ==> #(4.9 5.25 5.6 5.85 6.2)
+#(10 20 20 30) ranks ==> #(1.0 2.5 2.5 4.0)
+(Statistics tieCorrection: #(1 1 2)) ==> 6
+#(1 2 3 4 5 100) outliers ==> #(100)
+#(10 20 30) normalized ==> #(0.0 0.5 1.0)
+(#(1 2 3) correlationWith: #(2 4 6)) ==> 1.0
+(#(1 2 3) correlationWith: #(6 4 2)) ==> -1.0
+((#(1 2 3 4) spearmanWith: #(1 4 9 16)) - 1.0) abs < 1.0e-12 ==> true
+(#(1 2 3) covarianceWith: #(2 4 6)) ==> 2.0
+(Array with: 1 with: nil with: 3) mean ==> 2.0
+[#() mean] on: StatsError do: [:e | 'caught'] ==> 'caught'
+[#(1) variance] on: StatsError do: [:e | 'caught'] ==> 'caught'
+[#(1 2 3) quantile: 2] on: StatsError do: [:e | 'caught'] ==> 'caught'
+(#(1 2 3) statisticsSummary includesSubstring: 'median') ==> true
+# the t test
+| t | t := TTest of: #(5.1 4.9 6.2 5.8 5.5 5.3 6.0 5.7) against: 5.0. (t statistic - 3.5591516294920362) abs < 1.0e-12 ==> true
+| t | t := TTest of: #(5.1 4.9 6.2 5.8 5.5 5.3 6.0 5.7) against: 5.0. (t p - 0.009229914920208025) abs < 1.0e-12 ==> true
+| t | t := TTest of: #(5.1 4.9 6.2 5.8 5.5 5.3 6.0 5.7) against: 5.0. t degreesOfFreedom ==> 7
+| t | t := TTest of: #(5.1 4.9 6.2 5.8 5.5 5.3 6.0 5.7) against: 5.0. t isSignificant ==> true
+| t | t := TTest of: #(1 2 3 4 5) and: #(1 2 3 4 5). t p ==> 1.0
+| t | t := TTest of: #(1 2 3 4 5) and: #(1 2 3 4 5). t isSignificant ==> false
+| t | t := TTest of: #(1 2 3 4 5) and: #(1 2 3 4 5). t printString ==> 'two-sample t test, Welch(p = 1.0000)'
+| t | t := TTest pooledOf: #(5.1 4.9 6.2 5.8) and: #(6.3 6.8 7.1 6.5). t degreesOfFreedom ==> 6
+| t | t := TTest pairedOf: #(5.1 4.9 6.2 5.8) and: #(6.3 6.8 7.1 6.5). t degreesOfFreedom ==> 3
+[(TTest pairedOf: #(1 2 3) and: #(1 2)) run] on: StatsError do: [:e | 'caught'] ==> 'caught'
+[(TTest of: #(2 2 2) against: 0) run] on: StatsError do: [:e | 'caught'] ==> 'caught'
+((TTest of: #(1 2 3 4) and: #(4 5 6 7)) report includesSubstring: 'Welch') ==> true
+# chi-square
+| c | c := ChiSquareTest goodnessOf: #(5 8 9 8 10 20). (c statistic - 13.4) abs < 1.0e-9 ==> true
+| c | c := ChiSquareTest goodnessOf: #(5 8 9 8 10 20). (c p - 0.019905220334774376) abs < 1.0e-12 ==> true
+| c | c := ChiSquareTest goodnessOf: #(10 10 10). c statistic ==> 0.0
+| c | c := ChiSquareTest independenceOf: (Array with: #(20 30) with: #(30 20)). c statistic ==> 4.0
+| c | c := ChiSquareTest independenceOf: (Array with: #(20 30) with: #(30 20)). (c p - 0.04550026389635833) abs < 1.0e-12 ==> true
+| c | c := ChiSquareTest independenceOf: (Array with: #(20 30) with: #(30 20)). c smallestExpected ==> 25.0
+| c | c := ChiSquareTest independenceOf: (Array with: #(10 20 30) with: #(30 20 10)). c degreesOfFreedom ==> 2
+[(ChiSquareTest goodnessOf: #(1 2) against: #(1 2 3)) run] on: StatsError do: [:e | 'caught'] ==> 'caught'
+# the rank tests
+| m | m := MannWhitneyTest of: #(5.1 4.9 6.2 5.8 5.5 5.3 6.0 5.7) and: #(6.3 6.8 7.1 6.5 6.9 7.4 6.2 7.0). m u ==> 0.5
+| m | m := MannWhitneyTest of: #(5.1 4.9 6.2 5.8 5.5 5.3 6.0 5.7) and: #(6.3 6.8 7.1 6.5 6.9 7.4 6.2 7.0). m u1 + m u2 ==> 64.0
+| m | m := MannWhitneyTest of: #(5.1 4.9 6.2 5.8 5.5 5.3 6.0 5.7) and: #(6.3 6.8 7.1 6.5 6.9 7.4 6.2 7.0). m p < 0.01 ==> true
+| m | m := MannWhitneyTest of: #(1 2 3 4 5) and: #(1 2 3 4 5). m u ==> 12.5
+| m | m := MannWhitneyTest of: #(1 2 3 4 5) and: #(1 2 3 4 5). m isSignificant ==> false
+| w | w := WilcoxonSignedRankTest of: #(1 2 3 4) and: #(1 2 5 7). w usedPairs ==> 2
+| w | w := WilcoxonSignedRankTest of: #(5 6 7 8) and: #(1 2 3 4). w w ==> 0.0
+[(WilcoxonSignedRankTest of: #(1 2 3) and: #(1 2 3)) run] on: StatsError do: [:e | 'caught'] ==> 'caught'
+# correlation and analysis of variance
+| c | c := CorrelationTest of: #(1 2 3 4 5 6 7 8) and: #(2 4 5 4 5 7 8 9). (c r - 0.9511897312113419) abs < 1.0e-12 ==> true
+| c | c := CorrelationTest of: #(1 2 3 4 5 6 7 8) and: #(2 4 5 4 5 7 8 9). (c p - 0.0002801804615488687) abs < 1.0e-12 ==> true
+| c | c := CorrelationTest spearmanOf: #(1 2 3 4 5) and: #(1 4 9 16 25). (c r - 1.0) abs < 1.0e-12 ==> true
+| f | f := AnovaTest of: (Array with: #(6 8 4 5) with: #(8 12 9 11) with: #(13 9 11 8)). (f statistic - 6.873134328358209) abs < 1.0e-10 ==> true
+| f | f := AnovaTest of: (Array with: #(6 8 4 5) with: #(8 12 9 11) with: #(13 9 11 8)). (f p - 0.01541684667047416) abs < 1.0e-10 ==> true
+| f | f := AnovaTest of: (Array with: #(6 8 4 5) with: #(8 12 9 11) with: #(13 9 11 8)). f betweenSS ==> 51.16666666666667
+[(AnovaTest of: (Array with: #(1 2 3))) run] on: StatsError do: [:e | 'caught'] ==> 'caught'
+# regression
+| r | r := LinearRegression of: #(1 2 3 4) and: #(3 5 7 9). r slope ==> 2.0
+| r | r := LinearRegression of: #(1 2 3 4) and: #(3 5 7 9). r intercept ==> 1.0
+| r | r := LinearRegression of: #(1 2 3 4) and: #(3 5 7 9). r rSquared ==> 1.0
+| r | r := LinearRegression of: #(1 2 3 4) and: #(3 5 7 9). r valueAt: 10 ==> 21.0
+| r | r := LinearRegression of: #(1 2 3 4 5) and: #(2.1 4.2 5.8 8.1 9.9). (r rSquared - 0.9978219796368216) abs < 1.0e-12 ==> true
+| r | r := LinearRegression of: #(1 2 3 4 5) and: #(2.1 4.2 5.8 8.1 9.9). r pForSlope < 0.001 ==> true
+| r | r := LinearRegression of: #(1 2 3 4) and: #(3 5 7 9). r equation ==> 'y = 2.0000x + 1.0000'
+[LinearRegression of: #(1 2) and: #(3 4)] on: StatsError do: [:e | 'caught'] ==> 'caught'
+[LinearRegression of: #(2 2 2) and: #(3 4 5)] on: StatsError do: [:e | 'caught'] ==> 'caught'
+# the table
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 2) with: #(3 4)). t printString ==> 'a DataTable(2 x 2)'
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 2) with: #(3 4)). t column: 'b' ==> #(2 4)
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 2) with: #(3 4)). t at: 2 and: 'a' ==> 3
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 2) with: #(3 4)). (t rowAt: 1) at: 'b' ==> 2
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 2) with: #(3 4)). (t select: [:r | (r at: 'a') > 1]) rowCount ==> 1
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 2) with: #(3 4)). (t sortBy: 'a' descending: true) at: 1 and: 'a' ==> 3
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 2) with: #(3 4)). (t withColumns: #('b')) columnNames ==> #('b')
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 2) with: #(3 4)). (t withoutColumn: 'b') columnNames ==> #('a')
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 2) with: #(3 4)). (t renameColumn: 'a' to: 'z') columnNames ==> #('z' 'b')
+| t | t := DataTable columns: #('a') rows: (Array with: #(1) with: #(2) with: #(3)). t meanOf: 'a' ==> 2.0
+| t | t := DataTable columns: #('a') rows: (Array with: #(1) with: #(2) with: #(3)). t sumOf: 'a' ==> 6
+| t | t := DataTable columns: #('a') rows: (Array with: #(1) with: #(2) with: #(3)). t numericColumnNames ==> #('a')
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 2) with: #(3 4)). t reversed at: 1 and: 'a' ==> 3
+| t | t := DataTable columns: #('g' 'v') rows: (Array with: #('x' 1) with: #('x' 3) with: #('y' 5)). (t groupBy: 'g') size ==> 2
+| t | t := DataTable columns: #('g' 'v') rows: (Array with: #('x' 1) with: #('x' 3) with: #('y' 5)). (t meanBy: 'g' of: 'v') at: 1 and: 'v' ==> 2.0
+| t | t := DataTable columns: #('g' 'v') rows: (Array with: #('x' 1) with: #('x' 3) with: #('y' 5)). (t countsBy: 'g') at: 1 and: 'count' ==> 2
+| t | t := DataTable columns: #('g' 'v') rows: (Array with: #('x' 1) with: #('x' 3) with: #('y' 5)). t distinctValuesOf: 'g' ==> #('x' 'y')
+| a b | a := DataTable columns: #('k' 'v') rows: (Array with: #('x' 1)). b := DataTable columns: #('k' 'w') rows: (Array with: #('x' 9)). (a join: b on: 'k') columnNames ==> #('k' 'v' 'w')
+| a b | a := DataTable columns: #('k' 'v') rows: (Array with: #('x' 1) with: #('y' 2)). b := DataTable columns: #('k' 'w') rows: (Array with: #('x' 9)). (a join: b on: 'k') rowCount ==> 1
+| a b | a := DataTable columns: #('k' 'v') rows: (Array with: #('x' 1) with: #('y' 2)). b := DataTable columns: #('k' 'w') rows: (Array with: #('x' 9)). (a leftJoin: b on: 'k') rowCount ==> 2
+| t | t := DataTable columns: #('a') rows: (Array with: #(1)). [t column: 'zz'] on: StatsError do: [:e | 'caught'] ==> 'caught'
+# CSV
+| t | t := DataTable fromCSV: 'a,b,c', (String with: Character lf), '1,2.5,hello'. t columnNames ==> #('a' 'b' 'c')
+| t | t := DataTable fromCSV: 'a,b,c', (String with: Character lf), '1,2.5,hello'. t at: 1 and: 'b' ==> 2.5
+| t | t := DataTable fromCSV: 'a,b,c', (String with: Character lf), '1,2.5,hello'. t at: 1 and: 'c' ==> 'hello'
+| t | t := DataTable fromCSV: 'a,b', (String with: Character lf), '1,'. (t at: 1 and: 'b') printString ==> 'nil'
+| t | t := DataTable fromCSV: 'a,b', (String with: Character lf), '"one, two",3'. t at: 1 and: 'a' ==> 'one, two'
+| t | t := DataTable fromCSV: 'a', (String with: Character lf), '"he said ""hi"""'. t at: 1 and: 'a' ==> 'he said "hi"'
+| t | t := CSVReader new header: false; parse: '1,2'. t columnNames ==> #('column1' 'column2')
+| t | t := DataTable fromTSV: 'a', (String with: Character tab), 'b', (String with: Character lf), '1', (String with: Character tab), '2'. t at: 1 and: 'b' ==> 2
+| t | t := DataTable columns: #('a') rows: (Array with: (Array with: 'one, two')). (t asCSV includesSubstring: '"one, two"') ==> true
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 2)). (DataTable fromCSV: t asCSV) at: 1 and: 'b' ==> 2
+(CSVReader numberFrom: '42') ==> 42
+(CSVReader numberFrom: '-2.5') ==> -2.5
+(CSVReader numberFrom: '1e3') ==> 1000.0
+(CSVReader numberFrom: 'abc') printString ==> 'nil'
+(CSVReader numberFrom: '1.2.3') printString ==> 'nil'
+[DataTable readCSV: '/no/such/file.csv'] on: StatsError do: [:e | 'caught'] ==> 'caught'
+# the example data, which was made with a known answer in it
+Stats examplePlants rowCount ==> 120
+Stats examplePlants columnNames ==> #('id' 'variety' 'height' 'width' 'weight' 'leaves')
+(Stats examplePlants countBy: 'variety') at: 'beta' ==> 40
+(Stats examplePlants correlationBetween: 'height' and: 'weight') > 0.9 ==> true
+(Stats examplePlants anovaOf: 'height' by: 'variety') p < 0.001 ==> true
+| r | r := Stats examplePlants regressionOf: 'weight' on: 'height'. (r slope between: 1.8 and: 2.4) ==> true
+| r | r := Stats examplePlants regressionOf: 'weight' on: 'height'. r rSquared > 0.85 ==> true
+Stats exampleWeather rowCount ==> 48
+Stats exampleWeather includesColumn: 'temperature, C' ==> true
+(Stats exampleWeather numbersIn: 'temperature, C') size < 48 ==> true
+(Stats exampleWeather distinctValuesOf: 'town') size ==> 4
+[Stats exampleWeather tTestOf: 'rainfall' by: 'town'] on: StatsError do: [:e | 'four towns is too many for a t test'] ==> 'four towns is too many for a t test'
+| w | w := Stats exampleWeather select: [:r | (r at: 'town') = 'Bath' or: [(r at: 'town') = 'Hay-on-Wye']]. (w tTestOf: 'rainfall' by: 'town') degreesOfFreedom > 0 ==> true
+# plots
+((TextPlot histogram: #(1 2 2 3 3 3 4 4 5) bins: 5) includesSubstring: 'n = 9') ==> true
+((TextPlot histogram: #(5 5 5)) includesSubstring: 'all 3 values are 5') ==> true
+((TextPlot histogram: #()) includesSubstring: 'nothing to plot') ==> true
+((TextPlot boxPlot: #(1 2 3 4 5 6 7 8 100)) includesSubstring: 'outliers') ==> true
+((TextPlot scatter: #(1 2 3) and: #(2 4 6)) includesSubstring: '*') ==> true
+(TextPlot sparkline: #(1 2 3 4 5)) size ==> 5
+(TextPlot sparkline: #(1 2 3)) ==> '_=@'
+(TextPlot sparkline: #()) ==> ''
+((TextPlot distribution: #(1 2 3 4 5 6 7 8)) includesSubstring: 'median') ==> true
+((TextPlot bars: (Dictionary new at: 'a' put: 3; yourself)) includesSubstring: '#') ==> true
+# the facade and the browser
+Stats version ==> '1.0'
+Stats examples size ==> 2
+(Stats tests size >= 10) ==> true
+(Stats mean: #(1 2 3)) ==> 2.0
+(Stats normalCDF: 0.0) ==> 0.5
+(Stats regressionOf: #(2 4 6) on: #(1 2 3)) slope ==> 2.0
+(Stats tTestOf: #(1 2 3 4) and: #(1 2 3 4)) p ==> 1.0
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 'x')). TableBrowser openOn: t. TableBrowser listItems ==> #('* the whole table' '# a' '  b')
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 'x')). TableBrowser openOn: t. ((TableBrowser detailAt: 1) includesSubstring: 'a') ==> true
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 'x')). TableBrowser openOn: t. TableBrowser command: 2 at: 2. ((TableBrowser detailAt: 2) includesSubstring: 'median') ==> true
+| t | t := DataTable columns: #('a' 'b') rows: (Array with: #(1 'x')). TableBrowser openOn: t. TableBrowser command: 9 at: 1 ==> 'select a column first'
+TableBrowser commandLabels size ==> 13
+# the package itself
+(Smalltalk availablePackages includes: 'Stats') ==> true
+Smalltalk isPackageLoaded: 'Stats' ==> true
+((Smalltalk packageDescription: 'Stats') includesSubstring: 'statistics') ==> true

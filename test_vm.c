@@ -402,6 +402,9 @@ int main(int argc, char **argv) {
         check("Smalltalk loadPackage: 'Phylo'", "true");
         n = run_lib_tests("packages/Phylo/tests/tests.txt");
         printf("ok    Phylo package tests%s: %d run\n", pass ? " under GC stress" : "", n);
+        check("Smalltalk loadPackage: 'Stats'", "true");
+        n = run_lib_tests("packages/Stats/tests/tests.txt");
+        printf("ok    Stats package tests%s: %d run\n", pass ? " under GC stress" : "", n);
         gc_threshold = saved_threshold;
     }
     /* ---- the changes file: every route that changes code is logged, and replays ---- */
