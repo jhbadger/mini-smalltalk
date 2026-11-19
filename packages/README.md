@@ -3,7 +3,7 @@
 This folder holds systems that are **not** part of the standard image. Load one when you want it:
 
 ```smalltalk
-Smalltalk availablePackages            "#('Bio' 'Debugger' 'Prolog' 'Regex' 'SUnit')"
+Smalltalk availablePackages            "#('Bio' 'Debugger' 'Phylo' 'Prolog' 'Regex' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'        "files it in (once)"
 Smalltalk isPackageLoaded: 'Prolog'
 Smalltalk packageDescription: 'Prolog' "the first comment of its file"
@@ -67,3 +67,6 @@ Keep tests with the package: both packages have a `tests/tests.txt` of `expressi
 * **[Bio](Bio/README.md)** — bioinformatics: FASTA, FASTQ and GenBank files, sequence and feature objects, translation with
   the NCBI genetic codes, ORFs, composition and assembly statistics, IUPAC pattern search, k-mers, restriction enzymes,
   Needleman-Wunsch and Smith-Waterman alignment, a sequence browser, and (with Prolog loaded) features as Prolog facts.
+* **[Phylo](Phylo/README.md)** — phylogenetics, which loads Bio: the usual distance models, neighbour joining and UPGMA, Newick
+  reading and writing, trees drawn with characters, re-rooting and Robinson-Foulds comparison, progressive multiple alignment,
+  the bootstrap with a majority-rule consensus, and a tree browser.

@@ -1,0 +1,161 @@
+# Tests for the Phylo package, run by test_vm after loading it.
+# The package tests itself with SUnit (108 tests); the first lines run those suites, and the rest
+# check the same ground from outside, one expression at a time.
+Smalltalk loadPackage: 'Phylo' ==> true
+| s | s := (TestSuite forClasses: (Array with: PhyloTreeTest with: PhyloDistanceTest with: PhyloBuildTest with: PhyloAlignmentTest)) run. s printString ==> '108 run, 108 passed, 0 failed, 0 errors'
+# reading Newick
+(PhyloTree fromNewick: '((A:0.1,B:0.2)95:0.05,C:0.3,D:0.4);') taxa ==> #('A' 'B' 'C' 'D')
+(PhyloTree fromNewick: '((A,B),C);') size ==> 3
+(PhyloTree fromNewick: '((A,B),C);') nodeCount ==> 5
+(PhyloTree fromNewick: '(A:1,B:2);') isRooted ==> true
+(PhyloTree fromNewick: '(A,B,C);') isRooted ==> false
+(PhyloTree fromNewick: '((A,B),C);') printString ==> 'a PhyloTree(3 taxa)'
+(PhyloTree fromNewick: '((A,B)Primates,C);') internalNodes last label ==> 'Primates'
+(PhyloTree fromNewick: '((A,B)88,C);') internalNodes last support ==> 88
+(PhyloTree fromNewick: '[note](A,B);') taxa ==> #('A' 'B')
+(PhyloTree fromNewick: '(Homo_sapiens,Gorilla);') taxa ==> #('Gorilla' 'Homo sapiens')
+(NewickReader parseAll: '(A,B);(C,D);') size ==> 2
+[PhyloTree fromNewick: '((A,B);'] on: PhyloError do: [:e | 'caught'] ==> 'caught'
+[PhyloTree fromNewick: ''] on: PhyloError do: [:e | 'caught'] ==> 'caught'
+(PhyloError inheritsFrom: Error) ==> true
+# writing Newick
+(PhyloTree fromNewick: '((A:0.1,B:0.2)95:0.05,C:0.3,D:0.4);') asNewick ==> '((A:0.1,B:0.2)95:0.05,C:0.3,D:0.4);'
+(PhyloTree fromNewick: '((A:0.1,B:0.2),C:0.3);') asNewickWithoutLengths ==> '((A,B),C);'
+(PhyloTree fromNewick: '(A,B,C);') asNewick ==> '(A,B,C);'
+# walking and measuring
+(PhyloTree fromNewick: '((A:0.1,B:0.2),C:0.3);') totalBranchLength ==> 0.6000000000000001
+((PhyloTree fromNewick: '((A:0.1,B:0.2),C:0.3);') distanceBetween: 'A' and: 'B') ==> 0.30000000000000004
+((PhyloTree fromNewick: '((A:0.1,B:0.2),C:0.3);') distanceBetween: 'A' and: 'A') ==> 0
+((PhyloTree fromNewick: '((A,B),C);') mrcaOf: #('A' 'B')) leafCount ==> 2
+((PhyloTree fromNewick: '((A,B),C);') mrcaOf: #('A' 'C')) isRoot ==> true
+((PhyloTree fromNewick: '((A,B),C);') leafNamed: 'A') depth ==> 2
+(PhyloTree fromNewick: '((A:1,B:1):1,C:1);') height ==> 2
+[(PhyloTree fromNewick: '(A,B);') leafNamed: 'Z'] on: PhyloError do: [:e | 'caught'] ==> 'caught'
+# topology
+(PhyloTree fromNewick: '((A,B),(C,D));') splits ==> Set (#('C' 'D'))
+(PhyloTree fromNewick: '(A,B,C,D);') splits size ==> 0
+((PhyloTree fromNewick: '((A,B),C,D);') robinsonFouldsTo: (PhyloTree fromNewick: '(D,C,(B,A));')) ==> 0
+((PhyloTree fromNewick: '((A,B),(C,D));') robinsonFouldsTo: (PhyloTree fromNewick: '((A,C),(B,D));')) ==> 2
+((PhyloTree fromNewick: '((A,B),C,D);') hasSameTopologyAs: (PhyloTree fromNewick: '(D,C,(B,A));')) ==> true
+(PhyloTree fromNewick: '((A,B),(C,D));') isBinary ==> true
+(PhyloTree fromNewick: '(A,B,C,D);') isBinary ==> false
+(PhyloTree star: #('A' 'B' 'C')) size ==> 3
+# changing a tree
+((PhyloTree fromNewick: '((A:1,B:2):3,C:4);') pruneTaxa: #('A')) taxa ==> #('B' 'C')
+(((PhyloTree fromNewick: '((A:1,B:2):3,C:4);') pruneTaxa: #('A')) leafNamed: 'B') branchLength ==> 5
+((PhyloTree fromNewick: '((A,B),(C,D));') keepTaxa: #('A' 'C')) taxa ==> #('A' 'C')
+(((PhyloTree fromNewick: '(A:1,B:2);') scaleBy: 10) leafNamed: 'B') branchLength ==> 20
+((PhyloTree fromNewick: '((A:1,B:1):1,(C:1,D:1):1);') unroot) root children size ==> 3
+((PhyloTree fromNewick: '((A:1,B:1):0.001,C:1,D:1);') collapseBranchesShorterThan: 0.01) root children size ==> 4
+((PhyloTree fromNewick: '((A:1,B:1):1,C:1,D:1);') rootOn: 'D') isRooted ==> true
+((PhyloTree fromNewick: '((A:0.1,B:0.1):0.1,C:0.1,D:5.0);') rootOnMidpoint) isRooted ==> true
+((PhyloTree fromNewick: '(((A,B),C),D);') ladderize) root children first leafCount ==> 1
+# drawing
+((PhyloTree fromNewick: '((A:1,B:1):1,C:1);') asText lines size) ==> 5
+((PhyloTree fromNewick: '((A:1,B:1)90:1,C:1);') asText includesSubstring: '90') ==> true
+((PhyloTree fromNewick: '((A,B),C);') asText includesSubstring: 'A') ==> true
+((TreeRenderer cladogram: (PhyloTree fromNewick: '((A,B),C);')) includesSubstring: 'B') ==> true
+((TreeRenderer render: (PhyloTree fromNewick: '((A:1,B:1):1,C:1);') width: 20) includesSubstring: 'C') ==> true
+((PhyloTree fromNewick: '((A:1,B:1):1,C:1,D:1);') report includesSubstring: '4 taxa') ==> true
+# the distance models
+(PDistanceModel new distanceBetween: 'AAAA' and: 'AAAT') ==> 0.25
+(PDistanceModel new distanceBetween: 'AAAA' and: 'AAAA') ==> 0.0
+(JukesCantorModel new distanceBetween: 'AAAAAAAAAA' and: 'AAAAAAAATT') ==> 0.2326161962278796
+(PoissonModel new distanceBetween: 'AAAAAAAAAA' and: 'AAAAAAAAWW') ==> 0.2231435513142097
+((Kimura2ParameterModel new distanceBetween: 'AAAAAAAAAA' and: 'GGAAAAAAAA') = (Kimura2ParameterModel new distanceBetween: 'AAAAAAAAAA' and: 'CCAAAAAAAA')) ==> false
+(PDistanceModel new distanceBetween: 'AN-A' and: 'AGTT') ==> 0.5
+(PDistanceModel new comparedSitesBetween: 'AN-A' and: 'AGTT') ==> 2
+| m | m := JukesCantorModel new. m distanceBetween: 'AAAAAAAA' and: 'CGCGCGCG'. m sawSaturation ==> true
+(JukesCantorModel new distanceBetween: 'AAAAAAAA' and: 'CGCGCGCG') ==> 10.0
+(DistanceModel named: 'jc69') shortName ==> 'jc69'
+(DistanceModel named: 'K2P') name ==> 'Kimura two-parameter (1980)'
+(DistanceModel named: 'poisson') isForProtein ==> true
+(DistanceModel named: 'p') isForProtein ==> false
+[DistanceModel named: 'nonesuch'] on: PhyloError do: [:e | 'caught'] ==> 'caught'
+DistanceModel names size ==> 6
+(JukesCantorModel new) printString ==> 'Jukes-Cantor (1969)'
+# the distance matrix
+(DistanceMatrix labels: #('A' 'B' 'C')) size ==> 3
+| m | m := DistanceMatrix labels: #('A' 'B'). m at: 1 and: 2 put: 5. m at: 2 and: 1 ==> 5
+| m | m := DistanceMatrix labels: #('A' 'B'). m at: 1 and: 2 put: 5. m between: 'B' and: 'A' ==> 5
+| m | m := DistanceMatrix labels: #('A' 'B'). m at: 1 and: 2 put: 5. m isSymmetric ==> true
+| m | m := DistanceMatrix labels: #('A' 'B' 'C'). m at: 1 and: 2 put: 2. m at: 1 and: 3 put: 4. m at: 2 and: 3 put: 6. m mean ==> 4.0
+| m | m := DistanceMatrix labels: #('A' 'B' 'C'). m at: 1 and: 2 put: 2. m at: 1 and: 3 put: 4. m at: 2 and: 3 put: 6. m closestPair ==> #(1 2)
+| m | m := DistanceMatrix labels: #('A' 'B' 'C'). m at: 1 and: 3 put: 7. (m withoutTaxon: 'B') at: 1 and: 2 ==> 7
+| m | m := DistanceMatrix labels: #('A' 'B' 'C'). (m keepTaxa: #('A' 'C')) labels ==> #('A' 'C')
+| m | m := DistanceMatrix labels: #('a' 'b'). m at: 1 and: 2 put: 0.5. (DistanceMatrix fromPhylip: m asPhylip) between: 'a' and: 'b' ==> 0.5
+[DistanceMatrix fromPhylip: ''] on: PhyloError do: [:e | 'caught'] ==> 'caught'
+(DistanceMatrix labels: #('A' 'B')) printString ==> 'a DistanceMatrix(2 taxa)'
+# neighbour joining and UPGMA
+| m | m := DistanceMatrix labels: #('A' 'B'). m at: 1 and: 2 put: 4. m neighbourJoining distanceBetween: 'A' and: 'B' ==> 4.0
+| m | m := DistanceMatrix labels: #('A' 'B' 'C'). m at: 1 and: 2 put: 2. m at: 1 and: 3 put: 4. m at: 2 and: 3 put: 4. m nj distanceBetween: 'A' and: 'C' ==> 4.0
+[(DistanceMatrix labels: #('A')) neighbourJoining] on: PhyloError do: [:e | 'caught'] ==> 'caught'
+| m | m := DistanceMatrix labels: #('A' 'B' 'C'). m at: 1 and: 2 put: 1. m at: 1 and: 3 put: 9. m at: 2 and: 3 put: 9. m upgma isUltrametric ==> true
+| m | m := DistanceMatrix labels: #('A' 'B' 'C'). m at: 1 and: 2 put: 1. m at: 1 and: 3 put: 9. m at: 2 and: 3 put: 9. m upgma isRooted ==> true
+| m | m := DistanceMatrix labels: #('A' 'B' 'C'). m at: 1 and: 2 put: 1. m at: 1 and: 3 put: 9. m at: 2 and: 3 put: 9. m wpgma size ==> 3
+| m | m := DistanceMatrix labels: #('A' 'B' 'C'). m at: 1 and: 2 put: 1. m at: 1 and: 3 put: 9. m at: 2 and: 3 put: 9. m upgma name ==> 'UPGMA'
+# the simulated data: the tree builder has to find the tree the data came from
+(Phylo exampleAlignment) size ==> 8
+(Phylo exampleAlignment) length ==> 300
+(Phylo exampleAlignment) isProtein ==> false
+| a | a := Phylo exampleAlignment. (a neighbourJoiningUsing: 'jc69') robinsonFouldsTo: Phylo exampleTree ==> 0
+| a | a := Phylo exampleAlignment. (a neighbourJoiningUsing: 'k2p') robinsonFouldsTo: Phylo exampleTree ==> 0
+| a | a := Phylo exampleAlignment. (a neighbourJoining) hasSameTopologyAs: Phylo exampleTree ==> true
+Phylo exampleTree taxa size ==> 8
+# multiple alignments
+(MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACGA')) length ==> 4
+(MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACGA')) printString ==> 'a MultipleAlignment(2 x 4)'
+[MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACG')] on: PhyloError do: [:e | 'caught'] ==> 'caught'
+[MultipleAlignment labels: #('A') rows: #('ACGT' 'ACGT')] on: PhyloError do: [:e | 'caught'] ==> 'caught'
+(MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACGA')) columnAt: 4 ==> #($T $A)
+(MultipleAlignment labels: #('A' 'B') rows: #('AC-T' 'ACGA')) gapCount ==> 1
+(MultipleAlignment labels: #('A' 'B') rows: #('AC-T' 'ACGA')) withoutGapColumns length ==> 3
+(MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACGA')) consensus ==> 'ACGA'
+(MultipleAlignment labels: #('A' 'B' 'C') rows: #('ACGT' 'ACGA' 'ACGA')) consensus ==> 'ACGA'
+(MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACGA')) consensusWithThreshold: 0.9 ==> 'ACGN'
+(MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACGA')) matchLine ==> '***:'
+(MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACGA')) invariantColumns ==> 3
+((MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACGA')) identityBetween: 1 and: 2) ==> 0.75
+((MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACGA')) rowNamed: 'B') ==> 'ACGA'
+((MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACGA')) keepRows: #('B')) size ==> 1
+((MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACGA')) columnsFrom: 2 to: 3) rowAt: 1 ==> 'CG'
+| a | a := MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACGA'). (MultipleAlignment fromFasta: a asFasta) rows ==> #('ACGT' 'ACGA')
+((MultipleAlignment labels: #('A' 'B') rows: #('ACGT' 'ACGA')) resampleColumnsWith: (Random seed: 3)) length ==> 4
+# the progressive aligner
+(ProgressiveAligner new align: (Array with: 'ACGTACGT' with: 'ACGTACGT')) length ==> 8
+(ProgressiveAligner new align: (Array with: 'ACGTTTTACGT' with: 'ACGTACGT')) length ==> 11
+((ProgressiveAligner new align: (Array with: 'ACGTTTTACGT' with: 'ACGTACGT')) rowAt: 2) occurrencesOf: $- ==> 3
+(ProgressiveAligner new align: (Array with: 'ACGT')) length ==> 4
+[ProgressiveAligner new align: #()] on: PhyloError do: [:e | 'caught'] ==> 'caught'
+| r | r := Phylo exampleSequences collect: [:e | SeqRecord id: e id sequence: (e asString copyFrom: 1 to: 70)]. (Phylo align: r) size ==> 6
+| r | r := Phylo exampleSequences collect: [:e | SeqRecord id: e id sequence: (e asString copyFrom: 1 to: 70)]. (Phylo align: r) labels first ==> 'Human'
+# the bootstrap (the SUnit suite above covers it more thoroughly; these keep the slow part to one run)
+| b | b := Bootstrap new alignment: (Phylo exampleAlignment columnsFrom: 1 to: 150); replicates: 8; run. (Array with: (b supportFor: #('Baboon' 'Macaque')) with: b tree hasSupport with: b consensus size with: b replicates) ==> #(100 true 8 8)
+[Bootstrap new run] on: PhyloError do: [:e | 'caught'] ==> 'caught'
+(Bootstrap new replicates: 7; yourself) printString ==> 'a Bootstrap(7 replicates)'
+# the facade and the browser
+Phylo version ==> '1.0'
+Phylo models ==> #('p' 'jc69' 'k2p' 'tn93' 'poisson' 'kimura')
+Phylo examples size ==> 3
+(Phylo tree: '(A,B,C);') size ==> 3
+(Phylo draw: (Phylo tree: '((A:1,B:1):1,C:1);')) isEmpty ==> false
+| a | a := Phylo exampleAlignment columnsFrom: 1 to: 100. (Phylo nj: a) size ==> 8
+| a | a := Phylo exampleAlignment columnsFrom: 1 to: 100. (Phylo upgma: a) isUltrametric ==> true
+(Phylo star: #('A' 'B' 'C')) splits size ==> 0
+(Phylo model: 'jc69') shortName ==> 'jc69'
+(FileStream exists: (Phylo exampleFile: 'example.fasta')) ==> true
+TreeBrowser openOn: (Phylo tree: '((A:1,B:1):1,C:1);'). TreeBrowser listItems size ==> 5
+TreeBrowser openOn: (Phylo tree: '((A:1,B:1):1,C:1);'). TreeBrowser listItems first ==> '* the whole tree'
+TreeBrowser openOn: (Phylo tree: '((A:1,B:1):1,C:1);'). ((TreeBrowser detailAt: 1) includesSubstring: 'A') ==> true
+TreeBrowser openOn: (Phylo tree: '((A:1,B:1):1,C:1);'). ((TreeBrowser detailAt: 2) includesSubstring: 'a clade of 2') ==> true
+TreeBrowser openOn: (Phylo tree: '((A:1,B:1):1,C:1);'). ((TreeBrowser detailAt: 3) includesSubstring: 'the taxon A') ==> true
+TreeBrowser openOn: (Phylo tree: '((A:1,B:1):1,C:1);'). TreeBrowser command: 3 at: 1. ((TreeBrowser detailAt: 1) includesSubstring: '(A:1,B:1)') ==> true
+TreeBrowser openOn: (Phylo tree: '((A:1,B:1):1,C:1);'). TreeBrowser command: 7 at: 1. TreeBrowser tree size ==> 3
+TreeBrowser openOn: (Phylo tree: '((A:1,B:1):1,C:1,D:9);'). TreeBrowser command: 8 at: 1. TreeBrowser tree isRooted ==> true
+TreeBrowser openOn: (Phylo tree: '((A:1,B:1):1,C:1,D:1);'). TreeBrowser command: 9 at: 1 ==> 'select a taxon or a clade first'
+TreeBrowser commandLabels size ==> 13
+# the package itself
+(Smalltalk availablePackages includes: 'Phylo') ==> true
+Smalltalk isPackageLoaded: 'Phylo' ==> true
+Smalltalk isPackageLoaded: 'Bio' ==> true
+((Smalltalk packageDescription: 'Phylo') includesSubstring: 'phylogenetics') ==> true
