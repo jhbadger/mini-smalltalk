@@ -9,6 +9,7 @@ void open_transcript(void);
 void open_inspector(oop obj);
 void tools_after_eval(void);          /* refresh transcript windows, open pending inspectors, update browsers */
 void tools_system_menu_install(void);
+bool tools_open_debugger(void);       /* true if the Debugger package took the last error */
 extern bool ui_quit;
 extern const char *kernel_dir;        /* where kernel*.st and tutorial.st live */
 #endif

@@ -116,7 +116,8 @@ The Smalltalk-80 ("Blue Book") classes, except the graphics ones:
 
 * **Kernel-Objects**: Object (with dependents: `changed`/`update:`), UndefinedObject, Boolean, True, False, LookupKey, Association, Message
 * **Kernel-Classes**: Behavior, ClassDescription, Class, Metaclass, ClassOrganizer
-* **Kernel-Methods**: CompiledMethod, ContextPart, MethodContext, BlockContext, BlockClosure
+* **Kernel-Methods**: CompiledMethod (which also records `tempNames` and a `sourceMap` of pc to source offset, so a
+  debugger can show variables by name and mark the line being run), ContextPart, MethodContext, BlockContext, BlockClosure
 * **Kernel-Processes**: Process, ProcessorScheduler (`Processor`), Semaphore, Delay, SharedQueue. Forked processes run cooperatively (`yield`, `wait`, `Delay`) and keep running in the background while the user interface is idle.
 * **Kernel-Magnitudes**: Magnitude, Character (any Unicode code point, with case mapping for Latin, Greek and Cyrillic), Date, Time, **DateAndTime** and **Duration** with arithmetic: `Date today - (3 days)`, `(DateAndTime now + (90 minutes))`, `date2 - date1` answers a Duration, `addMonths:`, `addYears:`; Unix time conversion
 * **Kernel-Numbers**: Number, Integer, SmallInteger, LargePositiveInteger, LargeNegativeInteger, Fraction, Float, Random. Arithmetic is exact: `1/3` is a Fraction, `100 factorial` is a LargePositiveInteger, and mixed operands coerce by generality. Bit operations (`bitAnd:`, `bitOr:`, `bitXor:`, `bitShift:`) work on negative LargeIntegers with two's-complement semantics. Floats have `Float nan`, `infinity`, `isNaN`, `isInfinite`, hyperbolic functions, and print in shortest round-trip form (`0.1`, `1.0e-5`, `NaN`, `Infinity`); `sqrt`/`ln`/`sin`... accept Fractions and LargeIntegers. Also `printStringRadix:`, `raisedTo:modulo:`, `isProbablyPrime`, `primeFactors`, `binomial:`, `bitCount`, `Number>>to:collect:`.
@@ -141,7 +142,7 @@ case-insensitive, and an image does not hold processes or windows.
 The `packages/` folder holds optional systems that are not in the standard image. Load one on demand:
 
 ```smalltalk
-Smalltalk availablePackages          "#('Bio' 'Prolog' 'SUnit')"
+Smalltalk availablePackages          "#('Bio' 'Debugger' 'Prolog' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'      "also: System menu -> load package..., or  st -l Prolog"
 ```
 
@@ -151,6 +152,8 @@ that image. Two packages come with the system:
 * [**Prolog**](packages/Prolog/README.md) — Edinburgh/ISO syntax, a standard library, DCGs, `format`, `assert`/`retract`,
   exceptions, a bridge in both directions between Prolog and Smalltalk objects, and a query window.
 * [**SUnit**](packages/SUnit/README.md) — the testing framework: `TestCase`, assertions, suites and a test runner window.
+* [**Debugger**](packages/Debugger/README.md) — a window on the stack of an error, with the failing line marked and
+  variables by name. Load it and unhandled errors open it instead of the walkback.
 * [**Bio**](packages/Bio/README.md) — bioinformatics: FASTA, FASTQ and GenBank files, sequences and features, the NCBI genetic
   codes, ORFs, assembly statistics, IUPAC pattern search, k-mers, restriction enzymes, pairwise alignment, a sequence browser,
   and sequence features as Prolog facts.

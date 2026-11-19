@@ -23,7 +23,20 @@ static void sl_sort(StrList *l) { qsort(l->v, l->n, sizeof(char *), cmp_str); }
 static char *oop_str(oop s) { return s == nilobj || IS_INT(s) ? strdup("") : str_cstr(s); }
 static oop class_named(const char *name) { oop c = global_lookup(name); return is_class(c) ? c : NULL; }
 
+/* An unhandled error. When the Debugger package is loaded it is given the context the error came from;
+   otherwise (and if the debugger itself fails) the walkback window is shown as before. */
+bool tools_open_debugger(void) {
+    oop dbg = class_named("Debugger");
+    if (!dbg || !interp.errorContext || interp.errorContext == nilobj) return false;
+    oop args[2] = { interp.errorContext, new_string(interp.error) };
+    interp.failed = false;
+    interp_send(dbg, new_symbol("openOn:message:"), args, 2);
+    interp.errorContext = NULL;
+    if (interp.failed) { interp.failed = false; return false; }
+    return true;
+}
 static void show_error(void) {
+    if (tools_open_debugger()) { tools_after_eval(); return; }
     char *buf = malloc(strlen(interp.error) + strlen(interp.walkback) + 64);
     sprintf(buf, "%s\n\n%s", interp.error, interp.walkback);
     char title[200]; snprintf(title, sizeof title, "Error: %.150s", interp.error);

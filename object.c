@@ -117,7 +117,7 @@ void gc_collect(void) {
     for (int i = 0; i < 256; i++) mark_push(charTable[i]);
     for (int i = 0; i < symcap; i++) if (symtab[i]) mark_push(symtab[i]);
     for (int i = 0; i < nroots; i++) mark_push(*roots[i]);
-    mark_push(interp.active);
+    mark_push(interp.active); mark_push(interp.errorContext);
     mark_drain();
     struct Obj **pp = &all_objects;
     while (*pp) {

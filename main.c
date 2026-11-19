@@ -54,6 +54,7 @@ static time_t newest_kernel_source(const char *dir) {
     return newest;
 }
 static void show_background_error(void) {
+    if (tools_open_debugger()) return;
     char *buf = malloc(strlen(interp.error) + strlen(interp.walkback) + 64);
     sprintf(buf, "%s\n\n%s", interp.error, interp.walkback);
     char title[200]; snprintf(title, sizeof title, "Error in background process: %.120s", interp.error);

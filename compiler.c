@@ -21,6 +21,8 @@ typedef struct Gen {
     jmp_buf *jb; char *err; int errlen;
     oop ivars;              /* Array of instance variable names */
     bool inblock;           /* generating a real (non-inlined) block: ^ is a non-local return */
+    const char *tempnames[256]; int ntempnames;      /* the name of each temporary, by its index */
+    int map[512][2]; int nmap;                       /* pc -> source offset, one entry per statement */
 } Gen;
 
 static void gfail(Gen *g, const char *fmt, const char *a) { snprintf(g->err, g->errlen, fmt, a ? a : ""); longjmp(*g->jb, 1); }
@@ -46,6 +48,14 @@ static Scope *scope_new(Scope *parent, int inlined) {
 static void scope_add(Gen *g, Scope *s, const char *name) {
     if (s->n == 128) gfail(g, "too many temporaries", NULL);
     s->names[s->n] = (char *)name; s->idx[s->n] = (*s->ntemps)++; s->n++;
+    { int i = s->idx[s->n - 1];      /* remember the name so the debugger can show it */
+      if (i >= 0 && i < 256) { g->tempnames[i] = name; if (i + 1 > g->ntempnames) g->ntempnames = i + 1; } }
+}
+/* note that the statement starting at this source offset begins at the current bytecode */
+static void mark_source(Gen *g, int pos) {
+    if (g->nmap > 0 && g->map[g->nmap - 1][0] == g->n) { g->map[g->nmap - 1][1] = pos; return; }
+    if (g->nmap >= 512) return;
+    g->map[g->nmap][0] = g->n; g->map[g->nmap][1] = pos; g->nmap++;
 }
 /* returns 1 and sets depth/idx if found as temp */
 static int lookup_temp(Scope *s, const char *name, int *depth, int *idx) {
@@ -209,6 +219,7 @@ static void gen_expr(Gen *g, Node *n) {
 static void gen_stmts_value(Gen *g, Node **stmts, int n) {
     if (n == 0) { emit(g, OP_PUSH_NIL); adj(g, 1); return; }
     for (int i = 0; i < n; i++) {
+        mark_source(g, stmts[i]->pos);
         gen_expr(g, stmts[i]);
         if (stmts[i]->kind == N_RETURN) { if (i == n - 1) { emit(g, OP_PUSH_NIL); adj(g, 1); } continue; }
         if (i < n - 1) { emit(g, OP_POP); adj(g, -1); }
@@ -224,6 +235,12 @@ static oop finish_method(Gen *g, int nargs, oop selector, int prim) {
     oop bc = new_bytes(classByteArray, g->n); memcpy(BYTES(bc), g->code, g->n);
     SLOT(m, M_BYTECODES) = bc; SLOT(m, M_SELECTOR) = selector; SLOT(m, M_CLASS) = g->cls;
     SLOT(m, M_PRIM) = MK_INT(prim); SLOT(m, M_SOURCE) = nilobj; SLOT(m, M_CATEGORY) = nilobj;
+    { oop names = new_array(ntemps);        /* the debugger shows temporaries by name */
+      for (int i = 0; i < ntemps; i++) SLOT(names, i) = new_string(i < g->ntempnames && g->tempnames[i] ? g->tempnames[i] : "?");
+      SLOT(m, M_TEMPNAMES) = names;
+      oop map = new_array(g->nmap * 2);
+      for (int i = 0; i < g->nmap; i++) { SLOT(map, i * 2) = MK_INT(g->map[i][0]); SLOT(map, i * 2 + 1) = MK_INT(g->map[i][1]); }
+      SLOT(m, M_SOURCEMAP) = map; }
     free(g->code); g->code = NULL;
     return m;
 }
@@ -257,6 +274,7 @@ static oop compile(oop cls, const char *src, const char *category, bool doit, ch
         gen_stmts_value(&g, m->stmts, m->nstmts); emit(&g, OP_RETURN);
     } else {
         for (int i = 0; i < m->nstmts; i++) {
+            mark_source(&g, m->stmts[i]->pos);
             gen_expr(&g, m->stmts[i]);
             if (m->stmts[i]->kind != N_RETURN) { emit(&g, OP_POP); adj(&g, -1); }
         }

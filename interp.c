@@ -56,6 +56,7 @@ static bool is_exception_frame(oop ctx) {
 void interp_signal_error(const char *msg) {
     if (interp.failed) return;
     interp.failed = true;
+    interp.errorContext = interp.active;
     snprintf(interp.error, sizeof interp.error, "%s", msg);
     interp.walkback[0] = 0;
     int n = 0;

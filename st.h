@@ -37,7 +37,10 @@ enum { MC_THISCLASS = 3, METACLASS_SIZE };
 #define MK_FMT(size,kind) MK_INT((size) | ((kind) << 16))
 
 /* CompiledMethod */
-enum { M_HEADER = 0, M_LITERALS, M_BYTECODES, M_SELECTOR, M_CLASS, M_SOURCE, M_PRIM, M_CATEGORY, METHOD_SIZE };
+enum { M_HEADER = 0, M_LITERALS, M_BYTECODES, M_SELECTOR, M_CLASS, M_SOURCE, M_PRIM, M_CATEGORY,
+       M_TEMPNAMES,        /* Array of Strings, one per temporary (arguments first), for the debugger */
+       M_SOURCEMAP,        /* Array of pc, source offset, pc, source offset ... one pair per statement */
+       METHOD_SIZE };
 #define HDR_ARGS(h)   (INT_VAL(h) & 0xff)
 #define HDR_TEMPS(h)  ((INT_VAL(h) >> 8) & 0xff)
 #define HDR_STACK(h)  ((INT_VAL(h) >> 16) & 0xff)
@@ -129,6 +132,7 @@ void method_selector_of_source(const char *src, char *out, int outlen);
 /* interp.c */
 typedef struct {
     oop active;             /* active context */
+    oop errorContext;       /* where the last error was signalled, for the debugger (marked by the collector) */
     char error[1024];       /* set when an error aborted the run */
     char walkback[8192];
     bool failed;

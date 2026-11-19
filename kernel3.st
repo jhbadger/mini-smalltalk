@@ -7,7 +7,7 @@ PositionableStream subclass: #WriteStream instanceVariableNames: '' classVariabl
 WriteStream subclass: #ReadWriteStream instanceVariableNames: '' classVariableNames: '' category: 'Collections-Streams'!
 Stream subclass: #TranscriptStream instanceVariableNames: '' classVariableNames: '' category: 'System-Support'!
 Object subclass: #BlockClosure instanceVariableNames: 'outerContext method receiver numArgs' classVariableNames: '' category: 'Kernel-Methods'!
-Object subclass: #CompiledMethod instanceVariableNames: 'header literals bytecodes selector methodClass sourceCode primitive category' classVariableNames: '' category: 'Kernel-Methods'!
+Object subclass: #CompiledMethod instanceVariableNames: 'header literals bytecodes selector methodClass sourceCode primitive category tempNames sourceMap' classVariableNames: '' category: 'Kernel-Methods'!
 Object variableSubclass: #ContextPart instanceVariableNames: 'sender pc stackp method receiver home outer closure' classVariableNames: '' category: 'Kernel-Methods'!
 ContextPart variableSubclass: #MethodContext instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Methods'!
 ContextPart variableSubclass: #BlockContext instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Methods'!
@@ -305,7 +305,28 @@ primitive
 numArgs
 	^header bitAnd: 255!
 numTemps
-	^(header bitShift: -8) bitAnd: 255! !
+	^(header bitShift: -8) bitAnd: 255!
+tempNames
+	"the names of the arguments and temporaries, in the order they are stored in a context"
+	^tempNames ifNil: [Array new]!
+sourceMap
+	"pc, source offset, pc, source offset ... one pair for each statement, in increasing pc order"
+	^sourceMap ifNil: [Array new]!
+sourceOffsetForPC: aPC
+	"where in sourceCode the statement being run at aPC begins, or nil"
+	| map best |
+	map := self sourceMap.
+	best := nil.
+	1 to: map size by: 2 do: [:i | (map at: i) < aPC ifTrue: [best := map at: i + 1]].
+	^best ifNil: [map isEmpty ifTrue: [nil] ifFalse: [map at: 2]]!
+lineForPC: aPC
+	"the 1-based line of sourceCode being run at aPC, or nil"
+	| off line |
+	off := self sourceOffsetForPC: aPC.
+	(off isNil or: [sourceCode isNil]) ifTrue: [^nil].
+	line := 1.
+	1 to: (off min: sourceCode size) do: [:i | (sourceCode at: i) = Character lf ifTrue: [line := line + 1]].
+	^line! !
 
 !CompiledMethod methodsFor: 'printing'!
 printOn: aStream

@@ -1,0 +1,42 @@
+# Tests for the Debugger package, run by test_vm after loading it.
+# The package tests itself with SUnit (30 tests); these check the same ground from outside,
+# including the compiler support the debugger depends on.
+Smalltalk loadPackage: 'SUnit' ==> true
+Smalltalk loadPackage: 'Debugger' ==> true
+DebuggerTest run hasPassed ==> true
+DebuggerTest run failureCount ==> 0
+DebuggerTest run errorCount ==> 0
+(DebuggerTest run runCount > 25) ==> true
+# the compiler records what the debugger needs
+(DebuggerExample compiledMethodAt: #divide:by:) tempNames ==> #('a' 'b' 'result')
+(DebuggerExample compiledMethodAt: #setUpValues) tempNames ==> #()
+(DebuggerExample compiledMethodAt: #outer:) tempNames ==> #('n' 'doubled')
+((DebuggerExample compiledMethodAt: #divide:by:) sourceMap size > 0) ==> true
+((DebuggerExample compiledMethodAt: #divide:by:) sourceMap size even) ==> true
+Object compile: 'dbgLine | a | a := 1. ^a'. (Object compiledMethodAt: #dbgLine) lineForPC: 1 ==> 1
+Object compile: 'dbgLine | a | a := 1. ^a'. (Object compiledMethodAt: #dbgLine) tempNames ==> #('a')
+Object compile: 'dbgLine | a | a := 1. ^a'. Object removeSelector: #dbgLine. (Object includesSelector: #dbgLine) ==> false
+# frames
+| f | f := (DebuggerTest new framesOfError: [1/0]) first. f label ==> 'SmallInteger(Number)>>zeroDivide'
+| f | f := (DebuggerTest new framesOfError: [1/0]) first. f pc isNil ==> false
+| f | f := (DebuggerTest new framesOfError: [1/0]) first. f receiver ==> 1
+| f | f := (DebuggerTest new framesOfError: [nil foo]) first. (f label includesSubstring: 'doesNotUnderstand') ==> false
+(DebuggerTest new framesOfError: [1/0]) size > 1 ==> true
+((DebuggerTest new framesOfError: [DebuggerExample new divide: 1 by: 0]) anySatisfy: [:f | f label includesSubstring: 'divide:by:']) ==> true
+# the source and variables of a frame
+| f | f := (DebuggerTest new framesOfError: [DebuggerExample new divide: 9 by: 0]) detect: [:x | x label includesSubstring: 'divide:by:']. ((Debugger sourceOf: f) includesSubstring: 'result := a / b') ==> true
+| f | f := (DebuggerTest new framesOfError: [DebuggerExample new divide: 9 by: 0]) detect: [:x | x label includesSubstring: 'divide:by:']. ((Debugger linesOf: (Debugger markedSourceOf: f)) detect: [:l | l startsWith: '>']) ==> '>  	result := a / b.'
+| f | f := (DebuggerTest new framesOfError: [DebuggerExample new divide: 9 by: 0]) detect: [:x | x label includesSubstring: 'divide:by:']. ((Debugger describeVariablesOf: f) includesSubstring: 'arg  a = 9') ==> true
+| f | f := (DebuggerTest new framesOfError: [DebuggerExample new outer: 4]) detect: [:x | x label includesSubstring: 'outer:']. (Debugger tempNamed: 'doubled' in: f) ==> 8
+| f | f := (DebuggerTest new framesOfError: [DebuggerExample new outer: 4]) detect: [:x | x label includesSubstring: 'outer:']. (Debugger tempNamed: 'missing' in: f) ==> nil
+# the window
+Debugger debug: [1/0]. Debugger listItems isEmpty ==> false
+Debugger debug: [1/0]. ((Debugger detailAt: 1) includesSubstring: 'division by zero') ==> true
+Debugger debug: [1/0]. (Debugger command: 4 at: 1). ((Debugger detailAt: 1) includesSubstring: '1. ') ==> true
+Debugger debug: [1/0]. (Debugger command: 1 at: 1). ((Debugger detailAt: 1) includesSubstring: 'zeroDivide') ==> true
+Debugger debug: [1/0]. ((Debugger detailAt: 999) includesSubstring: 'division by zero') ==> true
+Debugger commandLabels size ==> 10
+(Debugger evaluateIn: nil) ==> 'select a frame first'
+Debugger debug: [1/0]. (Debugger fullStack includesSubstring: 'line ') ==> true
+(Debugger linesOf: (String with: $a with: Character lf with: $b)) ==> #('a' 'b')
+(Debugger linesOf: (String with: Character lf with: $a)) ==> #('' 'a')

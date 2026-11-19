@@ -393,6 +393,9 @@ int main(int argc, char **argv) {
         check("Smalltalk loadPackage: 'SUnit'", "true");
         n = run_lib_tests("packages/SUnit/tests/tests.txt");
         printf("ok    SUnit package tests%s: %d run\n", pass ? " under GC stress" : "", n);
+        check("Smalltalk loadPackage: 'Debugger'", "true");
+        n = run_lib_tests("packages/Debugger/tests/tests.txt");
+        printf("ok    Debugger package tests%s: %d run\n", pass ? " under GC stress" : "", n);
         gc_threshold = saved_threshold;
     }
     /* ---- the changes file: every route that changes code is logged, and replays ---- */
