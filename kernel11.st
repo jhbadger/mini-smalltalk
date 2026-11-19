@@ -109,7 +109,22 @@ primLogChange: aString
 openTool: aClassName title: aTitle contents: aString
 	"open a workspace window whose do it / print it send  aClassName evaluate: text  (the class answers a String)"
 	<primitive: 201>
-	^self error: 'cannot open the window'! !
+	^self error: 'cannot open the window'!
+openListTool: aClassName title: aTitle
+	"Open a two-pane browser: a list on the left, details on the right. The class answers
+		listItems                   an Array of Strings, one per row
+		detailAt: index             the text for the selected row (1-based; 0 when the list is empty)
+		commandLabels               an Array of Strings for the list's right-button menu ('-' is a separator)
+		command: labelIndex at: itemIndex   runs a command; a String answer is shown in the detail pane
+	The list is refreshed after every command."
+	<primitive: 203>
+	^self error: 'cannot open the window'!
+promptFor: aTitle default: aString
+	"ask the user for a line of text: the String, or nil if they cancelled or there is no user interface"
+	<primitive: 204>
+	^nil!
+promptFor: aTitle
+	^self promptFor: aTitle default: ''! !
 
 !Object methodsFor: 'evaluating'!
 compileSafely: aString

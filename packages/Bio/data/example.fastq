@@ -1,0 +1,16 @@
+@read1 good quality read
+ACGTACGTACGTACGTACGT
++
+IIIIIIIIIIIIIIIIIIII
+@read2 quality falls off at the end
+GGGGCCCCAAAATTTTGGGG
++
+IIIIIIIIIIIIII++++##
+@read3 short read
+ACGTTTGCA
++
+IIIIHHHGG
+@read4 poor read
+NNNNACGTACGTNNNN
++
+##!!IIIIIIII!!##

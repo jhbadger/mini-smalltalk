@@ -384,9 +384,12 @@ int main(int argc, char **argv) {
         int n = run_lib_tests("test_lib.txt");
         printf("ok    library tests%s: %d run\n", pass ? " under GC stress" : "", n);
         check("Smalltalk loadPackage: 'Prolog'", "true");
-        if (pass == 1) gc_threshold = 400000;     /* the package's heap is large: collect often, but not after every few allocations */
+        if (pass == 1) gc_threshold = 400000;     /* the packages' heaps are large: collect often, but not after every few allocations */
         n = run_lib_tests("packages/Prolog/tests/tests.txt");
         printf("ok    Prolog package tests%s: %d run\n", pass ? " under GC stress" : "", n);
+        check("Smalltalk loadPackage: 'Bio'", "true");
+        n = run_lib_tests("packages/Bio/tests/tests.txt");
+        printf("ok    Bio package tests%s: %d run\n", pass ? " under GC stress" : "", n);
         gc_threshold = saved_threshold;
     }
     /* ---- the changes file: every route that changes code is logged, and replays ---- */

@@ -1,0 +1,52 @@
+LOCUS       BIOTEST01                420 bp    DNA     circular SYN 19-NOV-2026
+DEFINITION  Synthetic test construct with two coding sequences, for the Bio
+            package of mini Smalltalk.
+ACCESSION   BIOTEST01
+VERSION     BIOTEST01.1
+KEYWORDS    synthetic; test.
+SOURCE      synthetic construct
+  ORGANISM  synthetic construct
+            other sequences; artificial sequences; synthetic construct.
+REFERENCE   1  (bases 1 to 420)
+  AUTHORS   Badger,J.H.
+  TITLE     An example entry for the Bio package
+  JOURNAL   Unpublished (2026)
+FEATURES             Location/Qualifiers
+     source          1..420
+                     /organism="synthetic construct"
+                     /mol_type="other DNA"
+                     /db_xref="taxon:32630"
+     gene            61..141
+                     /gene="alpha"
+                     /locus_tag="BTEST_0001"
+     CDS             61..141
+                     /gene="alpha"
+                     /locus_tag="BTEST_0001"
+                     /codon_start=1
+                     /transl_table=11
+                     /product="hypothetical protein alpha"
+                     /protein_id="BTEST_0001.1"
+                     /db_xref="GI:100001"
+                     /translation="MAKDNYITYTSARNLLAQCESLKGVS"
+     misc_feature    201..206
+                     /note="EcoRI site"
+     gene            complement(301..360)
+                     /gene="beta"
+                     /locus_tag="BTEST_0002"
+     CDS             complement(301..360)
+                     /gene="beta"
+                     /locus_tag="BTEST_0002"
+                     /codon_start=1
+                     /transl_table=11
+                     /product="hypothetical protein beta"
+                     /protein_id="BTEST_0002.1"
+                     /translation="MVMHTPLLAVSTPSDWHFY"
+ORIGIN      
+        1 tacactcaga aacagaactc gggtaatttt gacaggtcac gcagaggcgc gccctcctga
+       61 atggctaaag acaattacat aacatacacg tcagcacgaa acttgttggc ccagtgtgaa
+      121 tcgcttaagg gtgtaagtta aagtgcgtgg acactcgcta tgaatctctg atttacccac
+      181 tctgccaaac tccagcgcgg gaattcccat caccctaagt aaccgaataa tgcgttcgct
+      241 ctattgacta cgacgcgctc attcccttgt cggagagtta tggaacaagg acgctgtctg
+      301 ttaataaaaa tgccagtccg atggggtgga cacagcaagt aaaggcgtat gcatcaccat
+      361 agactagaag acagatagtg cacacgaccg gcgtcggaga aactctattt gccgcctgac
+//

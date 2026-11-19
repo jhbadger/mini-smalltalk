@@ -13,6 +13,8 @@
 char *transcript_text = NULL; size_t transcript_len = 0; static size_t transcript_cap = 0;
 oop pending_inspect = NULL; bool quit_requested = false;
 char *pending_tool_class = NULL, *pending_tool_title = NULL, *pending_tool_text = NULL; bool menu_items_changed = false;
+char *pending_list_tool_class = NULL, *pending_list_tool_title = NULL;                   /* set by primitive 203 */
+char *(*ui_prompt_hook)(const char *title, const char *initial) = NULL;                  /* set by the UI for primitive 204 */
 char *pending_window_title = NULL, *pending_window_text = NULL;   /* set by primitive 180, consumed by the UI */
 void interp_flush_cache(void);
 
@@ -300,6 +302,17 @@ oop call_primitive(int n, oop *args, int nargs, bool *ok) {
         if (!m) { SLOT(a, 0) = falseobj; SLOT(a, 1) = new_string(err); return a; }
         SLOT(a, 0) = trueobj; SLOT(a, 1) = m; return a; }
     case 200: menu_items_changed = true; return self;   /* the System menu's extra items changed */
+    case 203: { /* primOpenListTool: className title: aString -- a two-pane browser driven by the class (listItems, detailAt:, commandLabels, command:at:) */
+        if (!is_bytes(A(1)) || !is_bytes(A(2))) FAIL;
+        free(pending_list_tool_class); free(pending_list_tool_title);
+        pending_list_tool_class = str_cstr(A(1)); pending_list_tool_title = str_cstr(A(2)); return self; }
+    case 204: { /* primPromptFor: title default: aString -- a String, or nil when the user cancelled or there is no user interface */
+        if (!is_bytes(A(1)) || !is_bytes(A(2))) FAIL;
+        if (!ui_prompt_hook) return nilobj;
+        char *t = str_cstr(A(1)), *d = str_cstr(A(2));
+        char *r = ui_prompt_hook(t, d); free(t); free(d);
+        if (!r) return nilobj;
+        oop s = new_string(r); free(r); return s; }
     case 201: { /* primOpenTool: className title: aString contents: text -- a workspace whose do it / print it send className evaluate: */
         if (!is_bytes(A(1)) || !is_bytes(A(2)) || !is_bytes(A(3))) FAIL;
         free(pending_tool_class); free(pending_tool_title); free(pending_tool_text);

@@ -1,0 +1,244 @@
+# Tests for the Bio package, run by test_vm after loading it.
+# Each line is  expression ==> expected printString  (a comment starts with "# ").
+Smalltalk loadPackage: 'Bio' ==> true
+(DNASequence on: 'ACGTacgt') asString ==> 'ACGTacgt'
+(DNASequence on: ' ACG 12 T ') asString ==> 'ACGT'
+(DNASequence on: 'ACGTTT') reverseComplement asString ==> 'AAACGT'
+(DNASequence on: 'acgtRYKMBDHVN') reverseComplement asString ==> 'NBDHVKMRYacgt'
+(DNASequence on: 'ACGT') complement asString ==> 'TGCA'
+(DNASequence on: 'GCAT') gcPercent ==> 50.0
+(DNASequence on: 'GCGC') gcPercent ==> 100.0
+(DNASequence on: 'ACGTN') gcPercent ==> 50.0
+(DNASequence on: 'GGGC') gcSkew ==> (1/2)
+(DNASequence on: 'AAAT') atSkew ==> (1/2)
+(DNASequence on: 'ATGCGT') transcribe asString ==> 'AUGCGU'
+(RNASequence on: 'AUGCGU') reverseTranscribe asString ==> 'ATGCGT'
+(RNASequence on: 'AUGC') reverseComplement asString ==> 'GCAU'
+(DNASequence on: 'ACGT') isValid ==> true
+(DNASequence on: 'ACGZQ') invalidCharacters ==> #($Z $Q)
+(DNASequence on: 'ACGT') printString ==> 'DNASequence(ACGT, 4 bp)'
+((DNASequence on: 'ACGTACGT') copyFrom: 2 to: 4) asString ==> 'CGT'
+((DNASequence on: 'ACGTACGT') first: 3) asString ==> 'ACG'
+((DNASequence on: 'ACGTACGT') last: 3) asString ==> 'CGT'
+((DNASequence on: 'ACGTACGT') allButFirst: 6) asString ==> 'GT'
+((DNASequence on: 'ACGT') , 'TTTT') asString ==> 'ACGTTTTT'
+(DNASequence on: 'AACCG') composition printString ==> 'Dictionary ($G->1 $A->2 $C->2 )'
+(DNASequence on: 'AACCGN') ambiguousCount ==> 1
+((DNASequence on: 'ACGT') sameAs: 'acgt') ==> true
+(BioSequence guess: 'ACGTACGTACGT') class name ==> #DNASequence
+(BioSequence guess: 'AUGCAUGCAUGC') class name ==> #RNASequence
+(BioSequence guess: 'MKVLWAALLVTFLAGCQA') class name ==> #ProteinSequence
+((DNASequence on: 'ACGTACGTAC') gcContentIn: 4 step: 3) size ==> 3
+GeneticCode standard printString ==> 'GeneticCode 1 (Standard)'
+(GeneticCode standard aminoAcidFor: 'ATG') printString ==> '$M'
+(GeneticCode standard aminoAcidFor: 'TGA') printString ==> '$*'
+((GeneticCode id: 2) aminoAcidFor: 'TGA') printString ==> '$W'
+((GeneticCode id: 2) aminoAcidFor: 'AGA') printString ==> '$*'
+((GeneticCode id: 2) aminoAcidFor: 'ATA') printString ==> '$M'
+((GeneticCode id: 6) aminoAcidFor: 'TAA') printString ==> '$Q'
+((GeneticCode id: 10) aminoAcidFor: 'TGA') printString ==> '$C'
+((GeneticCode id: 12) aminoAcidFor: 'CTG') printString ==> '$S'
+((GeneticCode id: 13) aminoAcidFor: 'AGG') printString ==> '$G'
+((GeneticCode id: 14) aminoAcidFor: 'TAA') printString ==> '$Y'
+((GeneticCode id: 16) aminoAcidFor: 'TAG') printString ==> '$L'
+(GeneticCode standard aminoAcidFor: 'YTA') printString ==> '$L'
+(GeneticCode standard aminoAcidFor: 'GGN') printString ==> '$G'
+(GeneticCode standard aminoAcidFor: 'NNN') printString ==> '$X'
+(GeneticCode standard isStartCodon: 'ATG') ==> true
+(GeneticCode bacterial isStartCodon: 'GTG') ==> true
+(GeneticCode standard isStopCodon: 'TAA') ==> true
+GeneticCode standard stopCodons ==> #('TAA' 'TAG' 'TGA')
+(GeneticCode standard codonsFor: 'M') ==> #('ATG')
+(GeneticCode named: 'bacterial') id ==> 11
+GeneticCode ids ==> #(1 2 3 4 5 6 9 10 11 12 13 14 16 21 22 23 24 25 26)
+(DNASequence on: 'ATGAAATTTTAG') translate asString ==> 'MKF*'
+(DNASequence on: 'ATGAAATTTTAG') translateToStop asString ==> 'MKF'
+((DNASequence on: 'ATGAAATTTTAG') translateFrame: 2) asString ==> '*NF'
+((DNASequence on: 'ATGAAATTTTAG') translateFrame: -1) asString ==> 'LKFH'
+((DNASequence on: 'ATGAAATTTTAG') translateWith: (GeneticCode id: 2)) asString ==> 'MKF*'
+(DNASequence on: 'ATGAAA') sixFrameTranslations size ==> 6
+(DNASequence on: 'ATGAA') translate asString ==> 'M'
+(BioIUPAC basesFor: $R) ==> 'AG'
+(BioIUPAC codeFor: 'AG') printString ==> '$R'
+(BioIUPAC code: $R matches: $A) ==> true
+(BioIUPAC code: $R matches: $C) ==> false
+(BioIUPAC expand: 'ARY') ==> #('AAC' 'AAT' 'AGC' 'AGT')
+(3.14159 printShowingDecimalPlaces: 2) ==> '3.14'
+(0.5 printShowingDecimalPlaces: 3) ==> '0.500'
+(-1.236 printShowingDecimalPlaces: 2) ==> '-1.24'
+| r | r := SeqRecord id: 'seq1' description: 'a test' sequence: 'ACGTACGTAC'. r printString ==> 'SeqRecord(seq1, 10 bp)'
+| r | r := SeqRecord id: 'x' sequence: 'ACGT'. r annotationAt: #organism put: 'E. coli'. r organism ==> 'E. coli'
+| r | r := SeqRecord id: 'x' sequence: 'ACGTTTTT'. (r subsequenceFrom: 2 to: 4) asString ==> 'CGT'
+| r | r := SeqRecord id: 'x' sequence: 'ACGTTTTT'. r reverseComplement asString ==> 'AAAAACGT'
+| r | r := SeqRecord id: 'x' sequence: 'ACGT'. r quality: #(30 31 32 20). r minQuality ==> 20
+| r | r := SeqRecord id: 'x' sequence: 'ACGTAC'. r quality: #(5 30 31 32 30 5). (r trimQualityBelow: 20) asString ==> 'CGTA'
+(SeqLocation from: 3 to: 7) printString ==> '3..7'
+(SeqLocation from: 3 to: 7 strand: -1) printString ==> 'complement(3..7)'
+(SeqLocation from: 3 to: 7) size ==> 5
+(SeqLocation fromString: 'join(12..78,134..202)') printString ==> 'join(12..78,134..202)'
+(SeqLocation fromString: 'complement(join(12..78,134..202))') printString ==> 'complement(join(12..78,134..202))'
+(SeqLocation fromString: 'join(complement(12..78),complement(134..202))') printString ==> 'join(complement(12..78),complement(134..202))'
+(SeqLocation fromString: '<1..206') printString ==> '<1..206'
+(SeqLocation fromString: '1..>206') printString ==> '1..>206'
+(SeqLocation fromString: '102.110') printString ==> '102..110'
+(SeqLocation fromString: 'order(1..3,7..9)') printString ==> 'order(1..3,7..9)'
+(SeqLocation fromString: 'J00194.1:100..202') printString ==> 'J00194.1:100..202'
+(SeqLocation fromString: 'complement(join(1..3,7..9))') size ==> 6
+(SeqLocation fromString: '467') printString ==> '467'
+((SeqLocation fromString: 'complement(4..6)') extractFrom: (DNASequence on: 'AAACCCGGGTTT')) asString ==> 'GGG'
+((SeqLocation fromString: 'join(1..3,10..12)') extractFrom: (DNASequence on: 'AAACCCGGGTTA')) asString ==> 'AAATTA'
+((SeqLocation fromString: 'complement(join(1..3,10..12))') extractFrom: (DNASequence on: 'AAACCCGGGTTA')) asString ==> 'TAATTT'
+((SeqLocation from: 3 to: 7) includes: 5) ==> true
+((SeqLocation from: 1 to: 5) overlaps: (SeqLocation from: 5 to: 9)) ==> true
+((SeqLocation from: 1 to: 4) overlaps: (SeqLocation from: 5 to: 9)) ==> false
+| f | f := SeqFeature key: 'CDS' location: (SeqLocation from: 1 to: 9). f addQualifier: 'gene' value: 'thrA'. f printString ==> 'CDS 1..9 thrA'
+| f | f := SeqFeature key: 'CDS' location: (SeqLocation from: 1 to: 9). f addQualifier: 'db_xref' value: 'GI:1'. f addQualifier: 'db_xref' value: 'GI:2'. (f qualifiersAt: 'db_xref') ==> #('GI:1' 'GI:2')
+| c | c := SequenceCollection withAll: (Array with: (SeqRecord id: 'a' sequence: 'AAAAAAAAAA') with: (SeqRecord id: 'b' sequence: 'AAAAA') with: (SeqRecord id: 'c' sequence: 'AAA') with: (SeqRecord id: 'd' sequence: 'AA')). c n50 ==> 10
+| c | c := SequenceCollection withAll: (Array with: (SeqRecord id: 'a' sequence: 'AAAAAAAAAA') with: (SeqRecord id: 'b' sequence: 'AAAAA') with: (SeqRecord id: 'c' sequence: 'AAA') with: (SeqRecord id: 'd' sequence: 'AA')). c l50 ==> 1
+| c | c := SequenceCollection withAll: (Array with: (SeqRecord id: 'a' sequence: 'ACGT') with: (SeqRecord id: 'b' sequence: 'GG')). c ids ==> #('a' 'b')
+| c | c := SequenceCollection withAll: (Array with: (SeqRecord id: 'a' sequence: 'ACGT') with: (SeqRecord id: 'b' sequence: 'GG')). c totalLength ==> 6
+| c | c := SequenceCollection withAll: (Array with: (SeqRecord id: 'a' sequence: 'ACGT') with: (SeqRecord id: 'b' sequence: 'GG')). c longest id ==> 'a'
+| c | c := SequenceCollection new. c add: (SeqRecord id: 'a' sequence: 'ACGT'). c asFasta size ==> 8
+(FastaReader parse: (String with: $>), 'a d', (String with: Character lf), 'ACGTACGT') first id ==> 'a'
+(FastaReader parse: (String with: $>), 'a d', (String with: Character lf), 'ACGTACGT') first description ==> 'd'
+(FastaReader parse: '') size ==> 0
+| c | c := Bio read: (Bio exampleFile: 'example.fasta'). c size ==> 3
+| c | c := Bio read: (Bio exampleFile: 'example.fasta'). c ids first ==> 'sp|P69905|HBA_HUMAN'
+| c | c := Bio read: (Bio exampleFile: 'example.fasta'). c totalLength ==> 349
+| c | c := Bio read: (Bio exampleFile: 'example.fasta'). (c at: 1) sequence class name ==> #ProteinSequence
+| c | c := Bio read: (Bio exampleFile: 'example.fasta'). (c at: 3) sequence class name ==> #DNASequence
+| n | n := 0. Bio fasta: (Bio exampleFile: 'example.fasta') do: [:r | n := n + r size]. n ==> 349
+| c | c := Bio read: (Bio exampleFile: 'example.fastq'). c size ==> 4
+| c | c := Bio read: (Bio exampleFile: 'example.fastq'). (c atId: 'read1') quality first ==> 40
+| c | c := Bio read: (Bio exampleFile: 'example.fastq'). (c atId: 'read1') meanQuality ==> 40
+| c | c := Bio read: (Bio exampleFile: 'example.fastq'). (c atId: 'read3') size ==> 9
+| c | c := Bio read: (Bio exampleFile: 'example.fastq'). (c trimQualityBelow: 30) size ==> 4
+(FastqReader guessOffsetOf: 'IIIII') ==> 33
+(FastqReader guessOffsetOf: 'hhhhh') ==> 64
+(FastqReader guessOffsetOf: '!!##') ==> 33
+(FastqReader qualityString: #(30 31 40) offset: 33) ==> '?@I'
+(FastqReader scoresOf: '?@I' offset: 33) ==> #(30 31 40)
+(FastqReader errorProbabilityOf: 30) ==> 0.001
+| r | r := SeqRecord id: 'x' sequence: 'ACGT'. r quality: #(40 40 40 40). (r asFastq lines at: 4) ==> 'IIII'
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. r id ==> 'BIOTEST01'
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. r size ==> 420
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. r accession ==> 'BIOTEST01'
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. r version ==> 'BIOTEST01.1'
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. r organism ==> 'synthetic construct'
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. r topology ==> 'circular'
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. r moleculeType ==> 'DNA'
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. r taxonomy ==> #('other sequences' 'artificial sequences' 'synthetic construct')
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. r description ==> 'Synthetic test construct with two coding sequences, for the Bio package of mini Smalltalk'
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. r features size ==> 6
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. r featureTypes ==> #('source' 'gene' 'CDS' 'misc_feature')
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. r cdsFeatures size ==> 2
+| r f | r := (Bio read: (Bio exampleFile: 'example.gb')) first. f := r cdsFeatures first. f location printString ==> '61..141'
+| r f | r := (Bio read: (Bio exampleFile: 'example.gb')) first. f := r cdsFeatures first. (r proteinOf: f) asString = (f qualifierAt: 'translation') ==> true
+| r f | r := (Bio read: (Bio exampleFile: 'example.gb')) first. f := r cdsFeatures last. (r proteinOf: f) asString = (f qualifierAt: 'translation') ==> true
+| r f | r := (Bio read: (Bio exampleFile: 'example.gb')) first. f := r cdsFeatures last. f location printString ==> 'complement(301..360)'
+| r f | r := (Bio read: (Bio exampleFile: 'example.gb')) first. f := r cdsFeatures first. (f qualifierAt: 'product') ==> 'hypothetical protein alpha'
+| r f | r := (Bio read: (Bio exampleFile: 'example.gb')) first. f := r cdsFeatures first. (f qualifierAt: 'transl_table') ==> 11
+| r f | r := (Bio read: (Bio exampleFile: 'example.gb')) first. f := r cdsFeatures first. f label ==> 'alpha'
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. (r featuresAt: 100) size ==> 3
+| r | r := (Bio read: (Bio exampleFile: 'example.gb')) first. (r sequence restrictionSitesOf: 'EcoRI') ==> #(201)
+(Bio formatOf: 'x.fasta') printString ==> '#fasta'
+(Bio formatOf: 'x.fq') printString ==> '#fastq'
+(Bio formatOf: 'x.gbk') printString ==> '#genbank'
+(Bio formatOf: 'x.txt') printString ==> 'nil'
+(Bio formatOf: (Bio exampleFile: 'example.gb')) printString ==> '#genbank'
+Bio examples ==> #('example.fasta' 'example.fastq' 'example.gb')
+(DNASequence on: 'TTTATGAAATTTGGGTGACCC') longestOrf printString ==> 'ORF 4..18'
+((DNASequence on: 'TTTATGAAATTTGGGTGACCC') orfsLongerThan: 9) size ==> 1
+(((DNASequence on: 'TTTATGAAATTTGGGTGACCC') orfsLongerThan: 9) first qualifierAt: 'translation') ==> 'MKFG'
+(((DNASequence on: 'GGGTCACCCAAATTTCATAAA') orfsLongerThan: 9) first location) printString ==> 'complement(4..18)'
+(DNASequence on: 'ATGAAATTTTAG') codons ==> #('ATG' 'AAA' 'TTT' 'TAG')
+(DNASequence on: 'ATGAAATTTTAGATGAAA') codonUsage printString ==> 'Dictionary (''AAA''->2 ''TTT''->1 ''TAG''->1 ''ATG''->2 )'
+(DNASequence on: 'ACGTACGTAC') meltingTemperature ==> 30.0
+((DNASequence on: 'ACGTACGTACACGTACGTACACGT') meltingTemperature printShowingDecimalPlaces: 2) ==> '57.38'
+(DNASequence on: 'ACGT') molecularWeight ==> 1173.84
+(RNASequence on: 'ACGU') molecularWeight ==> 1444.77
+((ProteinSequence on: 'ACDEFGHIKLMNPQRSTVWY') molecularWeight printShowingDecimalPlaces: 2) ==> '2395.74'
+((ProteinSequence on: 'KKKKK') isoelectricPoint printShowingDecimalPlaces: 1) ==> '11.2'
+((ProteinSequence on: 'EEEEE') isoelectricPoint printShowingDecimalPlaces: 1) ==> '2.9'
+(((ProteinSequence on: 'KKKKK') chargeAtPH: 7.0) printShowingDecimalPlaces: 2) ==> '5.00'
+((ProteinSequence on: 'FWYAAAA') aromaticity printShowingDecimalPlaces: 4) ==> '0.4286'
+(ProteinSequence on: 'MKV*AA*') stopCount ==> 2
+(ProteinSequence on: 'MKV*AA*') withoutStops asString ==> 'MKVAA'
+(DNASequence on: 'AAGAATTCGGAATTCTT') indicesOfPattern: 'GAATTC' ==> #(3 10)
+(DNASequence on: 'AAGAATTCGGAATTCTT') indicesOf: 'gaattc' ==> #(3 10)
+(DNASequence on: 'GGATTCGGCTTT') indicesOfPattern: 'GGNTTY' ==> #(1 7)
+(DNASequence on: 'AAAA') indicesOfPattern: 'AA' ==> #(1 2 3)
+((DNASequence on: 'AAGAATTCGG') includesPattern: 'GAATTC') ==> true
+((DNASequence on: 'AAAA') includesPattern: 'GAATTC') ==> false
+((DNASequence on: 'AAGAATTCGG') firstIndexOfPattern: 'GAATTC') ==> 3
+((DNASequence on: 'AAGAATTCGG') occurrencesOfPattern: 'A') ==> 4
+(DNASequence on: 'ATGGCGC') kmerCounts: 3 ==> Dictionary ('GGC'->1 'TGG'->1 'CGC'->1 'GCG'->1 'ATG'->1 )
+((DNASequence on: 'AAATAAATAAA') mostFrequentKmers: 3 count: 2) printString ==> '#(''AAA''->3 ''AAT''->2)'
+((DNASequence on: 'AAAAA') kmers: 2) size ==> 4
+(DNASequence on: 'GAATTCAAAGAATTC') restrictionSites printString ==> 'Dictionary (''EcoRI''->#(1 10) )'
+((DNASequence on: 'GAATTCAAAGAATTC') digestWith: 'EcoRI') size ==> 3
+(((DNASequence on: 'AAAGGATCCTTT') digestWith: 'BamHI') collect: [:f | f asString]) ==> #('AAAG' 'GATCCTTT')
+((DNASequence on: 'AAAA') digestWith: 'EcoRI') size ==> 1
+(RestrictionEnzyme named: 'EcoRI') printString ==> 'EcoRI (GAATTC)'
+RestrictionEnzyme names size ==> 29
+((RestrictionEnzyme named: 'HinfI') sitesIn: (DNASequence on: 'GAATCGACTCAAA')) ==> #(1 6)
+(ScoringMatrix blosum62 scoreFor: $W and: $W) ==> 11
+(ScoringMatrix blosum62 scoreFor: $C and: $C) ==> 9
+(ScoringMatrix blosum62 scoreFor: $A and: $A) ==> 4
+(ScoringMatrix blosum62 scoreFor: $A and: $W) ==> -3
+(ScoringMatrix blosum62 scoreFor: $D and: $E) ==> 2
+(ScoringMatrix blosum62 scoreFor: $Y and: $F) ==> 3
+(ScoringMatrix blosum62 scoreFor: $w and: $w) ==> 11
+(ScoringMatrix blosum62 scoreFor: $J and: $J) ==> -4
+(ScoringMatrix nucleotide scoreFor: $A and: $A) ==> 5
+(ScoringMatrix nucleotide scoreFor: $A and: $C) ==> -4
+(ScoringMatrix nucleotide scoreFor: $N and: $A) ==> 0
+((ScoringMatrix match: 2 mismatch: -1) scoreFor: $Q and: $Q) ==> 2
+((ProteinSequence on: 'MKVLWAAL') alignWith: (ProteinSequence on: 'MKVLWAAL')) score ==> 41
+((ProteinSequence on: 'MKVLWAAL') alignWith: (ProteinSequence on: 'MKVIWSAAL')) firstAligned ==> 'MKVLW-AAL'
+((ProteinSequence on: 'MKVLWAAL') alignWith: (ProteinSequence on: 'MKVIWSAAL')) secondAligned ==> 'MKVIWSAAL'
+((ProteinSequence on: 'MKVLWAAL') alignWith: (ProteinSequence on: 'MKVIWSAAL')) score ==> 28
+((ProteinSequence on: 'MKVLWAAL') alignWith: (ProteinSequence on: 'MKVIWSAAL')) matchLine ==> '|||:| |||'
+((ProteinSequence on: 'MKVLWAAL') alignWith: (ProteinSequence on: 'MKVIWSAAL')) identities ==> 7
+((ProteinSequence on: 'MKVLWAAL') alignWith: (ProteinSequence on: 'MKVIWSAAL')) gaps ==> 1
+((ProteinSequence on: 'MKVLWAAL') identityWith: (ProteinSequence on: 'MKVLWAAL')) ==> 100.0
+((DNASequence on: 'ACGTACGT') alignWith: (DNASequence on: 'ACGTACGT')) score ==> 40
+((DNASequence on: 'ACGTTACGT') alignWith: (DNASequence on: 'ACGTACGT')) firstAligned ==> 'ACGTTACGT'
+((DNASequence on: 'AAACGTAAA') localAlignWith: (DNASequence on: 'TTTCGTTTT')) firstAligned ==> 'CGT'
+((DNASequence on: 'AAACGTAAA') localAlignWith: (DNASequence on: 'TTTCGTTTT')) score ==> 15
+((DNASequence on: 'AAACGTAAA') localAlignWith: (DNASequence on: 'TTTCGTTTT')) start1 ==> 4
+((ProteinSequence on: 'HEAGAWGHEE') localAlignWith: (ProteinSequence on: 'PAWHEAE')) firstAligned ==> 'AWGHE'
+((ProteinSequence on: 'HEAGAWGHEE') localAlignWith: (ProteinSequence on: 'PAWHEAE')) secondAligned ==> 'AW-HE'
+((ProteinSequence on: 'HEAGAWGHEE') localAlignWith: (ProteinSequence on: 'PAWHEAE')) score ==> 17
+((ProteinSequence on: 'MKVLWAAL') alignWith: (ProteinSequence on: '')) secondAligned ==> '--------'
+((ProteinSequence on: '') alignWith: (ProteinSequence on: '')) size ==> 0
+((ProteinSequence on: 'MKVLWAAL') alignWith: (ProteinSequence on: 'MKVIWSAAL')) report lines first ==> 'global alignment, score 28, 7/9 identical (77.8%), 1 gaps'
+SequenceBrowser commandLabels size ==> 14
+(SequenceBrowser openOn: (Bio exampleFile: 'example.gb')) printString ==> 'SequenceBrowser'
+SequenceBrowser listItems size ==> 1
+(SequenceBrowser detailAt: 1) lines first ==> 'BIOTEST01  Synthetic test construct with two coding sequences, for the Bio package of mini Smalltalk'
+(SequenceBrowser command: 5 at: 1) printString ==> 'nil'
+(SequenceBrowser detailAt: 1) lines first ==> 'BIOTEST01: 6 features'
+(SequenceBrowser command: 6 at: 1) printString ==> 'nil'
+(SequenceBrowser detailAt: 1) lines first ==> 'BIOTEST01: 4 open reading frames of 90 bases or more'
+(SequenceBrowser command: 3 at: 1) printString ==> 'nil'
+((SequenceBrowser detailAt: 0) includesSubstring: 'N50') ==> true
+Bio version ==> 'Bio 1.0'
+
+# ---- the bridge to the Prolog package (loaded here so the tests do not depend on the order) ----
+Smalltalk loadPackage: 'Prolog' ==> true
+BioProlog isAvailable ==> true
+BioProlog reset ==> true
+BioProlog assertAll: (Bio read: (Bio exampleFile: 'example.gb')) ==> 1
+Prolog answerLine: 'sequence(Id, Len, Mol)' ==> 'Id = ''BIOTEST01'', Len = 420, Mol = dna.'
+Prolog answerLine: 'organism(_, O)' ==> 'O = ''synthetic construct''.'
+Prolog answerLine: 'taxon(''BIOTEST01'', 2, T)' ==> 'T = ''artificial sequences''.'
+Prolog answerLine: 'cds(Id, I, S, E, -1)' ==> 'Id = ''BIOTEST01'', I = 6, S = 301, E = 360.'
+Prolog answerLine: 'gene_location(''BIOTEST01'', beta, S, E, Str)' ==> 'S = 301, E = 360, Str = -1 ; S = 301, E = 360, Str = -1.'
+Prolog answerLine: 'product(''BIOTEST01'', 3, P)' ==> 'P = ''hypothetical protein alpha''.'
+Prolog answerLine: 'feature_length(''BIOTEST01'', 3, L)' ==> 'L = 81.'
+Prolog answerLine: 'qualifier(''BIOTEST01'', 3, transl_table, T)' ==> 'T = 11.'
+Prolog answerLine: 'findall(I, feature_at(''BIOTEST01'', I, 100), L)' ==> 'L = [1,2,3].'
+Prolog answerLine: 'longer_than(Id, 100)' ==> 'Id = ''BIOTEST01''.'
+(BioProlog solve: 'gene(_, _, G)') size ==> 4
+BioProlog reset ==> true

@@ -3,7 +3,7 @@
 This folder holds systems that are **not** part of the standard image. Load one when you want it:
 
 ```smalltalk
-Smalltalk availablePackages            "#('Prolog')"
+Smalltalk availablePackages            "#('Bio' 'Prolog')"
 Smalltalk loadPackage: 'Prolog'        "files it in (once)"
 Smalltalk isPackageLoaded: 'Prolog'
 Smalltalk packageDescription: 'Prolog' "the first comment of its file"
@@ -43,6 +43,21 @@ Useful hooks:
 * `Smalltalk openTool: 'ToolClass' title: 'Title' contents: 'text'` opens a workspace window whose *do it* and *print it* send
   `ToolClass evaluate: aString` (answering a String, which *print it* inserts) instead of compiling Smalltalk. This is how the Prolog
   window works.
+* `Smalltalk openListTool: 'ToolClass' title: 'Title'` opens a two-pane browser: a list on the left, details on the right. The class
+  answers `listItems` (an Array of Strings), `detailAt: index` (the text for the selected row), `commandLabels` (the list's
+  right-button menu, where `'-'` is a separator) and `command: labelIndex at: itemIndex` (a String answer replaces the detail pane).
+  The list is refreshed after every command. This is how the sequence browser works.
+* `Smalltalk promptFor: 'Question' default: 'text'` asks the user for a line of text, and answers nil when they cancel or when
+  there is no user interface (so it is safe in a script).
 * Remember that in a chunk file a literal `!` inside source must be written `!!`.
 
-Keep tests with the package (the Prolog package has `tests/tests.txt`, which `make check` runs).
+Keep tests with the package: both packages have a `tests/tests.txt` of `expression ==> expected printString` lines that
+`make check` runs, normally and again with the garbage collector under pressure.
+
+## The packages
+
+* **[Prolog](Prolog/README.md)** — a Prolog system: Edinburgh/ISO syntax, the standard library, DCGs, `assert`/`retract`,
+  exceptions, a bridge in both directions between Prolog and Smalltalk objects, and a query window.
+* **[Bio](Bio/README.md)** — bioinformatics: FASTA, FASTQ and GenBank files, sequence and feature objects, translation with
+  the NCBI genetic codes, ORFs, composition and assembly statistics, IUPAC pattern search, k-mers, restriction enzymes,
+  Needleman-Wunsch and Smith-Waterman alignment, a sequence browser, and (with Prolog loaded) features as Prolog facts.

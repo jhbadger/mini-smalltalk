@@ -108,7 +108,7 @@ or open `FileStream`s. It is tied to the word size and byte order of the machine
 | `kernel1-6.st` | the class library in Smalltalk |
 | `tui.c` | raw terminal, cell double-buffer, SGR mouse, key decoding |
 | `widgets.c` | windows, list/text/button panes, pop-up menus, dialogs |
-| `tools.c` | System Browser, Workspace, Transcript, Inspector, system menu |
+| `tools.c` | System Browser, Workspace, Transcript, Inspector, system menu, and the window hooks packages use |
 
 ## The class library
 
@@ -141,13 +141,19 @@ case-insensitive, and an image does not hold processes or windows.
 The `packages/` folder holds optional systems that are not in the standard image. Load one on demand:
 
 ```smalltalk
-Smalltalk availablePackages          "#('Prolog')"
+Smalltalk availablePackages          "#('Bio' 'Prolog')"
 Smalltalk loadPackage: 'Prolog'      "also: System menu -> load package..., or  st -l Prolog"
 ```
 
 The load is recorded in the changes file (one line) so the next session loads it again; saving an image keeps the package in
-that image. The first package is [Prolog in Smalltalk](packages/Prolog/README.md): Edinburgh/ISO syntax, a standard library, DCGs,
-`format`, `assert`/`retract`, exceptions, a bridge in both directions between Prolog and Smalltalk objects, and a query window.
+that image. Two packages come with the system:
+
+* [**Prolog**](packages/Prolog/README.md) — Edinburgh/ISO syntax, a standard library, DCGs, `format`, `assert`/`retract`,
+  exceptions, a bridge in both directions between Prolog and Smalltalk objects, and a query window.
+* [**Bio**](packages/Bio/README.md) — bioinformatics: FASTA, FASTQ and GenBank files, sequences and features, the NCBI genetic
+  codes, ORFs, assembly statistics, IUPAC pattern search, k-mers, restriction enzymes, pairwise alignment, a sequence browser,
+  and sequence features as Prolog facts.
+
 See [packages/README.md](packages/README.md) for how packages work and how to write one.
 
 ## Testing the UI without a terminal

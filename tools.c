@@ -7,7 +7,7 @@
 
 extern oop pending_inspect;
 bool ui_quit = false;
-enum { W_BROWSER = 1, W_WORKSPACE, W_TRANSCRIPT, W_INSPECTOR, W_LESSON };
+enum { W_BROWSER = 1, W_WORKSPACE, W_TRANSCRIPT, W_INSPECTOR, W_LESSON, W_LISTTOOL };
 static void browsers_refresh(void);
 
 /* ---------- helpers ---------- */
@@ -412,6 +412,89 @@ void open_browser_on(const char *className) {
 }
 
 /* ---------- system menu ---------- */
+/* ---------- list tool: a two-pane browser a package drives from Smalltalk (primitive 203) ----------
+   The class answers:  listItems (Array of Strings), detailAt: index (String), commandLabels (Array of Strings),
+   command: labelIndex at: itemIndex (does the work; a String answer replaces the detail pane). */
+#define LT_MAXCMD 24
+typedef struct {
+    char cls[128]; Pane *list, *text;
+    const char *menu[LT_MAXCMD + 1]; int nmenu; char *labels[LT_MAXCMD];
+} ListTool;
+
+static void lt_layout(Window *w) {
+    ListTool *lt = w->user; int lw = w->r.w / 3; if (lw < 12) lw = 12; if (lw > w->r.w - 10) lw = w->r.w - 10;
+    lt->list->r = (Rect){ w->r.x + 1, w->r.y + 1, lw, w->r.h - 2 };
+    lt->text->r = (Rect){ w->r.x + 1 + lw + 1, w->r.y + 1, w->r.w - lw - 3, w->r.h - 2 };
+    for (int y = 0; y < w->r.h - 2; y++) tui_put(w->r.x + 1 + lw, w->r.y + 1 + y, 0x2502, C_FRAME, C_WIN_BG, 0);
+}
+static void lt_close(Window *w) { ListTool *lt = w->user; for (int i = 0; i < lt->nmenu; i++) free(lt->labels[i]); free(lt); }
+/* send a message to the tool's class; answers NULL (and reports) when it fails */
+static oop lt_send(ListTool *lt, const char *sel, oop *args, int nargs) {
+    oop cls = class_named(lt->cls);
+    if (!cls) { ui_status("no class named %s", lt->cls); return NULL; }
+    oop r = interp_send(cls, new_symbol(sel), args, nargs);
+    if (interp.failed) { show_error(); return NULL; }
+    return r;
+}
+static void lt_show_detail(Window *w) {
+    ListTool *lt = w->user;
+    int sel = lt->list->sel;
+    oop arg = MK_INT(sel + 1);
+    oop r = lt_send(lt, "detailAt:", &arg, 1);
+    if (!r) return;
+    char *s = oop_str(r); text_set(lt->text, s); free(s);
+}
+static void lt_fill(Window *w) {
+    ListTool *lt = w->user;
+    int keep = lt->list->sel;
+    oop items = lt_send(lt, "listItems", NULL, 0);
+    if (!items || IS_INT(items) || items->cls != classArray) return;
+    StrList l = { 0 };
+    for (uint32_t i = 0; i < items->size; i++) { char *s = oop_str(SLOT(items, i)); sl_add(&l, s); free(s); }
+    list_set_items(lt->list, l.v, l.n);
+    if (keep >= (int)items->size) keep = (int)items->size - 1;
+    if (keep < 0 && items->size) keep = 0;
+    if (keep >= 0) list_select(lt->list, keep, false);
+    lt_show_detail(w);
+}
+static const char *lt_text_menu[] = { "copy", "select all" };
+static void lt_text_menu_cb(Pane *p, int i) { if (i == 0) text_copy(p); else text_select_all(p); }
+static Window *lt_window_of(Pane *p) { return p->win; }
+static void lt_select(Pane *p) { lt_show_detail(lt_window_of(p)); }
+static void lt_menu_cb(Pane *p, int i) {
+    Window *w = lt_window_of(p); ListTool *lt = w->user;
+    oop args[2] = { MK_INT(i + 1), MK_INT(p->sel + 1) };
+    oop r = lt_send(lt, "command:at:", args, 2);
+    if (!r) return;
+    lt_fill(w);
+    if (!IS_INT(r) && r->kind == KIND_BYTES) { char *s = oop_str(r); text_set(lt->text, s); free(s); }
+    tools_after_eval();
+}
+static void open_list_tool(const char *clsName, const char *title) {
+    ListTool *lt = calloc(1, sizeof *lt);
+    snprintf(lt->cls, sizeof lt->cls, "%s", clsName);
+    int ww = tui_cols - 6 < 100 ? tui_cols - 6 : 100, wh = tui_rows - 6 < 26 ? tui_rows - 6 : 26;
+    if (ww < 30) ww = 30; if (wh < 10) wh = 10;
+    Window *w = win_new(title, 2 + cascade * 2, 1 + cascade, ww, wh); cascade = (cascade + 1) % 5;
+    w->kind = W_LISTTOOL; w->user = lt; w->layout = lt_layout; w->on_close = lt_close;
+    lt->list = win_add_list(w, lt_select);
+    lt->text = win_add_text(w, true);
+    lt->text->menu = lt_text_menu; lt->text->nmenu = 2; lt->text->on_menu = lt_text_menu_cb;
+    oop labels = lt_send(lt, "commandLabels", NULL, 0);
+    if (labels && !IS_INT(labels) && labels->cls == classArray) {
+        for (uint32_t i = 0; i < labels->size && lt->nmenu < LT_MAXCMD; i++) {
+            lt->labels[lt->nmenu] = oop_str(SLOT(labels, i));
+            lt->menu[lt->nmenu] = lt->labels[lt->nmenu];
+            lt->nmenu++;
+        }
+    }
+    if (lt->nmenu) { lt->list->menu = lt->menu; lt->list->nmenu = lt->nmenu; lt->list->on_menu = lt_menu_cb; }
+    lt_fill(w);
+    win_focus(w, lt->list);
+}
+/* a package asked for a prompt (primitive 204) */
+static char *tools_prompt(const char *title, const char *initial) { return dialog_prompt(title, initial); }
+
 /* The System menu: the built-in items, then whatever packages registered with SystemMenu (Smalltalk), then quit. */
 static const char *sys_base[] = { "system browser", "workspace", "system transcript", "smalltalk tutorial", "-", "file in...", "load package...", "browse class...", "save image", "collect garbage" };
 #define NBASE 10
@@ -469,7 +552,7 @@ static void sys_menu_cb(int i) {
     case 9: gc_collect(); ui_status("garbage collected"); break;
     }
 }
-void tools_system_menu_install(void) { sys_menu_rebuild(); }
+void tools_system_menu_install(void) { ui_prompt_hook = tools_prompt; sys_menu_rebuild(); }
 
 void tools_after_eval(void) {
     transcripts_refresh();
@@ -486,6 +569,7 @@ void tools_after_eval(void) {
     if (pending_inspect) { oop o = pending_inspect; pending_inspect = NULL; open_inspector(o); }
     if (pending_tool_class) { open_tool_workspace(pending_tool_title, pending_tool_class, pending_tool_text); free(pending_tool_class); free(pending_tool_title); free(pending_tool_text); pending_tool_class = pending_tool_title = pending_tool_text = NULL; }
     if (menu_items_changed) { menu_items_changed = false; sys_menu_rebuild(); }
+    if (pending_list_tool_class) { open_list_tool(pending_list_tool_class, pending_list_tool_title); free(pending_list_tool_class); free(pending_list_tool_title); pending_list_tool_class = pending_list_tool_title = NULL; }
     if (pending_window_text) { show_lesson_window(pending_window_title, pending_window_text); free(pending_window_title); free(pending_window_text); pending_window_title = pending_window_text = NULL; }
     static size_t last_classes = 0; size_t n = INT_VAL(SLOT(smalltalk, D_TALLY));
     if (n != last_classes) { last_classes = n; browsers_refresh(); }
