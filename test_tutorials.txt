@@ -1,0 +1,72 @@
+# The tutorials, checked once rather than in both passes of test_vm: they are documentation, they are
+# read in from disk on demand, and loading all of them into the image makes every later garbage
+# collection slower for no gain.
+#
+# What is checked: that each one reads in, that its lessons are there and have distinct titles and
+# real text, and that every line of a lesson the system takes for an example can at least be compiled.
+# Whether the examples ANSWER something sensible is a question only running them settles, which is the
+# author's job; AbstractTutorial>>checkExamples is there for that.
+Smalltalk tutorialNames class name ==> #Array
+(Smalltalk tutorialNames includes: 'Smalltalk') ==> true
+(Smalltalk tutorialFileFor: 'Smalltalk') isNil ==> false
+(Smalltalk tutorialFileFor: 'nothing at all') printString ==> 'nil'
+# the language's own, which lives beside the kernel sources
+Smalltalk tutorial. Tutorial start title ==> 'Welcome'
+Tutorial tutorialName ==> 'Smalltalk'
+Tutorial lessonCount > 20 ==> true
+| c | c := Tutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 100)) ==> #(0 true)
+(Smalltalk tutorialListing detect: [:each | each startsWith: 'Smalltalk']) includesSubstring: 'lessons' ==> true
+Tutorial start. (Smalltalk startTutorial: 'Smalltalk') title ==> 'Welcome'
+[Smalltalk startTutorial: 'nothing at all'] on: Error do: [:e | 'caught'] ==> 'caught'
+# a package's tutorial is not in the image until it is asked for
+Smalltalk loadPackage: 'SUnit' ==> true
+(Smalltalk at: #SUnitTutorial ifAbsent: ['not yet']) ==> 'not yet'
+(Smalltalk tutorialNames includes: 'SUnit') ==> true
+((Smalltalk tutorialListing detect: [:each | each startsWith: 'SUnit']) includesSubstring: 'not read in yet') ==> true
+(Smalltalk tutorialNamed: 'SUnit') == SUnitTutorial ==> true
+((Smalltalk tutorialListing detect: [:each | each startsWith: 'SUnit']) includesSubstring: '12 lessons') ==> true
+# SUnit
+| t ls | t := SUnitTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(12 12 true)
+| c | c := SUnitTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 40)) ==> #(0 true)
+SUnitTutorial tutorialName ==> 'SUnit'
+SUnitTutorial isAbstract ==> false
+SUnitTutorial start. SUnitTutorial next. SUnitTutorial lessonNumber ==> 2
+SUnitTutorial start. (SUnitTutorial goTo: 2) title = (SUnitTutorial titles at: 2) ==> true
+# Debugger
+Smalltalk loadPackage: 'Debugger'. (Smalltalk tutorialNamed: 'Debugger') == DebuggerTutorial ==> true
+| t ls | t := DebuggerTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(11 11 true)
+| c | c := DebuggerTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 40)) ==> #(0 true)
+DebuggerTutorial tutorialName ==> 'Debugger'
+# Regex
+Smalltalk loadPackage: 'Regex'. (Smalltalk tutorialNamed: 'Regex') == RegexTutorial ==> true
+| t ls | t := RegexTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(16 16 true)
+| c | c := RegexTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 40)) ==> #(0 true)
+RegexTutorial tutorialName ==> 'Regex'
+# Bio
+Smalltalk loadPackage: 'Bio'. (Smalltalk tutorialNamed: 'Bio') == BioTutorial ==> true
+| t ls | t := BioTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(17 17 true)
+| c | c := BioTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 40)) ==> #(0 true)
+BioTutorial tutorialName ==> 'Bio'
+# Prolog
+Smalltalk loadPackage: 'Prolog'. (Smalltalk tutorialNamed: 'Prolog') == PrologTutorial ==> true
+| t ls | t := PrologTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(15 15 true)
+| c | c := PrologTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 40)) ==> #(0 true)
+PrologTutorial tutorialName ==> 'Prolog'
+# Phylo
+Smalltalk loadPackage: 'Phylo'. (Smalltalk tutorialNamed: 'Phylo') == PhyloTutorial ==> true
+| t ls | t := PhyloTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(16 16 true)
+| c | c := PhyloTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 40)) ==> #(0 true)
+PhyloTutorial tutorialName ==> 'Phylo'
+# Stats
+Smalltalk loadPackage: 'Stats'. (Smalltalk tutorialNamed: 'Stats') == StatsTutorial ==> true
+| t ls | t := StatsTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(17 17 true)
+| c | c := StatsTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 40)) ==> #(0 true)
+StatsTutorial tutorialName ==> 'Stats'
+# every package that ships one is now listed, and every one of them reads
+(Smalltalk tutorialNames size >= 8) ==> true
+(Smalltalk tutorialNames includes: 'Phylo') ==> true
+Smalltalk tutorials size >= 8 ==> true
+(Smalltalk tutorials allSatisfy: [:each | each isAbstract not]) ==> true
+(Smalltalk tutorials allSatisfy: [:each | (each exampleCheck at: 2) = 0]) ==> true
+(Smalltalk tutorials allSatisfy: [:each | each lessonCount >= 10]) ==> true
+(Smalltalk tutorials collect: [:each | each tutorialName]) asArray = Smalltalk tutorialNames ==> true

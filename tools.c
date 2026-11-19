@@ -138,16 +138,35 @@ static void show_lesson_window(const char *title, const char *text) {
     }
     win_set_title(w, title); text_set(w->panes[0], text); win_raise(w); w->focus = w->panes[0];
 }
+/* Copy an Array of Strings out into C strings. The copy has to happen before the next message is sent:
+   an oop held only in a C local is not a root, so a collection during that send would free it. */
+static int strings_from_array(oop a, char **out, int max) {
+    if (interp.failed || !a || IS_INT(a) || a->cls != classArray) { interp.failed = false; return 0; }
+    int n = (int)a->size; if (n > max) n = max;
+    for (int i = 0; i < n; i++) out[i] = oop_str(SLOT(a, i));
+    return n;
+}
+
+/* The tutorials: the one for the language, and one from every loaded package that ships one. They are
+   read in from disk the first time they are asked for, so an image that never opens one carries none.
+   With only one there is nothing to choose, so it just opens. */
 static void open_tutorial(void) {
-    char err[512];
-    if (!class_named("Tutorial")) {
-        char path[1024]; snprintf(path, sizeof path, "%s/tutorial.st", kernel_dir ? kernel_dir : ".");
-        bool saved = changes_logging; changes_logging = false;     /* the tutorial is part of the system, not the user's changes */
-        bool ok = file_in(path, err, sizeof err);
+    char *raw[64], *items[64];
+    int n = strings_from_array(interp_send(smalltalk, new_symbol("tutorialNames"), NULL, 0), raw, 64);
+    if (n == 0) { ui_status("there are no tutorials to open"); return; }
+    int m = strings_from_array(interp_send(smalltalk, new_symbol("tutorialListing"), NULL, 0), items, 64);
+    if (m != n) { for (int k = 0; k < m; k++) free(items[k]); for (int k = 0; k < n; k++) items[k] = strdup(raw[k]); }
+    int pick = n == 1 ? 0 : dialog_choose("Tutorials", "every tutorial this image can open", items, n);
+    for (int k = 0; k < n; k++) free(items[k]);
+    if (pick >= 0) {
+        oop arg = new_string(raw[pick]);
+        bool saved = changes_logging; changes_logging = false;   /* a tutorial is part of the system, not the user's changes */
+        interp_send(smalltalk, new_symbol("startTutorial:"), &arg, 1);
         changes_logging = saved;
-        if (!ok) { dialog_text("Tutorial", err); return; }
+        if (interp.failed) show_error();
+        browsers_refresh(); tools_after_eval();
     }
-    bool ok; evaluate("Tutorial go", nilobj, &ok);
+    for (int k = 0; k < n; k++) free(raw[k]);
 }
 
 /* ---------- Inspector ---------- */
@@ -509,7 +528,7 @@ static void open_list_tool(const char *clsName, const char *title) {
 static char *tools_prompt(const char *title, const char *initial) { return dialog_prompt(title, initial); }
 
 /* The System menu: the built-in items, then whatever packages registered with SystemMenu (Smalltalk), then quit. */
-static const char *sys_base[] = { "system browser", "workspace", "system transcript", "smalltalk tutorial", "-", "file in...", "load package...", "browse class...", "save image", "collect garbage" };
+static const char *sys_base[] = { "system browser", "workspace", "system transcript", "tutorial...", "-", "file in...", "load package...", "browse class...", "save image", "collect garbage" };
 #define NBASE 10
 static const char *sys_items[NBASE + 40]; static int sys_n = 0, sys_extra = 0;   /* sys_extra: how many package items follow the base */
 static char *sys_extra_labels[32];
@@ -543,18 +562,22 @@ static void sys_menu_cb(int i) {
     switch (i) {
     case 0: open_browser(); break; case 1: open_workspace(); break; case 2: open_transcript(); break; case 3: open_tutorial(); break;
     case 5: { char *f = dialog_prompt("File in (path to .st file)", ""); if (f && f[0]) { char err[512]; if (file_in(f, err, sizeof err)) ui_status("filed in %s", f); else { ui_status("file in failed: %s", err); dialog_text("File in failed", err); } browsers_refresh(); } free(f); break; }
-    case 6: { /* load package */
-        oop names = interp_send(smalltalk, new_symbol("availablePackagesString"), NULL, 0);
-        char *list = interp.failed ? strdup("") : oop_str(names); interp.failed = false;
-        char title[1024]; snprintf(title, sizeof title, "Load package (available: %s)", list[0] ? list : "none"); free(list);
-        char *n = dialog_prompt(title, "");
-        if (n && n[0]) {
-            oop arg = new_string(n);
+    case 6: { /* load package: pick one from the list rather than typing its name */
+        char *raw[64], *items[64];
+        int n = strings_from_array(interp_send(smalltalk, new_symbol("availablePackages"), NULL, 0), raw, 64);
+        if (n == 0) { ui_status("there are no packages to load"); break; }
+        int m = strings_from_array(interp_send(smalltalk, new_symbol("packageListing"), NULL, 0), items, 64);
+        if (m != n) { for (int k = 0; k < m; k++) free(items[k]); for (int k = 0; k < n; k++) items[k] = strdup(raw[k]); }
+        int pick = dialog_choose("Load package", "a * marks the packages already loaded", items, n);
+        for (int k = 0; k < n; k++) free(items[k]);
+        if (pick >= 0) {
+            oop arg = new_string(raw[pick]);
             interp_send(smalltalk, new_symbol("loadPackage:"), &arg, 1);
-            if (interp.failed) show_error(); else ui_status("loaded package %s", n);
+            if (interp.failed) show_error(); else ui_status("loaded package %s", raw[pick]);
             browsers_refresh(); tools_after_eval();
         }
-        free(n); break; }
+        for (int k = 0; k < n; k++) free(raw[k]);
+        break; }
     case 7: { char *n = dialog_prompt("Browse class", ""); if (n && n[0]) { if (class_named(n)) open_browser_on(n); else ui_status("no class named %s", n); } free(n); break; }
     case 8: { char err[512], msg[1200];
         snprintf(msg, sizeof msg, "Save the whole system to %s?\n\nEverything is saved except open windows and processes. The changes file %s is set aside, since the image now contains it.", image_path, changes_abs_path());

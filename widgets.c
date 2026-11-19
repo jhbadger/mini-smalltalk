@@ -414,8 +414,59 @@ bool dialog_confirm(const char *title, const char *msg) {
     }
     modal = NULL; bool r = dialog_result == 1; win_close(win); return r;
 }
-static void text_window_layout(Window *w) { w->panes[0]->r = (Rect){ w->r.x + 1, w->r.y + 1, w->r.w - 2, w->r.h - 2 }; }
-static const char *ro_menu[] = { "copy", "select all" };
+/* Pick one of a list of things. Answers the index chosen, or -1 when the user backed out.
+   Arrow keys and the first letter move, Enter or a click on an item chooses, Escape cancels. */
+static bool choose_key(Window *w, Event *ev) {
+    if (ev->key == 13) { dialog_result = 1; return true; }
+    if (ev->key == 27) { dialog_result = 0; return true; }
+    return false;
+}
+int dialog_choose(const char *title, const char *prompt, char **items, int n) {
+    int w = (int)strlen(title) + 10;
+    for (int i = 0; i < n; i++) { int l = (int)strlen(items[i]) + 8; if (l > w) w = l; }
+    if (prompt) { int l = (int)strlen(prompt) + 6; if (l > w) w = l; }
+    if (w < 36) w = 36; if (w > tui_cols - 4) w = tui_cols - 4;
+    int rows = n < 1 ? 1 : n, maxrows = tui_rows - 12; if (maxrows < 3) maxrows = 3;
+    if (rows > maxrows) rows = maxrows;
+    int h = rows + (prompt ? 1 : 0) + 3;
+    Window *win = win_new(title, (tui_cols - w) / 2, (tui_rows - h) / 2, w, h);
+    win->on_key = choose_key;
+    Pane *lab = NULL;
+    if (prompt) { lab = win_add_text(win, true); text_set(lab, prompt); }
+    Pane *lp = win_add_list(win, NULL);
+    char **copy = malloc(sizeof(char *) * (n > 0 ? n : 1));
+    for (int i = 0; i < n; i++) copy[i] = strdup(items[i]);
+    list_set_items(lp, copy, n);
+    if (n) list_select(lp, 0, false);
+    Pane *b1 = win_add_button(win, "[ OK ]", NULL), *b2 = win_add_button(win, "[ Cancel ]", NULL);
+    win->focus = lp;
+    Event ev; modal = win; dialog_result = -1;
+    while (dialog_result < 0) {
+        int y = win->r.y + 1;
+        if (lab) { lab->r = (Rect){ win->r.x + 2, y, win->r.w - 4, 1 }; y++; }
+        lp->r = (Rect){ win->r.x + 2, y, win->r.w - 4, win->r.y + win->r.h - 2 - y };
+        if (lp->r.h < 1) lp->r.h = 1;
+        b1->r = (Rect){ win->r.x + 2, win->r.y + win->r.h - 2, 8, 1 };
+        b2->r = (Rect){ win->r.x + 12, win->r.y + win->r.h - 2, 12, 1 };
+        ui_draw(); tui_flush();
+        if (!tui_read_event(&ev, 500)) continue;
+        if (ev.type == EV_MOUSE_DOWN && in_rect(b1->r, ev.x, ev.y)) { dialog_result = 1; break; }
+        if (ev.type == EV_MOUSE_DOWN && in_rect(b2->r, ev.x, ev.y)) { dialog_result = 0; break; }
+        if (ev.type == EV_MOUSE_DOWN && ev.y == win->r.y && ev.x >= win->r.x + 1 && ev.x <= win->r.x + 3) { dialog_result = 0; break; }
+        /* a click on a row picks that row and takes it */
+        if (ev.type == EV_MOUSE_DOWN && ev.button == BTN_LEFT && in_rect(lp->r, ev.x, ev.y)) {
+            int idx = lp->top + (ev.y - lp->r.y);
+            if (idx >= 0 && idx < lp->nitems) { list_select(lp, idx, false); dialog_result = 1; break; }
+        }
+        ui_handle(&ev);
+    }
+    modal = NULL;
+    int r = dialog_result == 1 && lp->nitems ? lp->sel : -1;
+    win_close(win);
+    return r;
+}
+
+static void text_window_layout(Window *w) { w->panes[0]->r = (Rect){ w->r.x + 1, w->r.y + 1, w->r.w - 2, w->r.h - 2 }; }static const char *ro_menu[] = { "copy", "select all" };
 static void ro_menu_cb(Pane *p, int i) { if (i == 0) text_copy(p); else text_select_all(p); }
 void dialog_text(const char *title, const char *text) {
     int lines = 1, maxw = 20; int cur = 0;

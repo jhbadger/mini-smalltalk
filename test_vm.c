@@ -407,6 +407,12 @@ int main(int argc, char **argv) {
         printf("ok    Stats package tests%s: %d run\n", pass ? " under GC stress" : "", n);
         gc_threshold = saved_threshold;
     }
+    /* ---- the tutorials: once, not in both passes. They are read in from disk on demand, and keeping
+       them all in the image would slow every later collection down for no gain. ---- */
+    {
+        int n = run_lib_tests("test_tutorials.txt");
+        printf("ok    tutorials: %d run\n", n);
+    }
     /* ---- the changes file: every route that changes code is logged, and replays ---- */
     {
         changes_path = "test_changes.st"; remove(changes_path);

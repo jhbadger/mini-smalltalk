@@ -71,6 +71,7 @@ void text_scroll_to_end(Pane *p);
 /* modal helpers */
 int menu_popup(int x, int y, const char **items, int n);     /* -1 if cancelled */
 char *dialog_prompt(const char *title, const char *initial); /* malloc'd or NULL */
+int dialog_choose(const char *title, const char *prompt, char **items, int n);  /* index, or -1 */
 bool dialog_confirm(const char *title, const char *msg);
 void dialog_text(const char *title, const char *text);       /* non-modal read-only window */
 

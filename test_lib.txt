@@ -389,3 +389,46 @@ Random new nextGaussian isNumber ==> true
 | o | o := OrderedCollection new. #(1 2 3 4) pairsDo: [:a :b | o add: a + b]. o printString ==> 'OrderedCollection (3 7)'
 (#(1 2 3 4 5 6) groupBy: [:x | x odd]) size ==> 2
 (Random new next: 3) size ==> 3
+# the tutorial machinery (AbstractTutorial, TutorialLesson), and the Smalltalk tutorial that uses it
+(TutorialLesson title: 'T' text: 'body') title ==> 'T'
+(TutorialLesson title: 'T' text: 'body') text ==> 'body'
+(TutorialLesson title: 'T' text: 'body') printString ==> 'a TutorialLesson: T'
+AbstractTutorial isAbstract ==> true
+AbstractTutorial lessonSelectors ==> #()
+AbstractTutorial tutorialName ==> 'AbstractTutorial'
+AbstractTutorial subclass: #TutT instanceVariableNames: '' classVariableNames: '' category: 'T'. TutT compile: 'lessonSelectors ^#(#one #two)' classified: 'x'. TutT class compile: 'lessonSelectors ^#(#one #two)'. TutT class compile: 'one ^TutorialLesson title: ''One'' text: ''3 + 4'''. TutT class compile: 'two ^TutorialLesson title: ''Two'' text: ''Object new'''. TutT lessonCount ==> 2
+TutT titles ==> #('One' 'Two')
+TutT isAbstract ==> false
+TutT tutorialName ==> 'TutT'
+TutT lessonNumber ==> 1
+TutT next. TutT lessonNumber ==> 2
+TutT next. TutT lessonNumber ==> 2
+TutT previous. TutT lessonNumber ==> 1
+TutT previous. TutT lessonNumber ==> 1
+TutT last. TutT lessonNumber ==> 2
+TutT start. TutT lessonNumber ==> 1
+(TutT goTo: 2) title ==> 'Two'
+(TutT goTo: 'one') title ==> 'One'
+TutT reset. TutT lessonNumber ==> 1
+[TutT goTo: 'nothing'] on: Error do: [:e | 'caught'] ==> 'caught'
+TutT lesson title ==> 'One'
+(TutT lessons collect: [:each | each title]) asArray ==> #('One' 'Two')
+(AbstractTutorial named: 'TutT') == TutT ==> true
+(AbstractTutorial named: 'tutt') == TutT ==> true
+(AbstractTutorial named: 'nothing') printString ==> 'nil'
+(AbstractTutorial allTutorials includes: TutT) ==> true
+(Smalltalk tutorialNames includes: 'TutT') ==> true
+(Smalltalk tutorials includes: TutT) ==> true
+(Smalltalk tutorialNamed: 'TutT') == TutT ==> true
+((Smalltalk tutorialListing detect: [:each | each startsWith: 'TutT']) includesSubstring: '2 lessons') ==> true
+TutT exampleLines ==> #('3 + 4' 'Object new')
+TutT unreadableExamples ==> #()
+TutT exampleCheck ==> #(2 0)
+(TutT checkExamples includesSubstring: 'every example reads') ==> true
+(AbstractTutorial isExampleLine: 'Object new') ==> true
+(AbstractTutorial isExampleLine: '  Object new') ==> false
+(AbstractTutorial isExampleLine: 'It cannot be helped.') ==> false
+(AbstractTutorial isExampleLine: 'The quick brown fox.') ==> false
+(AbstractTutorial isExampleLine: '| a | a := 1') ==> true
+TutT class compile: 'three ^TutorialLesson title: ''Bad'' text: ''Object new foo: '''. TutT class compile: 'lessonSelectors ^#(#one #two #three)'. TutT unreadableExamples size ==> 1
+TutT class compile: 'lessonSelectors ^#(#one #two)'. TutT unreadableExamples size ==> 0

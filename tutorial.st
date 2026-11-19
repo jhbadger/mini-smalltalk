@@ -1,106 +1,20 @@
-"An interactive tutorial for Mini Smalltalk-80, in the spirit of ProfStef.
- File this in (System menu > smalltalk tutorial, or: Smalltalk fileIn: 'tutorial.st') and evaluate:   Tutorial go"
+"The Smalltalk tutorial, in the spirit of ProfStef.
 
-Object subclass: #TutorialLesson instanceVariableNames: 'title text' classVariableNames: '' category: 'Tutorial'!
-Object subclass: #Tutorial instanceVariableNames: '' classVariableNames: 'Current' category: 'Tutorial'!
+File this in (System menu > tutorial..., or: Smalltalk fileIn: 'tutorial.st') and evaluate:   Tutorial go
 
-!TutorialLesson class methodsFor: 'instance creation'!
-title: aString text: lessonText
-	^self new setTitle: aString text: lessonText! !
+The lesson machinery -- show, next, previous, contents, goTo: -- lives in AbstractTutorial, which is part of
+the base system, so this file holds nothing but the lessons themselves. Each package writes its own tutorial
+the same way; see the comment at the top of kernel12.st."
 
-!TutorialLesson methodsFor: 'accessing'!
-setTitle: aString text: lessonText
-	title := aString. text := lessonText!
-title
-	^title!
-text
-	^text!
-printOn: aStream
-	aStream nextPutAll: 'a TutorialLesson: '; nextPutAll: title! !
+AbstractTutorial subclass: #Tutorial instanceVariableNames: '' classVariableNames: '' category: 'Tutorial'!
 
-!Tutorial class methodsFor: 'navigation'!
-go
-	"start (or resume) the tutorial"
-	Current isNil ifTrue: [Current := 1].
-	^self show!
-start
-	Current := 1.
-	^self show!
-first
-	^self start!
-last
-	Current := self lessons size.
-	^self show!
-next
-	Current := ((Current ifNil: [0]) + 1) min: self lessons size.
-	^self show!
-previous
-	Current := ((Current ifNil: [2]) - 1) max: 1.
-	^self show!
-goTo: aNumberOrTitle
-	"a lesson number, or the beginning of a lesson title"
-	aNumberOrTitle isNumber
-		ifTrue: [Current := (aNumberOrTitle truncated max: 1) min: self lessons size]
-		ifFalse: [| i |
-			i := self lessons findFirst: [:l | l title asLowercase startsWith: aNumberOrTitle asString asLowercase].
-			i = 0 ifTrue: [^self error: 'no lesson called ', aNumberOrTitle printString].
-			Current := i].
-	^self show!
-reset
-	Current := nil!
-contents
-	"show the table of contents"
-	| s |
-	s := WriteStream on: String new.
-	s nextPutAll: 'Smalltalk Tutorial  --  contents'; cr; cr.
-	self lessons doWithIndex: [:l :i |
-		s nextPutAll: (i printPaddedWith: $  to: 3); nextPutAll: '.  '; nextPutAll: l title.
-		i = Current ifTrue: [s nextPutAll: '   <-- you are here'].
-		s cr].
-	s cr; nextPutAll: 'Jump to a lesson with, for example:   Tutorial goTo: 7      or      Tutorial goTo: ''Blocks'''; cr.
-	s nextPutAll: 'Carry on where you were with:          Tutorial show'; cr.
-	self openWindowNamed: 'Tutorial contents' contents: s contents!
-help
-	^self contents! !
-
-!Tutorial class methodsFor: 'accessing'!
-lesson
-	"the current lesson"
-	^self lessons at: (Current ifNil: [1])!
-lessonNumber
-	^Current ifNil: [1]!
-lessons
-	^self lessonSelectors collect: [:sel | self perform: sel]!
+!Tutorial class methodsFor: 'the lessons'!
+tutorialName
+	^'Smalltalk'!
 lessonSelectors
 	^#(#welcome #printingAndDoing #everythingIsAnObject #commentsAndReservedWords #literals #unaryMessages #binaryMessages #keywordMessages
 		#precedence #cascades #variables #booleans #blocks #loops #numbers #stringsAndSymbols #collections
-		#iterating #streams #classesAndMetaclasses #definingAClass #instanceVariablesSelfAndSuper #theBrowser #reflection #errors #processes #whatNext)!
-tutorial
-	"the lessons, as ProfStef calls them"
-	^self lessons!
-goOn: aNumber
-	"ProfStef's name for goTo:"
-	^self goTo: aNumber! !
-
-!Tutorial class methodsFor: 'displaying'!
-show
-	| l s n |
-	l := self lesson. n := self lessonNumber.
-	s := WriteStream on: String new.
-	s nextPutAll: 'Smalltalk Tutorial  --  lesson '; print: n; nextPutAll: ' of '; print: self lessons size; nextPutAll: ':  '; nextPutAll: l title; cr.
-	s nextPutAll: (String new: 72 withAll: $-); cr; cr.
-	s nextPutAll: l text; cr; cr.
-	s nextPutAll: (String new: 72 withAll: $-); cr.
-	s nextPutAll: 'Select a line below and do it (ctrl-D) to move on:'; cr.
-	n < self lessons size ifTrue: [s nextPutAll: '    Tutorial next'; cr].
-	n > 1 ifTrue: [s nextPutAll: '    Tutorial previous'; cr].
-	s nextPutAll: '    Tutorial contents'; cr.
-	self openWindowNamed: 'Tutorial ', n printString, '/', self lessons size printString, ': ', l title contents: s contents.
-	^l!
-openWindowNamed: aTitle contents: aString
-	"shown in a window by the user interface; printed on the Transcript when there is none"
-	<primitive: 180>
-	Transcript show: aString; cr! !
+		#iterating #streams #classesAndMetaclasses #definingAClass #instanceVariablesSelfAndSuper #theBrowser #reflection #errors #processes #whatNext)! !
 
 !Tutorial class methodsFor: 'lessons - basics'!
 welcome
@@ -196,7 +110,8 @@ are seen through the compiler:
 
 Everything else that looks like syntax is punctuation:  ^ answers a value from
 a method, := assigns, . ends a statement, ; cascades, | | declares temporaries,
-[ ] delimits a block, # introduces a symbol or literal array, $ a character.'!
+Square brackets delimit a block, # introduces a symbol or a literal array, and
+$ introduces a character.'!
 literals
 	^TutorialLesson title: 'Literals' text:
 'Numbers:
@@ -351,7 +266,7 @@ total := total + 10.
 total
 
 Names starting with a capital letter are globals by convention: the classes,
-Smalltalk (the dictionary of all globals), Transcript, Processor.
+the dictionary of all globals, the Transcript, and the scheduler.
 
 Smalltalk at: #total
 Smalltalk at: #Greeting put: ''hello''.
@@ -597,7 +512,7 @@ streams
 'Streams read from or write to a sequence one element at a time.
 
 | r | r := ReadStream on: #(1 2 3 4 5). r next. r next. r upToEnd
-| r | r := ReadStream on: ''hello world''. r upTo: $
+| r | r := ReadStream on: ''hello world''. r upTo: Character space
 | r | r := ReadStream on: ''a,b,,c''. r upTo: $,. r upTo: $,. r atEnd
 
 A WriteStream is the efficient way to build a String:
@@ -617,7 +532,8 @@ FileStream readOnlyFileNamed: ''tutorial-demo.txt'' do: [:f | f lines]
 FileStream appendFileNamed: ''tutorial-demo.txt'' do: [:f | f nextPutAll: ''!!'']
 FileStream remove: ''tutorial-demo.txt''
 
-Directory lists and creates folders, and Smalltalk gives access to the environment:
+Folders are listed and created through Directory, and the environment is
+reached through Smalltalk:
 
 Directory default entries
 (Directory on: ''tutorial-demo'') create; exists
@@ -625,8 +541,9 @@ Directory default entries
 Smalltalk getenv: ''HOME''
 Smalltalk os
 
-Every object prints itself by implementing printOn: aStream; printString and the
-Transcript are built on that.  Random is a stream of Floats:
+Every object prints itself by implementing printOn: aStream; printString and
+the Transcript are both built on that.  A stream of random Floats is a stream
+too:
 
 Random new next
 (Random new next: 3)'!
@@ -888,8 +805,8 @@ Processes have priorities 1 to 8; a higher priority process runs first:
 
 | r | r := OrderedCollection new. [r add: #low] forkAt: 3. [r add: #high] forkAt: 6. r
 
-Processor is the scheduler; Processor activeProcess is the one running now,
-Processor yield lets others at the same priority run:
+The scheduler is called Processor; its activeProcess is the one running now,
+Yielding lets others at the same priority run:
 
 Processor activeProcess
 Processor activePriority

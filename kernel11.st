@@ -56,6 +56,27 @@ availablePackages
 	^names asSortedCollection asArray!
 availablePackagesString
 	^', ' join: self availablePackages!
+packageListing
+	"one line per package for the load-package list: a tick on the ones already loaded, the name,
+	and the first line of its description"
+	| names width |
+	names := self availablePackages.
+	width := 4.
+	names do: [:each | width := width max: each size].
+	^names collect: [:each |
+		| text |
+		text := ([self packageDescription: each] on: Error do: [:e | '']) ifNil: [''].
+		text := text copyUpTo: Character lf.
+		text := self withoutPackageNamePrefix: text for: each.
+		((self isPackageLoaded: each) ifTrue: ['* '] ifFalse: ['  ']),
+			(each, (String new: width - each size + 2 withAll: (Character value: 32))),
+			(text truncateTo: 60)]!
+withoutPackageNamePrefix: aString for: aName
+	"a description usually starts 'Name: what it does'; the name is already in the column before it"
+	| text |
+	text := aString trimBoth.
+	(text startsWith: aName, ':') ifTrue: [^(text copyFrom: aName size + 2 to: text size) trimBoth].
+	^text!
 packageFileFor: aName
 	"the file to file in for a package, or nil"
 	| dir folder |
