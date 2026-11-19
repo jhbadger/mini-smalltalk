@@ -608,11 +608,22 @@ w contents
 
 print: writes an object''s printString; << writes strings as they are and prints
 everything else.  Read and write at once with a ReadWriteStream, and use a
-FileStream for files (the whole file is read when opened and written on close):
+FileStream for files.  It reads and writes the file as you go, so it works on files of
+any size; close it when you are done (the scoped forms do that for you):
 
-| f | f := FileStream newFileNamed: ''tutorial-demo.txt''. f nextPutAll: ''some text''; cr. f close
-(FileStream oldFileNamed: ''tutorial-demo.txt'') contentsOfEntireFile
+| f | f := FileStream newFileNamed: ''tutorial-demo.txt''. f nextPutAll: ''some text''; cr; nextPutAll: ''more''. f close
+FileStream contentsOf: ''tutorial-demo.txt''
+FileStream readOnlyFileNamed: ''tutorial-demo.txt'' do: [:f | f lines]
+FileStream appendFileNamed: ''tutorial-demo.txt'' do: [:f | f nextPutAll: ''!!'']
 FileStream remove: ''tutorial-demo.txt''
+
+Directory lists and creates folders, and Smalltalk gives access to the environment:
+
+Directory default entries
+(Directory on: ''tutorial-demo'') create; exists
+(Directory on: ''tutorial-demo'') delete
+Smalltalk getenv: ''HOME''
+Smalltalk os
 
 Every object prints itself by implementing printOn: aStream; printString and the
 Transcript are built on that.  Random is a stream of Floats:
@@ -777,6 +788,19 @@ thisContext class
 [thisContext] value class
 [:x | x] numArgs
 
+A context knows its sender, receiver, method and temporaries, so a method can look at
+who called it, and can even return on someone else''s behalf:
+
+thisContext sender
+thisContext stack size
+| a b | a := 10. b := 20. thisContext tempAt: 2
+Integer compile: ''whoCalledMe ^thisContext sender printString''.
+3 whoCalledMe
+
+thisContext return: x answers x from the context as if it had executed ^x, and
+resume: x continues a context lower in the stack, running pending ensure: blocks on
+the way.  A context that has returned is dead (isDead) and cannot be resumed.
+
 perform: sends a message chosen at run time; the compiler is available as well:
 
 3 perform: #between:and: with: 1 with: 5
@@ -805,7 +829,35 @@ You can raise errors yourself with error:, and Error signal: does the same:
 
 self error: ''something is wrong''
 Error signal: ''the widget is broken''
-[1 / 0] on: ZeroDivide do: [:e | ''handled'']     "this Smalltalk has no exception handlers: the error wins"
+
+An error nobody handles stops the evaluation and opens this window.  To handle one,
+put the risky code in a block and send on:do: -- the handler block receives the
+exception.  Falling off its end answers the handler''s value from on:do::
+
+[1 / 0] on: ZeroDivide do: [:e | ''handled'']
+[nil foo] on: MessageNotUnderstood do: [:e | e message selector]
+[#(1 2 3) at: 5] on: Error do: [:e | e messageText]
+[1 / 0] on: ZeroDivide, MessageNotUnderstood do: [:e | e class name]
+
+Inside a handler, e return: 5 leaves on:do: with 5, e retry runs the block again,
+e retryUsing: [...] runs another block instead, and e pass or e outer hands the
+error to an outer handler.  Warnings (and your own resumable exceptions) can be
+resumed, so the code that signalled carries on:
+
+[(Warning signal: ''careful'') + 1] on: Warning do: [:e | e resume: 41]
+[(1 / 0) + 1] on: ZeroDivide do: [:e | e resume: 9]
+
+An Error is not resumable.  To clean up whatever happens, use ensure: (it also
+runs when the block is left by ^ or by an unhandled error) or ifCurtailed: (only
+when the block does not finish normally):
+
+[1 / 0] ensure: [Transcript show: ''cleaned up''; cr]
+[^3] ifCurtailed: [Transcript show: ''left early''; cr]
+
+Make your own with a subclass of Error (or in the browser), then signal it:
+
+Error subclass: #WidgetBroken instanceVariableNames: '''' classVariableNames: '''' category: ''Tutorial''
+[WidgetBroken new signal: ''no''] on: WidgetBroken do: [:e | e messageText]
 
 Every Object understands halt, which simply raises an error named halt.  In the
 classic Smalltalk-80 a debugger would open; here the error window plays that part.

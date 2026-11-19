@@ -20,6 +20,7 @@ typedef struct Gen {
     oop cls; bool doit;
     jmp_buf *jb; char *err; int errlen;
     oop ivars;              /* Array of instance variable names */
+    bool inblock;           /* generating a real (non-inlined) block: ^ is a non-local return */
 } Gen;
 
 static void gfail(Gen *g, const char *fmt, const char *a) { snprintf(g->err, g->errlen, fmt, a ? a : ""); longjmp(*g->jb, 1); }
@@ -171,7 +172,7 @@ static void gen_expr(Gen *g, Node *n) {
         adj(g, 1); break;
     case N_VAR: gen_var(g, n->name); break;
     case N_ASSIGN: gen_expr(g, n->recv); gen_store(g, n->name); break;
-    case N_RETURN: gen_expr(g, n->recv); emit(g, OP_RETURN); break;
+    case N_RETURN: gen_expr(g, n->recv); emit(g, OP_RETURN); if (g->inblock) emit(g, OP_RETURN_RETRY); break;
     case N_BLOCK: { oop m = gen_block_method(g, n); emit1(g, OP_PUSH_BLOCK, addlit(g, m)); adj(g, 1); break; }
     case N_BRACE: {
         oop a = dict_assoc_at(smalltalk, new_symbol("Array"));
@@ -229,7 +230,7 @@ static oop finish_method(Gen *g, int nargs, oop selector, int prim) {
 
 static oop gen_block_method(Gen *g, Node *b) {
     Gen bg; memset(&bg, 0, sizeof bg);
-    bg.cls = g->cls; bg.doit = g->doit; bg.jb = g->jb; bg.err = g->err; bg.errlen = g->errlen; bg.ivars = g->ivars;
+    bg.cls = g->cls; bg.doit = g->doit; bg.jb = g->jb; bg.err = g->err; bg.errlen = g->errlen; bg.ivars = g->ivars; bg.inblock = true;
     Scope *s = scope_new(g->scope, 0); bg.scope = s;
     for (int i = 0; i < b->nparams; i++) scope_add(&bg, s, b->params[i]);
     for (int i = 0; i < b->ntemps; i++) scope_add(&bg, s, b->temps[i]);

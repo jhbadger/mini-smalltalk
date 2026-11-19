@@ -127,8 +127,6 @@ negated
 	^0 - self!
 abs
 	^self < 0 ifTrue: [self negated] ifFalse: [self]!
-zeroDivide
-	^self error: 'division by zero'!
 gcd: anInteger
 	| a b t |
 	a := self abs. b := anInteger abs.
@@ -350,7 +348,7 @@ numerator: n denominator: d
 
 !Fraction methodsFor: 'private'!
 setNumerator: n denominator: d
-	d = 0 ifTrue: [^self error: 'division by zero'].
+	d = 0 ifTrue: [^self zeroDivide].
 	d < 0 ifTrue: [numerator := n negated. denominator := d negated] ifFalse: [numerator := n. denominator := d]!
 reduced
 	| g |
@@ -378,7 +376,7 @@ denominator
 	^self retry: #* coercing: aNumber!
 / aNumber
 	aNumber isFraction ifTrue: [
-		aNumber numerator = 0 ifTrue: [^self error: 'division by zero'].
+		aNumber numerator = 0 ifTrue: [^self zeroDivide].
 		^(Fraction numerator: numerator * aNumber denominator denominator: denominator * aNumber numerator) reduced].
 	^self retry: #/ coercing: aNumber!
 // aNumber
@@ -390,7 +388,7 @@ negated
 abs
 	^Fraction numerator: numerator abs denominator: denominator!
 reciprocal
-	numerator = 0 ifTrue: [^self error: 'division by zero'].
+	numerator = 0 ifTrue: [^self zeroDivide].
 	^(Fraction numerator: denominator denominator: numerator) reduced!
 squared
 	^Fraction numerator: numerator squared denominator: denominator squared!
@@ -469,7 +467,7 @@ storeOn: aStream
 	^self retry: #* coercing: aNumber!
 / aNumber
 	<primitive: 43>
-	aNumber isNumber ifTrue: [aNumber = 0 ifTrue: [^self error: 'division by zero']].
+	aNumber isNumber ifTrue: [aNumber = 0 ifTrue: [^self zeroDivide]].
 	^self retry: #/ coercing: aNumber!
 // aNumber
 	^(self / aNumber) floor!

@@ -722,9 +722,13 @@ hash
 	^h! !
 
 !Dictionary methodsFor: 'accessing'!
+errorKeyNotFound: key
+	^KeyNotFound isNil
+		ifTrue: [self primError: 'key not found: ', key printString]
+		ifFalse: [KeyNotFound new key: key; signal: 'key not found: ', key printString]!
 at: key
 	<primitive: 90>
-	^self error: 'key not found: ', key printString!
+	^self errorKeyNotFound: key!
 at: key ifAbsent: aBlock
 	<primitive: 90>
 	^aBlock value!
@@ -737,7 +741,7 @@ at: key put: value
 	^self error: 'cannot store'!
 associationAt: key
 	<primitive: 95>
-	^self error: 'key not found'!
+	^self errorKeyNotFound: key!
 keys
 	"Answer a Set of the keys"
 	^Set withAll: self primKeys!
@@ -761,7 +765,7 @@ add: anAssociation
 	^anAssociation!
 removeKey: key
 	<primitive: 92>
-	^self error: 'key not found: ', key printString!
+	^self errorKeyNotFound: key!
 removeKey: key ifAbsent: aBlock
 	<primitive: 92>
 	^aBlock value!

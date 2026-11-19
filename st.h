@@ -65,7 +65,8 @@ enum {
     OP_PUSH_SELF, OP_PUSH_NIL, OP_PUSH_TRUE, OP_PUSH_FALSE, OP_PUSH_INT, OP_PUSH_CONTEXT,
     OP_STORE_INST, OP_STORE_TEMP, OP_STORE_OUTER, OP_STORE_GLOBAL,
     OP_POP, OP_DUP, OP_SEND, OP_SUPER_SEND, OP_RETURN, OP_BLOCK_RETURN,
-    OP_PUSH_BLOCK, OP_JUMP, OP_JUMP_FALSE, OP_JUMP_TRUE
+    OP_PUSH_BLOCK, OP_JUMP, OP_JUMP_FALSE, OP_JUMP_TRUE,
+    OP_RETURN_RETRY     /* follows every OP_RETURN inside a block: after an unwind block has run, drop its value and redo the return */
 };
 
 /* ---------- well known objects (object.c) ---------- */

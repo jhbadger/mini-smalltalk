@@ -11,8 +11,17 @@ Object subclass: #CompiledMethod instanceVariableNames: 'header literals bytecod
 Object variableSubclass: #ContextPart instanceVariableNames: 'sender pc stackp method receiver home outer closure' classVariableNames: '' category: 'Kernel-Methods'!
 ContextPart variableSubclass: #MethodContext instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Methods'!
 ContextPart variableSubclass: #BlockContext instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Methods'!
-Object subclass: #Exception instanceVariableNames: 'messageText' classVariableNames: '' category: 'Kernel-Exceptions'!
+Object subclass: #Exception instanceVariableNames: 'messageText signalContext handlerContext resumeBlock disabled' classVariableNames: '' category: 'Kernel-Exceptions'!
 Exception subclass: #Error instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Exceptions'!
+Exception subclass: #Notification instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Exceptions'!
+Notification subclass: #Warning instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Exceptions'!
+Error subclass: #ArithmeticError instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Exceptions'!
+ArithmeticError subclass: #ZeroDivide instanceVariableNames: 'dividend' classVariableNames: '' category: 'Kernel-Exceptions'!
+Error subclass: #MessageNotUnderstood instanceVariableNames: 'message receiver' classVariableNames: '' category: 'Kernel-Exceptions'!
+Error subclass: #SubscriptOutOfBounds instanceVariableNames: '' classVariableNames: '' category: 'Kernel-Exceptions'!
+Error subclass: #KeyNotFound instanceVariableNames: 'key' classVariableNames: '' category: 'Kernel-Exceptions'!
+Object subclass: #ExceptionSet instanceVariableNames: 'classes' classVariableNames: '' category: 'Kernel-Exceptions'!
+Object subclass: #ExceptionRetry instanceVariableNames: 'block' classVariableNames: '' category: 'Kernel-Exceptions'!
 Object subclass: #Compiler instanceVariableNames: '' classVariableNames: '' category: 'System-Compiler'!
 Stream subclass: #Random instanceVariableNames: 'seed' classVariableNames: '' category: 'Kernel-Numbers'!
 
@@ -232,13 +241,36 @@ whileFalse
 repeat
 	[true] whileTrue: [self value]!
 ensure: aBlock
-	| r |
-	r := self value.
+	"Evaluate the receiver, then aBlock -- also when the receiver is left by a ^, an exception return or an error.
+	The VM finds this frame by its selector and runs aBlock (temp 1) unless the flag (temp 2) says it already has."
+	| complete result |
+	complete := false.
+	result := self value.
+	complete := true.
 	aBlock value.
-	^r!
+	^result!
 ifCurtailed: aBlock
-	^self value!
-on: anExceptionClass do: aBlock
+	"Evaluate the receiver; aBlock runs only if the receiver is left without completing."
+	| complete result |
+	complete := false.
+	result := self value.
+	complete := true.
+	^result!
+on: exceptionSelector do: handlerBlock
+	"Evaluate the receiver; an exception matching exceptionSelector (an Exception class or an ExceptionSet) signalled
+	while it runs is given to handlerBlock. Falling off the end of the handler returns its value from here."
+	| block result |
+	block := self.
+	[result := block primOn: exceptionSelector do: handlerBlock.
+	 result class == ExceptionRetry] whileTrue: [result block notNil ifTrue: [block := result block]].
+	^result!
+on: selector1 do: handler1 on: selector2 do: handler2
+	^[self on: selector1 do: handler1] on: selector2 do: handler2!
+primOn: exceptionSelector do: handlerBlock
+	"The marker frame that Exception>>signal looks for. Its temps are read through ContextPart>>handlerSelector etc."
+	| active unwindBlock |
+	active := true.
+	unwindBlock := [:value | ^value].
 	^self value!
 valueWithExit
 	^self value: [^nil]! !
@@ -303,7 +335,69 @@ tempAt: index
 tempAt: index put: value
 	^self basicAt: index put: value!
 numTemps
-	^method numTemps! !
+	^method numTemps!
+parentContext
+	^sender!
+outerContext
+	^outer!
+isDead
+	"true once the context has returned or been unwound"
+	^pc < 0!
+stackDepth
+	| n c |
+	n := 0. c := self.
+	[c notNil] whileTrue: [n := n + 1. c := c sender].
+	^n!
+stack
+	"the receiver and all the contexts below it, innermost first"
+	| r c |
+	r := OrderedCollection new. c := self.
+	[c notNil] whileTrue: [r add: c. c := c sender].
+	^r!
+findContextSuchThat: aBlock
+	| c |
+	c := self.
+	[c notNil] whileTrue: [(aBlock value: c) ifTrue: [^c]. c := c sender].
+	^nil! !
+
+!ContextPart methodsFor: 'controlling'!
+primResume: value
+	"Abandon the running contexts and continue the receiver with value as the answer of the send it is suspended in.
+	Fails unless the receiver is a live context lower down in the active process's stack."
+	<primitive: 149>
+	^self error: 'cannot resume this context'!
+runUnwindBlocksDownTo: aContext
+	"run, innermost first, the ensure: and ifCurtailed: blocks of the frames between the active context and aContext"
+	| c |
+	c := thisContext sender.
+	[c notNil and: [c ~~ aContext]] whileTrue: [
+		(c isUnwindContext and: [(c tempAt: 2) ~~ true]) ifTrue: [c tempAt: 2 put: true. (c tempAt: 1) value].
+		c := c sender]!
+resume: value
+	"Unwind back to the receiver (running ensure: blocks on the way) and continue it with value."
+	self isDead ifTrue: [^self error: 'cannot resume a dead context'].
+	self runUnwindBlocksDownTo: self.
+	^self primResume: value!
+return: value
+	"Return value from the receiver to its sender, as if the receiver had executed ^value."
+	sender isNil ifTrue: [^self error: 'cannot return from the bottom context'].
+	^sender resume: value! !
+
+!ContextPart methodsFor: 'exception support'!
+isUnwindContext
+	^home isNil and: [(method selector == #ensure: or: [method selector == #ifCurtailed:]) and: [receiver class == BlockClosure]]!
+isHandlerContext
+	^home isNil and: [method selector == #primOn:do: and: [receiver class == BlockClosure]]!
+handlerSelector
+	^self tempAt: 1!
+handlerBlock
+	^self tempAt: 2!
+handlerActive
+	^(self tempAt: 3) == true!
+handlerActive: aBoolean
+	self tempAt: 3 put: aBoolean!
+handlerUnwindBlock
+	^self tempAt: 4! !
 
 !ContextPart methodsFor: 'printing'!
 printOn: aStream
@@ -328,25 +422,180 @@ isBlockContext
 	^true! !
 
 !Exception class methodsFor: 'signalling'!
+new
+	^self basicNew!
 signal
 	^self new signal!
 signal: aString
-	^self new signal: aString!
-new
-	^self basicNew messageText: 'An exception has occurred'! !
+	^self new signal: aString! !
+
+!Exception class methodsFor: 'exception selector'!
+, anExceptionSelector
+	"Exception, Exception ... builds an ExceptionSet for on:do:"
+	^ExceptionSet new add: self; add: anExceptionSelector; yourself!
+handles: anException
+	^anException isKindOf: self! !
 
 !Exception methodsFor: 'signalling'!
 signal
-	^self error: messageText!
+	"Look down the stack for an enabled #on:do: frame whose exception selector handles the receiver and run its
+	handler block on top of the current stack, so that #resume: can come back here. Without a handler, #defaultAction."
+	resumeBlock := [:value | ^value].
+	signalContext := thisContext.
+	disabled := OrderedCollection new.
+	^self activateHandlerFrom: thisContext sender!
 signal: aString
 	messageText := aString.
-	^self error: aString!
+	^self signal!
+activateHandlerFrom: startContext
+	| c |
+	c := startContext.
+	[c notNil] whileTrue: [
+		(c isHandlerContext and: [c handlerActive and: [(c handlerSelector respondsTo: #handles:) and: [c handlerSelector handles: self]]])
+			ifTrue: [^self runHandler: c].
+		c := c sender].
+	^self defaultAction!
+runHandler: aHandlerContext
+	"A handler is disabled while it runs, together with the handlers nested inside it: an exception signalled by the
+	handler block is looked for further out."
+	| c block result |
+	handlerContext := aHandlerContext.
+	c := signalContext.
+	[c ~~ aHandlerContext] whileTrue: [
+		(c isHandlerContext and: [c handlerActive]) ifTrue: [disabled add: c. c handlerActive: false].
+		c := c sender].
+	disabled add: aHandlerContext.
+	aHandlerContext handlerActive: false.
+	block := aHandlerContext handlerBlock.
+	result := block numArgs = 0 ifTrue: [block value] ifFalse: [block value: self].
+	"falling off the end of the handler returns its value from #on:do: -- through the local, because the handler may
+	have signalled the receiver again, which replaces handlerContext"
+	^aHandlerContext handlerUnwindBlock value: result! !
+
+!Exception methodsFor: 'handling'!
+return: value
+	"leave #on:do: with value as its answer"
+	handlerContext isNil ifTrue: [^self error: 'return: sent outside a handler block'].
+	^handlerContext handlerUnwindBlock value: value!
+return
+	^self return: nil!
+retry
+	"leave the handler and evaluate the protected block again"
+	handlerContext isNil ifTrue: [^self error: 'retry sent outside a handler block'].
+	^handlerContext handlerUnwindBlock value: ExceptionRetry new!
+retryUsing: aBlock
+	"leave the handler and evaluate aBlock, under the same handler, in place of the protected block"
+	handlerContext isNil ifTrue: [^self error: 'retryUsing: sent outside a handler block'].
+	^handlerContext handlerUnwindBlock value: (ExceptionRetry new block: aBlock)!
+resume: value
+	"continue from the #signal that raised the exception, answering value"
+	self isResumable ifFalse: [^self error: 'IllegalResumeAttempt: this exception is not resumable'].
+	disabled do: [:each | each handlerActive: true].
+	^resumeBlock value: value!
+resume
+	^self resume: nil!
+outer
+	"signal the exception again, to the handlers further out. If one of them resumes, answer the resumption value."
+	| savedHandler savedResume savedDisabled answer |
+	savedHandler := handlerContext.
+	savedHandler isNil ifTrue: [^self signal].
+	savedResume := resumeBlock.
+	savedDisabled := disabled.
+	disabled := OrderedCollection new.
+	resumeBlock := [:value | handlerContext := savedHandler. resumeBlock := savedResume. disabled := savedDisabled. ^value].
+	answer := self activateHandlerFrom: savedHandler sender.
+	handlerContext := savedHandler. resumeBlock := savedResume. disabled := savedDisabled.
+	^answer!
+pass
+	"hand the exception to the handlers further out, as if this handler did not exist"
+	| answer |
+	answer := self outer.
+	^self isResumable ifTrue: [self resume: answer] ifFalse: [self return: answer]!
+signalerContext
+	^signalContext!
+defaultAction
+	"nothing handled the exception: report it, abandoning the evaluation (pending ensure: blocks still run)"
+	^nil primError: self messageText! !
+
+!Exception methodsFor: 'accessing'!
+isResumable
+	^true!
 messageText
-	^messageText!
+	^messageText ifNil: [self description]!
 messageText: aString
 	messageText := aString!
 description
-	^messageText! !
+	^'An exception has occurred'! !
+
+!Error methodsFor: 'handling'!
+isResumable
+	^false! !
+
+!Notification methodsFor: 'handling'!
+defaultAction
+	"an unhandled notification just answers nil"
+	^nil! !
+
+!Warning methodsFor: 'handling'!
+defaultAction
+	"an unhandled warning is noted in the Transcript and execution continues"
+	Transcript show: 'Warning: ', self messageText; cr.
+	^nil! !
+
+!ArithmeticError methodsFor: 'handling'!
+isResumable
+	^true! !
+
+!ZeroDivide methodsFor: 'accessing'!
+dividend
+	^dividend!
+dividend: aNumber
+	dividend := aNumber!
+description
+	^'The program attempted to divide a number by zero'! !
+
+!MessageNotUnderstood methodsFor: 'accessing'!
+message
+	^message!
+message: aMessage
+	message := aMessage!
+receiver
+	^receiver!
+receiver: anObject
+	receiver := anObject!
+isResumable
+	^true! !
+
+!KeyNotFound methodsFor: 'accessing'!
+key
+	^key!
+key: anObject
+	key := anObject! !
+
+!ExceptionSet class methodsFor: 'instance creation'!
+new
+	^self basicNew setUp! !
+
+!ExceptionSet methodsFor: 'exceptions'!
+setUp
+	classes := OrderedCollection new!
+add: anExceptionSelector
+	classes add: anExceptionSelector!
+, anExceptionSelector
+	^ExceptionSet new add: self; add: anExceptionSelector; yourself!
+handles: anException
+	classes do: [:each | (each handles: anException) ifTrue: [^true]].
+	^false! !
+
+!ExceptionRetry methodsFor: 'accessing'!
+block
+	^block!
+block: aBlock
+	block := aBlock! !
+
+!Number methodsFor: 'arithmetic'!
+zeroDivide
+	^ZeroDivide new dividend: self; signal: 'division by zero'! !
 
 !Compiler class methodsFor: 'evaluating'!
 evaluate: aString

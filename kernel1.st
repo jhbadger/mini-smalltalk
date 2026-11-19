@@ -176,10 +176,15 @@ perform: aSymbol withArguments: anArray
 
 !Object methodsFor: 'error handling'!
 error: aString
+	Error isNil ifTrue: [^self primError: aString].
+	^Error new signal: aString!
+primError: aString
+	"report aString and abandon the evaluation; this is what an unhandled Error finally does"
 	<primitive: 11>
 	^nil!
 doesNotUnderstand: aMessage
-	^self error: 'does not understand #', aMessage selector!
+	MessageNotUnderstood isNil ifTrue: [^self primError: 'does not understand #', aMessage selector].
+	^MessageNotUnderstood new message: aMessage; receiver: self; signal: 'does not understand #', aMessage selector!
 halt
 	^self error: 'halt'!
 subclassResponsibility
@@ -187,7 +192,8 @@ subclassResponsibility
 shouldNotImplement
 	^self error: 'This message is not appropriate for this object'!
 errorSubscriptBounds: index
-	^self error: 'subscript out of bounds: ', index printString!
+	SubscriptOutOfBounds isNil ifTrue: [^self primError: 'subscript out of bounds: ', index printString].
+	^SubscriptOutOfBounds new signal: 'subscript out of bounds: ', index printString!
 assert: aBlock
 	aBlock value ifFalse: [self error: 'assertion failed']!
 inspect
@@ -607,23 +613,23 @@ printString: base
 	^self asFloat * aNumber asFloat!
 / aNumber
 	<primitive: 25>
-	aNumber = 0 ifTrue: [^self error: 'division by zero'].
+	aNumber = 0 ifTrue: [^self zeroDivide].
 	^self asFloat / aNumber asFloat!
 // aNumber
 	<primitive: 23>
-	aNumber = 0 ifTrue: [^self error: 'division by zero'].
+	aNumber = 0 ifTrue: [^self zeroDivide].
 	^(self asFloat / aNumber asFloat) floor!
 \\ aNumber
 	<primitive: 24>
-	aNumber = 0 ifTrue: [^self error: 'division by zero'].
+	aNumber = 0 ifTrue: [^self zeroDivide].
 	^self asFloat \\ aNumber asFloat!
 quo: aNumber
 	<primitive: 38>
-	aNumber = 0 ifTrue: [^self error: 'division by zero'].
+	aNumber = 0 ifTrue: [^self zeroDivide].
 	^(self asFloat / aNumber asFloat) truncated!
 rem: aNumber
 	<primitive: 39>
-	aNumber = 0 ifTrue: [^self error: 'division by zero'].
+	aNumber = 0 ifTrue: [^self zeroDivide].
 	^self asFloat rem: aNumber asFloat!
 gcd: anInteger
 	| a b t |
@@ -745,7 +751,7 @@ printPaddedWith: aCharacter to: width
 	^self error: 'argument must be a number'!
 / aNumber
 	<primitive: 43>
-	aNumber = 0 ifTrue: [^self error: 'division by zero'].
+	aNumber = 0 ifTrue: [^self zeroDivide].
 	^self error: 'argument must be a number'!
 fractionPart
 	<primitive: 58>

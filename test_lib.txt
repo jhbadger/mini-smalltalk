@@ -1,0 +1,391 @@
+# Library regression tests, run by test_vm: one expression per line, then ' ==> ' and the expected printString.
+# Lines starting with "# " are comments; ERROR: <message> means the expression should end in that error.
+(3@4) + 1 ==> 4@5
+(3@4) * 2 ==> 6@8
+(3@4) - (1@1) ==> 2@3
+(3@4) / 2 ==> (3/2)@2
+(7@9) // 2 ==> 3@4
+(7@9) \\ 4 ==> 3@1
+(3@4) < 5 ==> true
+(3@4) max: 5 ==> 5@5
+(3@4) theta ==> 0.9272952180016122
+((0@1) theta * 180 / Float pi) rounded ==> 90
+(3@4) unitVector ==> 0.6@0.8
+(3@4) crossProduct: (1@2) ==> 2
+(3@4) area ==> 12
+(3@4) asArray ==> #(3 4)
+(3@4) isPoint ==> true
+(1.5@2.5) floor ==> 1@2
+(1.5@2.5) ceiling ==> 2@3
+(3@4) squared ==> 9@16
+(0@0) isZero ==> true
+(Point r: 2 degrees: 0) printString ==> '2.0@0.0'
+(Point zero) printString ==> '0@0'
+((0@0) corner: (10@20)) topCenter ==> 5@0
+((0@0) corner: (10@20)) leftCenter ==> 0@10
+((0@0) corner: (10@20)) translateBy: 5 ==> 5@5 corner: 15@25
+((0@0) corner: (10@20)) insetBy: 2 ==> 2@2 corner: 8@18
+((0@0) corner: (10@20)) expandBy: 1 ==> -1@-1 corner: 11@21
+((0@0) extent: (4@6)) isEmpty ==> false
+(Rectangle point: (5@5) point: (1@2)) printString ==> '1@2 corner: 5@5'
+(Rectangle center: (10@10) extent: (4@4)) printString ==> '8@8 corner: 12@12'
+(Rectangle merging: {(0@0) corner: (1@1). (5@5) corner: (6@6)}) printString ==> '0@0 corner: 6@6'
+| r | r := (0@0) corner: (10@10). r width: 3. r printString ==> '0@0 corner: 3@10'
+#(1 2 3 4) sum: [:x | x * x] ==> 30
+#(1 2 3 4) average ==> (5/2)
+#(1 2 3 4) fold: [:a :b | a + b] ==> 10
+#() fold: [:a :b | a + b] ==> ERROR: cannot fold an empty collection
+#(3 1 2) sorted ==> #(1 2 3)
+#(3 1 2) sorted: [:a :b | a > b] ==> #(3 2 1)
+'hello' sorted ==> 'ehllo'
+#(3 1 2) asOrderedCollection sorted ==> #(1 2 3)
+(1 to: 5) sorted: [:a :b | a > b] ==> #(5 4 3 2 1)
+#(1 2 3) gather: [:x | {x. x * 10}] ==> #(1 10 2 20 3 30)
+((#(1 2 3 4 5 6) groupBy: [:x | x odd]) at: true) printString ==> 'OrderedCollection (1 3 5)'
+#(1 2 3) ifEmpty: ['e'] ifNotEmpty: [:c | c size] ==> 3
+#() ifEmpty: ['e'] ifNotEmpty: [:c | c size] ==> 'e'
+#(1 2 3) noneSatisfy: [:x | x > 5] ==> true
+#(1 2 3) detect: [:x | x > 1] ifFound: [:x | x * 100] ==> 200
+#(1 2 3) detect: [:x | x > 5] ifFound: [:x | x * 100] ==> nil
+#(1 2 3) at: 5 ifAbsent: [#none] ==> #none
+#(10 20 30 40) atAll: #(1 3) ==> #(10 30)
+#(1 2 3) atWrap: 5 ==> 2
+#(1 2 3 4 5) copyFrom: 3 ==> #(3 4 5)
+#(1 2 3 2 1) copyAfter: 2 ==> #(3 2 1)
+#(1 2 3 2 1) copyAfterLast: 2 ==> #(1)
+#(1 2 3 2 1) copyUpTo: 3 ==> #(1 2)
+#(1 2 3 2 1) copyUpToLast: 2 ==> #(1 2 3)
+#(1 2 3) copyWithFirst: 0 ==> #(0 1 2 3)
+#(1 2 3 2 1) lastIndexOf: 2 ==> 4
+#(1 3 2) isSorted ==> false
+#(1 2 3) isSorted ==> true
+', ' join: #('a' 'b' 'c') ==> 'a, b, c'
+#(1 2 3) withIndexCollect: [:e :i | e * i] ==> #(1 4 9)
+| s | s := OrderedCollection new. #(1 2 3) permutationsDo: [:p | s add: p]. s size ==> 6
+| s | s := OrderedCollection new. #(1 2 3) permutationsDo: [:p | s add: p]. s first printString, s last printString ==> '#(1 2 3)#(3 1 2)'
+Array streamContents: [:s | s nextPut: 1; nextPut: 2] ==> #(1 2)
+String streamContents: [:s | s nextPutAll: 'ab'; print: 3] ==> 'ab3'
+(OrderedCollection newFrom: #(1 2)) printString ==> 'OrderedCollection (1 2)'
+(Set newFrom: #(1 2 2)) size ==> 2
+Array empty size ==> 0
+(Dictionary newFrom: {1->2. 3->4}) printString ==> 'Dictionary (1->2 3->4 )'
+(Dictionary keys: #(1 2) values: #(3 4)) printString ==> 'Dictionary (1->3 2->4 )'
+(Dictionary new at: 1 put: 2; yourself) includesAssociation: 1->2 ==> true
+| d | d := Dictionary new. d addAll: {1->2. 3->4}. d size ==> 2
+(Dictionary new) associationAt: 1 ifAbsent: [0] ==> 0
+(Set withAll: #(1 2 3)) union: #(3 4) ==> Set (1 2 3 4)
+((Set withAll: #(1 2 3)) intersection: #(2 3 9)) size ==> 2
+((Set withAll: #(1 2 3)) difference: #(2)) size ==> 2
+(Set withAll: #(1 2)) isSubsetOf: #(1 2 3) ==> true
+| oc | oc := OrderedCollection withAll: #(1 2 3). oc add: 9 afterIndex: 1. oc printString ==> 'OrderedCollection (1 9 2 3)'
+| oc | oc := OrderedCollection withAll: #(1 2 3). oc removeAllFoundIn: #(1 3). oc printString ==> 'OrderedCollection (2)'
+(1 to: 3) isInterval ==> true
+(1->2) isAssociation ==> true
+3 isAssociation ==> false
+[:a | a] cull: 5 ==> 5
+[3] cull: 5 ==> 3
+[:a :b | a + b] cull: 1 cull: 2 ==> 3
+[:a | a] valueWithEnoughArguments: #(1 2 3) ==> 1
+[1/0] ifError: [:m | m] ==> 'division by zero'
+[1/0] ifError: ['err'] ==> 'err'
+#size value: 'abc' ==> 3
+(#+ value: 3 value: 4) ==> 7
+#at:put: precedence ==> 3
+#+ precedence ==> 2
+#foo precedence ==> 1
+#at:put: isKeyword ==> true
+(#size implementors size > 3) ==> true
+(#printOn: senders size > 5) ==> true
+Object isBehavior ==> true
+3 isBehavior ==> false
+Metaclass isMetaclass ==> false
+Object class isMetaclass ==> true
+Object includesBehavior: Object ==> true
+Integer includesBehavior: Object ==> true
+Object hasMethods ==> true
+Integer instVarNames ==> #()
+Point instVarNames ==> #('x' 'y')
+(Semaphore new) isSignaled ==> false
+(Semaphore new signal; yourself) signals ==> 1
+| s | s := ReadStream on: 'hello world'. s upToAll: 'o w' ==> 'hell'
+| s | s := ReadStream on: 'a--b--c'. (s upToAll: '--') , (s upToAll: '--') , s upToEnd ==> 'abc'
+| s | s := ReadStream on: 'abc'. s next. s next. s back printString ==> '$b'
+| s | s := ReadStream on: 'one two'. s skipToAll: 'one '. s upToEnd ==> 'two'
+| s | s := ReadStream on: 'abc'. s atStart ==> true
+(ReadStream on: #(1 2 3)) inject: 0 into: [:a :b | a + b] ==> 6
+(ReadStream on: #(1 2 3)) detect: [:x | x > 1] ==> 2
+| w | w := WriteStream on: String new. w lf. w next: 2 put: $x. w contents size ==> 3
+(WriteStream on: String new) readStream atEnd ==> true
+3 asString ==> '3'
+#(1 2) asString ==> '#(1 2)'
+nil asString ==> 'nil'
+(3 in: [:x | x + 1]) ==> 4
+3 ifNotNil: [:x | x] ifNil: [0] ==> 3
+nil ifNotNil: [:x | x] ifNil: [0] ==> 0
+Object new printStringLimitedTo: 5 ==> 'an Ob...'
+(1 to: 50) printStringLimitedTo: 10 ==> '(1 to: 50)'
+(1/2) sqrt ==> 0.7071067811865476
+(1/2) ln ==> -0.6931471805599453
+(2 raisedTo: 200) sqrt ==> 1.2676506002282294e30
+(2 raisedTo: 2000) ln ==> 1386.2943611198905
+(1/3) sin ==> 0.3271946967961522
+Float nan printString ==> 'NaN'
+Float nan isNaN ==> true
+Float nan = Float nan ==> false
+Float infinity isInfinite ==> true
+Float infinity negated printString ==> '-Infinity'
+Float infinity isFinite ==> false
+3.5 isFinite ==> true
+Float epsilon printString ==> '2.220446049250313e-16'
+Float fmax printString ==> '1.7976931348623157e308'
+Float halfPi printString ==> '1.5707963267948966'
+1000 log ==> 3.0
+100 log ==> 2.0
+2.5 sinh ==> 6.0502044810397875
+2.5 cosh ==> 6.132289479663686
+2.5 tanh ==> 0.9866142981514304
+1000 tanh ==> 1.0
+(0 - 5) bitAnd: 3 ==> 3
+(0 - 5) bitOr: 3 ==> -5
+(0 - 5) bitXor: 3 ==> -8
+(0 - 5) bitShift: -1 ==> -3
+(0 - 5) bitShift: 2 ==> -20
+(0 - 1) bitAnd: 255 ==> 255
+((2 raisedTo: 64) negated bitAnd: 255) ==> 0
+((2 raisedTo: 64) negated bitAnd: (2 raisedTo: 64) - 1) ==> 0
+((2 raisedTo: 64) negated bitOr: 255) printString ==> '-18446744073709551361'
+((2 raisedTo: 64) negated bitXor: (2 raisedTo: 64) negated) ==> 0
+((2 raisedTo: 64) negated bitXor: 12345) ==> -18446744073709539271
+((2 raisedTo: 64) negated bitShift: -3) printString ==> '-2305843009213693952'
+((2 raisedTo: 70) negated bitShift: -70) ==> -1
+(((2 raisedTo: 64) + 5) negated bitAnd: ((2 raisedTo: 64) + 3) negated) printString ==> '-18446744073709551623'
+((2 raisedTo: 64) bitAnd: (0 - 1)) printString ==> '18446744073709551616'
+(((2 raisedTo: 64) negated + 1) bitAnd: 7) ==> 1
+((2 raisedTo: 64) negated bitInvert) printString ==> '18446744073709551615'
+(2 raisedTo: 64) bitCount ==> 1
+(2 raisedTo: 64) lowBit ==> 65
+12 lowBit ==> 3
+255 bitCount ==> 8
+12 bitClear: 4 ==> 8
+12 anyMask: 4 ==> true
+12 allMask: 12 ==> true
+12 noMask: 3 ==> true
+(3 raisedTo: 100 modulo: 7) ==> 4
+1000007 isProbablyPrime ==> false
+1000009 isProbablyPrime ==> false
+((2 raisedTo: 89) - 1) isProbablyPrime ==> true
+((2 raisedTo: 89) + 1) isProbablyPrime ==> false
+360 primeFactors ==> #(2 2 2 3 3 5)
+97 primeFactors ==> #(97)
+1 primeFactors ==> #()
+(10 binomial: 3) ==> 120
+(52 binomial: 5) ==> 2598960
+255 hex ==> 'FF'
+255 printStringRadix: 16 ==> '16rFF'
+(0 - 255) printStringRadix: 16 ==> '-16rFF'
+255 storeString: 2 ==> '2r11111111'
+12345 numberOfDigits ==> 5
+16 isPerfectSquare ==> true
+17 isPerfectSquare ==> false
+SmallInteger maxVal class ==> SmallInteger
+SmallInteger maxVal + 1 ==> 2305843009213693952
+(SmallInteger maxVal + 1) class ==> LargePositiveInteger
+SmallInteger minVal class ==> SmallInteger
+3 cubed ==> 27
+(3 to: 5 collect: [:x | x * 2]) ==> #(6 8 10)
+(1 to: 10 by: 3 collect: [:x | x]) ==> #(1 4 7 10)
+3.7 fractionPart ==> 0.7000000000000002
+(7/2) fractionPart ==> (1/2)
+(7/2) integerPart ==> 3
+3 isRational ==> true
+(1/2) isRational ==> true
+3.5 isRational ==> false
+(1/2) closeTo: 0.5 ==> true
+5 withSign: -1 ==> -5
+(1 arcTan: 1) printString ==> '0.7853981633974483'
+((0-1) arcTan: (0-1)) printString ==> '-2.356194490192345'
+3 asNumber ==> 3
+'17' asNumber + 1 ==> 18
+'3.5' asFloat ==> 3.5
+SmallInteger maxVal printString ==> '2305843009213693951'
+'héllo' size ==> 6
+'héllo' asWideString size ==> 5
+'héllo' asWideString printString ==> '''héllo'''
+'héllo' asWideString utf8Encoded size ==> 6
+'héllo' asWideString asUppercase displayString ==> 'HÉLLO'
+('héllo' asWideString asUppercase utf8Encoded = 'HÉLLO') ==> true
+(Character value: 955) printString ==> '$λ'
+(Character value: 955) isLetter ==> true
+(Character value: 955) isLowercase ==> true
+(Character value: 955) asUppercase value ==> 923
+(Character value: 937) asLowercase value ==> 969
+(Character value: 1078) asUppercase value ==> 1046
+(Character value: 233) asUppercase value ==> 201
+(Character value: 255) asUppercase value ==> 376
+(Character value: 223) isLowercase ==> true
+(Character value: 305) asUppercase value ==> 73
+(Character value: 20013) isLetter ==> true
+(Character value: 955) utf8Encoded size ==> 2
+(Character value: 128512) utf8Encoded size ==> 4
+(Character value: 128512) utf8Encoded asWideString first value ==> 128512
+(Character value: 955) = (Character value: 955) ==> true
+((Set new) add: (Character value: 955); add: (Character value: 955); yourself) size ==> 1
+'日本語' asWideString size ==> 3
+'日本語' asWideString reversed utf8Encoded ==> '語本日'
+('日本語' asWideString copyFrom: 2 to: 3) utf8Encoded ==> '本語'
+('日本語' asWideString , 'abc') size ==> 6
+('日本語' asWideString indexOf: (Character value: 26412)) ==> 2
+('abc' asWideString = 'abc' asWideString) ==> true
+('abc' asWideString < 'abd' asWideString) ==> true
+'abc' asWideString isString ==> true
+'abc' asWideString asSymbol printString ==> '#abc'
+('ab' asWideString , 'é') size ==> 3
+(String new: 2) isWideString ==> false
+(WriteStream on: (WideString new: 0)) nextPutAll: 'héllo' asWideString; contents ==> 'héllo'
+((WriteStream on: (WideString new: 0)) nextPutAll: 'héllo' asWideString; nextPutAll: 'abc'; contents) size ==> 8
+(ReadStream on: 'héllo' asWideString) upToEnd size ==> 5
+'abc' asWideString asUppercase printString ==> '''ABC'''
+(String with: (Character value: 255)) asWideString first value ==> 255
+(String with: (Character value: 195)) asWideString first value ==> 195
+'{1} and {2}' format: #(3 4) ==> '3 and 4'
+'{a} is {b}' format: (Dictionary new at: #a put: 1; at: #b put: 'two'; yourself) ==> '1 is two'
+'%1 + %2' bindWith: 3 with: 4 ==> '3 + 4'
+'100%% sure' bindWith: 1 ==> '100% sure'
+'x{1}' % {7} ==> 'x7'
+'hello world' capitalized ==> 'Hello world'
+#foo capitalized printString ==> '#Foo'
+'abc' beginsWith: 'ab' ==> true
+'hello' findString: 'll' ==> 3
+'hello' findString: 'z' ==> 0
+'hello hello' findString: 'llo' startingAt: 5 ==> 9
+'12345' isAllDigits ==> true
+'12a' isAllDigits ==> false
+'' isAllDigits ==> false
+'  hi there  ' trimBoth ==> 'hi there'
+'  hi' trimLeft ==> 'hi'
+'hi  ' trimRight ==> 'hi'
+'hello' truncateTo: 3 ==> 'hel'
+'at:put:' keywords ==> #('at:' 'put:')
+'foo' keywords ==> #('foo')
+'a,b;c' findTokens: ',;' ==> OrderedCollection ('a' 'b' 'c')
+'a b' subStrings ==> OrderedCollection ('a' 'b')
+'abc' caseSensitiveCompareTo: 'abd' ==> -1
+'b' caseSensitiveCompareTo: 'a' ==> 1
+'hello' codePointAt: 1 ==> 104
+#(1 2) asByteArray hex ==> '0102'
+(ByteArray with: 1 with: 255) hex ==> '01ff'
+(ByteArray with: 1 with: 255) asInteger ==> 511
+'hi' asByteArray asString ==> 'hi'
+'abc' asText isText ==> true
+FileStream newFileNamed: 'zz_t1.txt' do: [:f | f nextPutAll: 'line one'; cr; nextPutAll: 'line two'; cr; nextPutAll: 'last']. FileStream readOnlyFileNamed: 'zz_t1.txt' do: [:f | f lines] ==> OrderedCollection ('line one' 'line two' 'last')
+FileStream readOnlyFileNamed: 'zz_t1.txt' do: [:f | f size] ==> 22
+FileStream readOnlyFileNamed: 'zz_t1.txt' do: [:f | (f next: 4), f next printString, f peek printString, f position printString] ==> 'line$ $o5'
+FileStream readOnlyFileNamed: 'zz_t1.txt' do: [:f | f position: 5. (f upTo: $ ) size] ==> 8
+FileStream readOnlyFileNamed: 'zz_t1.txt' do: [:f | f skip: 20. f atEnd] ==> false
+FileStream readOnlyFileNamed: 'zz_t1.txt' do: [:f | f setToEnd. f next] ==> nil
+FileStream readOnlyFileNamed: 'zz_t1.txt' do: [:f | f nextLine. f nextLine. f nextLine. f nextLine] ==> nil
+FileStream readOnlyFileNamed: 'zz_t1.txt' do: [:f | f next. f contents size printString, ' ', f position printString] ==> '22 1'
+FileStream oldFileNamed: 'zz_t1.txt' do: [:f | f position: 4. f nextPutAll: 'XX']. FileStream readOnlyFileNamed: 'zz_t1.txt' do: [:f | f nextLine] ==> 'lineXXne'
+FileStream appendFileNamed: 'zz_t1.txt' do: [:f | f nextPutAll: '+tail']. FileStream readOnlyFileNamed: 'zz_t1.txt' do: [:f | f lines last] ==> 'last+tail'
+| f | f := FileStream readOnlyFileNamed: 'zz_t1.txt'. f close. f close. [f next] on: FileError do: [:e | e messageText] ==> 'file is closed: zz_t1.txt'
+| f | f := FileStream readOnlyFileNamed: 'zz_t1.txt'. [f nextPutAll: 'x'] on: FileError do: [:e | e messageText] ==> 'file is read only: zz_t1.txt'
+[FileStream oldFileNamed: 'zz_nonexistent.txt'] on: FileError do: [:e | e messageText] ==> 'file not found: zz_nonexistent.txt'
+[FileStream oldFileNamed: 'zz_nonexistent.txt'] on: Error do: [:e | e class name] ==> #FileError
+(FileStream isAFileNamed: 'zz_t1.txt') printString, (FileStream isAFileNamed: 'zz_nonexistent') printString, (FileStream exists: '.') printString ==> 'truefalsetrue'
+FileStream sizeOf: 'zz_nonexistent' ==> nil
+FileStream newFileNamed: 'zz_t2.bin' do: [:f | f binary. f nextPut: 0; nextPut: 255; nextPutAll: #(1 2 3) asByteArray; nextPut: 65]. FileStream readOnlyFileNamed: 'zz_t2.bin' do: [:f | f binary. (Array with: f size with: f next with: f next with: (f next: 3) with: f upToEnd)] ==> #(6 0 255 #[1 2 3] #[65])
+FileStream newFileNamed: 'zz_t3.txt' do: [:f | f nextPutAll: 'héllo' asWideString; nextPut: (Character value: 955)]. (FileStream contentsOf: 'zz_t3.txt') size ==> 8
+(FileStream contentsOf: 'zz_t3.txt') asWideString size ==> 6
+(FileStream contentsOf: 'zz_t3.txt') asWideString last value ==> 955
+FileStream newFileNamed: 'zz_t4.txt' do: [:f | f nextPutAll: 'x'; nextPut: (Character value: 13); nextPut: Character lf; nextPutAll: 'y']. FileStream readOnlyFileNamed: 'zz_t4.txt' do: [:f | f lines] ==> OrderedCollection ('x' 'y')
+FileStream fileNamed: 'zz_t4.txt' do: [:f | f position: 3. f truncate]. (FileStream contentsOf: 'zz_t4.txt') size ==> 3
+FileStream newFileNamed: 'zz_t5.txt' do: [:f | 1 to: 2000 do: [:i | f nextPutAll: i printString; cr]]. FileStream readOnlyFileNamed: 'zz_t5.txt' do: [:f | f lines size] ==> 2000
+FileStream readOnlyFileNamed: 'zz_t5.txt' do: [:f | f upTo: Character cr. f upTo: Character cr] ==> '2'
+FileStream newFileNamed: 'zz_t6.st' do: [:f | f nextPutAll: 'Smalltalk at: #ZzFromFile put: 99!']. FileStream fileIn: 'zz_t6.st'. Smalltalk at: #ZzFromFile ==> 99
+(FileStream readOnlyFileNamed: 'zz_t1.txt') printString ==> 'a FileStream on ''zz_t1.txt'''
+| f | f := FileStream readOnlyFileNamed: 'zz_t1.txt'. f close. f printString ==> 'a FileStream on ''zz_t1.txt'' (closed)'
+FileStream rename: 'zz_t6.st' to: 'zz_t7.st'. (FileStream exists: 'zz_t6.st') printString, (FileStream exists: 'zz_t7.st') printString ==> 'falsetrue'
+FileStream remove: 'zz_t1.txt'. FileStream remove: 'zz_t2.bin'. FileStream remove: 'zz_t3.txt'. FileStream remove: 'zz_t4.txt'. FileStream remove: 'zz_t5.txt'. FileStream remove: 'zz_t7.st' ==> true
+(Directory on: 'zz_dir/deeper') exists ==> false
+(Directory on: 'zz_dir/deeper') create exists ==> true
+(Directory exists: 'zz_dir') printString, (Directory exists: 'zz_dir/deeper') printString, (Directory exists: 'zz_nonexistent') printString ==> 'truetruefalse'
+(Directory on: 'zz_dir/deeper') newFileNamed: 'inner.txt'; entries ==> #('inner.txt')
+(Directory on: 'zz_dir/deeper') fileNames ==> #('inner.txt')
+(Directory on: 'zz_dir') directoryNames ==> #('deeper')
+(Directory on: 'zz_dir') fileNames ==> #()
+((Directory on: 'zz_dir/deeper') newFileNamed: 'zz.txt') nextPutAll: 'hi'; close. (Directory on: 'zz_dir/deeper') sizeOf: 'zz.txt' ==> 2
+(Directory on: 'zz_dir/deeper') fileExists: 'zz.txt' ==> true
+(Directory on: 'zz_dir/deeper') directoryExists: 'zz.txt' ==> false
+(Directory on: 'zz_dir/deeper') sizeOf: 'zz_none' ==> nil
+((Directory on: 'zz_dir/deeper') modificationTimeOf: 'zz.txt') year >= 2026 ==> true
+(Directory on: 'zz_dir/deeper') fullNameFor: 'x.txt' ==> 'zz_dir/deeper/x.txt'
+(Directory on: '/tmp/x/') pathName ==> '/tmp/x'
+(Directory on: '/') fullNameFor: 'etc' ==> '/etc'
+(Directory on: 'zz_dir/deeper') rename: 'zz.txt' to: 'zz2.txt'. (Directory on: 'zz_dir/deeper') entries ==> #('inner.txt' 'zz2.txt')
+[(Directory on: 'zz_dir/deeper') delete. 'deleted'] on: FileError do: [:e | 'refused'] ==> 'refused'
+[(Directory on: 'zz_nonexistent') entries] on: FileError do: [:e | e messageText] ==> 'cannot read directory zz_nonexistent'
+(Directory on: 'zz_dir') = (Directory on: 'zz_dir/') ==> true
+(Directory on: 'zz_dir') printString ==> 'a Directory on ''zz_dir'''
+(Directory on: 'zz_dir') deleteAll. (Directory exists: 'zz_dir') printString ==> 'false'
+Directory default pathName = Smalltalk currentDirectory pathName ==> true
+Smalltalk os isString ==> true
+(Smalltalk getenv: 'ZZ_NO_SUCH_VARIABLE') printString ==> 'nil'
+Smalltalk getenv: 'ZZ_NO_SUCH_VARIABLE' ifAbsent: ['dflt'] ==> 'dflt'
+(Smalltalk getenv: 'PATH') isString ==> true
+(Smalltalk microsecondClock > 1700000000000000) printString ==> 'true'
+(Smalltalk hasClassNamed: 'Object') printString, (Smalltalk hasClassNamed: 'Nope') printString ==> 'truefalse'
+(Date newDay: 1 month: 3 year: 2024) - (Date newDay: 28 month: 2 year: 2024) ==> 2:00:00:00
+(Date newDay: 28 month: 2 year: 2024) + (2 days) ==> 1 March 2024
+(Date newDay: 1 month: 3 year: 2024) - (1 days) ==> 29 February 2024
+(Date newDay: 31 month: 1 year: 2024) addMonths: 1 ==> 29 February 2024
+(Date newDay: 29 month: 2 year: 2024) addYears: 1 ==> 28 February 2025
+(Date newDay: 15 month: 3 year: 2023) addMonths: -4 ==> 15 November 2022
+(Date newDay: 5 month: 2 year: 2024) lastDayOfMonth ==> 29 February 2024
+(Date newDay: 28 month: 2 year: 2024) monthAbbreviation, ' ', (Date newDay: 28 month: 2 year: 2024) dayAbbreviation, ' ', (Date newDay: 28 month: 2 year: 2024) weekdayName ==> 'Feb Wed Wednesday'
+(Date newDay: 28 month: 2 year: 2024) isLeapYear printString, (Date newDay: 28 month: 2 year: 2023) isLeapYear printString ==> 'truefalse'
+(Date newDay: 28 month: 2 year: 2024) isoString ==> '2024-02-28'
+(Date newDay: 28 month: 2 year: 2024) daysUntil: (Date newDay: 1 month: 3 year: 2024) ==> 2
+(Date newDay: 1 month: 3 year: 2024) daysFrom: (Date newDay: 28 month: 2 year: 2024) ==> 2
+Date year: 2024 day: 60 ==> 29 February 2024
+(Date fromSeconds: (Date newDay: 28 month: 2 year: 2024) asSeconds) printString ==> '28 February 2024'
+(Date newDay: 28 month: 2 year: 2024) isDate printString, 3 isDate printString ==> 'truefalse'
+(Time hours: 23 minutes: 30 seconds: 0) + (1 hours) ==> 12:30:00 am
+((Time hours: 23 minutes: 30 seconds: 0) - (30 minutes)) print24 ==> '23:00:00'
+(Time hours: 10 minutes: 0 seconds: 0) - (Time hours: 9 minutes: 15 seconds: 0) ==> 0:00:45:00
+| t | t := Time hours: 23 minutes: 30 seconds: 15. t hour printString, ' ', t hour12 printString, ' ', t minute printString, ' ', t second printString, ' ', t meridian ==> '23 11 30 15 PM'
+Time noon print24, ' ', Time midnight print24 ==> '12:00:00 00:00:00'
+(Time hours: 0 minutes: 0 seconds: 1) hour12 ==> 12
+DateAndTime year: 2024 month: 12 day: 31 hour: 23 minute: 59 second: 30 ==> 2024-12-31T23:59:30
+(DateAndTime year: 2024 month: 12 day: 31 hour: 23 minute: 59 second: 30) + (45 seconds) ==> 2025-01-01T00:00:15
+(DateAndTime year: 2024 month: 12 day: 31 hour: 23 minute: 59 second: 30) - (45 seconds) ==> 2024-12-31T23:58:45
+| dt | dt := DateAndTime year: 2024 month: 12 day: 31 hour: 23 minute: 59 second: 30. dt year printString, ' ', dt month printString, ' ', dt day printString, ' ', dt hour printString, ' ', dt minute printString, ' ', dt second printString, ' ', dt dayName, ' ', dt dayOfYear printString, ' ', dt monthName ==> '2024 12 31 23 59 30 Tuesday 366 December'
+| dt | dt := DateAndTime year: 2024 month: 12 day: 31 hour: 23 minute: 59 second: 30. ((dt + (3 days)) - dt) printString, ' ', (dt - (dt - (1 hours))) printString ==> '3:00:00:00 0:01:00:00'
+| dt | dt := DateAndTime year: 2024 month: 12 day: 31 hour: 23 minute: 59 second: 30. (dt < (dt + (1 seconds))) printString, ' ', (dt = (DateAndTime fromSeconds: dt asSeconds)) printString, ' ', dt date printString, ' ', dt time print24 ==> 'true true 31 December 2024 23:59:30'
+DateAndTime fromUnixTime: 0 ==> 1970-01-01T00:00:00
+DateAndTime fromUnixTime: 86400 * 365 ==> 1971-01-01T00:00:00
+(DateAndTime fromUnixTime: 1700000000) asUnixTime ==> 1700000000
+DateAndTime date: (Date newDay: 28 month: 2 year: 2024) time: (Time hours: 23 minutes: 30 seconds: 0) ==> 2024-02-28T23:30:00
+(Date newDay: 28 month: 2 year: 2024) asDateAndTime ==> 2024-02-28T00:00:00
+(DateAndTime now year >= 2026) printString ==> 'true'
+Duration days: 1 hours: 2 minutes: 3 seconds: 4 ==> 1:02:03:04
+90 minutes ==> 0:01:30:00
+1500 milliSeconds ==> 0:00:00:01.500
+(2 hours + (30 minutes)) ==> 0:02:30:00
+(1 hours) * 2 ==> 0:02:00:00
+(1 days) / (1 hours) ==> 24
+(1 hours) / 2 ==> 0:00:30:00
+3 hours negated ==> -0:03:00:00
+| d | d := Duration days: 1 hours: 2 minutes: 3 seconds: 4. d days printString, d hours printString, d minutes printString, d seconds printString, ' ', d totalSeconds printString ==> '1234 93784'
+((1 hours) < (61 minutes)) printString, ((60 minutes) = (1 hours)) printString, ((1 hours) max: (2 hours)) printString ==> 'truetrue0:02:00:00'
+Duration zero isZero ==> true
+(2 weeks) totalSeconds ==> 1209600
+(Random new seed: 42; next) < 1 ==> true
+(Random default pick: #(7)) printString ==> '7'
+Random new nextGaussian isNumber ==> true
+| r | r := Random new. (1 to: 100) allSatisfy: [:i | r nextBoolean isBoolean] ==> true
+#(1 2 3 4 5) shuffled size ==> 5
+(#(1 2 3 4 5) shuffled asSortedCollection asArray) printString ==> '#(1 2 3 4 5)'
+| a | a := #(1 2 3) copy. a shuffle. a asSortedCollection asArray printString ==> '#(1 2 3)'
+| o | o := OrderedCollection new. #(1 2 3 4) pairsDo: [:a :b | o add: a + b]. o printString ==> 'OrderedCollection (3 7)'
+(#(1 2 3 4 5 6) groupBy: [:x | x odd]) size ==> 2
+(Random new next: 3) size ==> 3

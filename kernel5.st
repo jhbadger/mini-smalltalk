@@ -1,11 +1,10 @@
-"Mini Smalltalk-80 kernel, part 5: more collections and streams - LinkedList, RunArray, MappedCollection, Text, FileStream; storing, copying, dependents"
+"Mini Smalltalk-80 kernel, part 5: more collections and streams - LinkedList, RunArray, MappedCollection, Text; storing, copying, dependents"
 
 Object subclass: #Link instanceVariableNames: 'nextLink' classVariableNames: '' category: 'Collections-Support'!
 SequenceableCollection subclass: #LinkedList instanceVariableNames: 'firstLink lastLink' classVariableNames: '' category: 'Collections-Sequenceable'!
 SequenceableCollection subclass: #RunArray instanceVariableNames: 'runs values' classVariableNames: '' category: 'Collections-Sequenceable'!
 Collection subclass: #MappedCollection instanceVariableNames: 'domain map' classVariableNames: '' category: 'Collections-Sequenceable'!
 ArrayedCollection subclass: #Text instanceVariableNames: 'string runs' classVariableNames: '' category: 'Collections-Text'!
-ReadWriteStream subclass: #FileStream instanceVariableNames: 'name dirty' classVariableNames: '' category: 'Collections-Streams'!
 
 !Object methodsFor: 'copying'!
 deepCopy
@@ -662,79 +661,5 @@ contents
 	^collection copyFrom: 1 to: readLimit!
 readStream
 	^ReadStream on: self contents! !
-
-!FileStream class methodsFor: 'instance creation'!
-fileNamed: aString
-	"open for reading and writing; created if it does not exist"
-	| c |
-	c := self primRead: aString.
-	^(self basicNew on: (c isNil ifTrue: [String new] ifFalse: [c])) setName: aString; yourself!
-oldFileNamed: aString
-	| c |
-	c := self primRead: aString.
-	c isNil ifTrue: [^self error: 'file not found: ', aString].
-	^(self basicNew on: c) setName: aString; yourself!
-newFileNamed: aString
-	^(self basicNew on: String new) setName: aString; markDirty; yourself!
-readOnlyFileNamed: aString
-	^self oldFileNamed: aString!
-isAFileNamed: aString
-	^self primExists: aString!
-remove: aString
-	^self primDelete: aString! !
-
-!FileStream class methodsFor: 'primitives'!
-primRead: aString
-	<primitive: 170>
-	^nil!
-primWrite: contents to: aString append: aBoolean
-	<primitive: 171>
-	^false!
-primDelete: aString
-	<primitive: 172>
-	^false!
-primExists: aString
-	<primitive: 173>
-	^false! !
-
-!FileStream methodsFor: 'private'!
-on: aCollection
-	super on: aCollection.
-	readLimit := aCollection size!
-setName: aString
-	name := aString. dirty := false!
-markDirty
-	dirty := true! !
-
-!FileStream methodsFor: 'accessing'!
-name
-	^name!
-nextPut: anObject
-	dirty := true.
-	^super nextPut: anObject!
-nextPutAll: aCollection
-	dirty := true.
-	^super nextPutAll: aCollection!
-contentsOfEntireFile
-	^collection copyFrom: 1 to: readLimit!
-size
-	^readLimit!
-fileIn
-	^Smalltalk fileInString: self contentsOfEntireFile! !
-
-!FileStream methodsFor: 'file status'!
-flush
-	dirty ifTrue: [
-		(FileStream primWrite: self contentsOfEntireFile to: name append: false) ifFalse: [^self error: 'cannot write ', name].
-		dirty := false].
-	^self!
-close
-	^self flush!
-isDirty
-	^dirty! !
-
-!FileStream methodsFor: 'printing'!
-printOn: aStream
-	aStream nextPutAll: 'a FileStream on '; print: name! !
 
 Smalltalk at: #Dependents put: IdentityDictionary new!

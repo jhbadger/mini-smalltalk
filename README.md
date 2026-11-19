@@ -9,7 +9,7 @@ overlapping draggable/resizable windows, and a persistent **changes file**.
 ```
 make            # builds ./st (needs a C compiler, no other dependencies)
 ./st            # start the environment in an xterm-compatible terminal
-make check      # headless VM test-suite
+make check      # headless VM test-suite (test_vm.c, plus the 389 expression/result pairs in test_lib.txt)
 ./st -e '3 + 4' # evaluate expressions without the UI
 ```
 
@@ -85,17 +85,24 @@ The Smalltalk-80 ("Blue Book") classes, except the graphics ones:
 * **Kernel-Classes**: Behavior, ClassDescription, Class, Metaclass, ClassOrganizer
 * **Kernel-Methods**: CompiledMethod, ContextPart, MethodContext, BlockContext, BlockClosure
 * **Kernel-Processes**: Process, ProcessorScheduler (`Processor`), Semaphore, Delay, SharedQueue. Forked processes run cooperatively (`yield`, `wait`, `Delay`) and keep running in the background while the user interface is idle.
-* **Kernel-Magnitudes**: Magnitude, Character, Date, Time
-* **Kernel-Numbers**: Number, Integer, SmallInteger, LargePositiveInteger, LargeNegativeInteger, Fraction, Float, Random. Arithmetic is exact: `1/3` is a Fraction, `100 factorial` is a LargePositiveInteger, and mixed operands coerce by generality.
-* **Collections**: Collection, Bag, Set, IdentitySet, Dictionary, IdentityDictionary, SystemDictionary (`Smalltalk`), SequenceableCollection, LinkedList, Link, Interval, ArrayedCollection, Array, ByteArray, String, Symbol, Text, RunArray, OrderedCollection, SortedCollection, MappedCollection. Sets and Dictionaries honour user-defined `=` and `hash`.
-* **Streams**: Stream, PositionableStream, ReadStream, WriteStream, ReadWriteStream, FileStream (whole-file read on open, write on `close`)
-* **Graphics-Primitives**: Point and Rectangle (the arithmetic parts only)
-* **System**: SystemDictionary, Compiler (evaluate:), TranscriptStream, Exception/Error (minimal: `signal:` reports an error)
+* **Kernel-Magnitudes**: Magnitude, Character (any Unicode code point, with case mapping for Latin, Greek and Cyrillic), Date, Time, **DateAndTime** and **Duration** with arithmetic: `Date today - (3 days)`, `(DateAndTime now + (90 minutes))`, `date2 - date1` answers a Duration, `addMonths:`, `addYears:`; Unix time conversion
+* **Kernel-Numbers**: Number, Integer, SmallInteger, LargePositiveInteger, LargeNegativeInteger, Fraction, Float, Random. Arithmetic is exact: `1/3` is a Fraction, `100 factorial` is a LargePositiveInteger, and mixed operands coerce by generality. Bit operations (`bitAnd:`, `bitOr:`, `bitXor:`, `bitShift:`) work on negative LargeIntegers with two's-complement semantics. Floats have `Float nan`, `infinity`, `isNaN`, `isInfinite`, hyperbolic functions, and print in shortest round-trip form (`0.1`, `1.0e-5`, `NaN`, `Infinity`); `sqrt`/`ln`/`sin`... accept Fractions and LargeIntegers. Also `printStringRadix:`, `raisedTo:modulo:`, `isProbablyPrime`, `primeFactors`, `binomial:`, `bitCount`, `Number>>to:collect:`.
+* **Collections**: Collection, Bag, Set, IdentitySet, Dictionary, IdentityDictionary, SystemDictionary (`Smalltalk`), SequenceableCollection, LinkedList, Link, Interval, ArrayedCollection, Array, ByteArray, String, Symbol, **WideString**, Text, RunArray, OrderedCollection, SortedCollection, MappedCollection. Sets and Dictionaries honour user-defined `=` and `hash`. A `String` is a string of bytes, so UTF-8 passes straight through the terminal, source files and `FileStream`s; `aString asWideString` (or `utf8Decoded`) decodes it into a `WideString` of real code points (`'héllo' size` is 6, `'héllo' asWideString size` is 5) and `utf8Encoded` goes back. Everyday protocol includes `sorted`/`sorted:`, `groupBy:`, `fold:`, `gather:`, `sum:`, `ifEmpty:`/`ifNotEmpty:`, `copyUpTo:`/`copyAfter:`, `join:`, `permutationsDo:`, `shuffled`, set `union:`/`intersection:`/`difference:`, `streamContents:`, string `format:` (`'{1} and {2}' format: {a. b}`), `bindWith:`, `trimBoth`, `findString:`, `keywords`.
+* **Streams**: Stream, PositionableStream, ReadStream, WriteStream, ReadWriteStream, FileStream (incremental read/write/seek/append on a real file handle; binary mode; `Directory` lists, creates and deletes folders)
+* **Graphics-Primitives**: Point and Rectangle (the arithmetic and geometry parts only: no display). Numbers are accepted wherever a Point is: `(3@4) + 1`, `rect insetBy: 2`. Point has `theta`, `unitVector`, `normal`, `rotateBy:about:`; Rectangle has the corner/centre accessors and mutators, `merge:`, `intersect:`, `Rectangle merging:`, `center:extent:`
+* **System**: SystemDictionary, Compiler (evaluate:), TranscriptStream, **Directory** (`entries`, `fileNames`, `directoryNames`, `create`, `delete`, `deleteAll`, `fileExists:`, `sizeOf:`, `modificationTimeOf:`), and operating-system access from `Smalltalk`: `getenv:`, `os`, `hostName`, `currentDirectory`, `homeDirectory`, `microsecondClock`
+* **Exceptions**: Exception, Error, Notification, Warning, ArithmeticError, ZeroDivide, MessageNotUnderstood, SubscriptOutOfBounds, KeyNotFound, ExceptionSet (`ZeroDivide, MessageNotUnderstood`). `on:do:` handlers run on top of the signalling stack and support `return:`, `retry`, `retryUsing:`, `resume:`, `pass`, `outer`, re-`signal`, `signalerContext`, `isResumable` and `messageText`; `ensure:` and `ifCurtailed:` run when their block is left by an exception return, a `^`, or an unhandled error. Unhandled errors still abort to the walkback window. `error:`, `doesNotUnderstand:`, zero division, subscript and missing-key errors all signal real exceptions, so they can be caught.
+* **thisContext**: `sender`, `receiver`, `method`, `selector`, `home`, `pc`, `tempAt:` / `tempAt:put:`, `stack`, `stackDepth`, `isDead`, `backtrace`, plus control transfer with `return:` and `resume:` (both run pending `ensure:` blocks)
 
-Deliberate simplifications: no exception handling beyond `error:` aborting to a
-walkback (`on:do:` just evaluates the block), no `become:`, no class-side
-instance variables, bit operations are not defined on negative LargeIntegers,
-and there is no binary image (the kernel sources plus the changes file are the image).
+Deliberate simplifications: exceptions raised by the VM itself (`NonBoolean receiver`,
+"Block cannot return", file-in and `compile:` failures, a deadlocked scheduler) are
+not Smalltalk exceptions and cannot be caught, `terminate` does not run `ensure:`
+blocks, no `become:`, no class-side
+instance variables, no way to run an operating-system command (`system:` is
+deliberately absent), a `FileStream` that is not closed keeps its handle (there are 128;
+use the `...do:` forms), `String` comparison with `<` is by byte value rather than
+case-insensitive, and there is no binary image (the kernel sources plus the changes file
+are the image).
 
 ## Testing the UI without a terminal
 

@@ -6,6 +6,9 @@
 #include <math.h>
 #include <time.h>
 #include <sys/time.h>
+#include <sys/stat.h>
+#include <dirent.h>
+#include <unistd.h>
 
 char *transcript_text = NULL; size_t transcript_len = 0; static size_t transcript_cap = 0;
 oop pending_inspect = NULL; bool quit_requested = false;
@@ -23,11 +26,28 @@ static bool is_num(oop o) { return IS_INT(o) || (!IS_INT(o) && o->cls == classFl
 static double num_val(oop o) { return IS_INT(o) ? (double)INT_VAL(o) : FLOATVAL(o); }
 static bool fits(intptr_t v) { return v >= -INT_MAX_VAL && v < INT_MAX_VAL; }
 static oop fmt_float(double d) {
-    char buf[64]; snprintf(buf, sizeof buf, "%.15g", d);
-    if (strtod(buf, NULL) != d) snprintf(buf, sizeof buf, "%.17g", d);
-    if (!strpbrk(buf, ".einA")) strcat(buf, ".0");
-    return new_string(buf);
+    /* shortest text that reads back as the same double, in Smalltalk style: 3.14, 1.0e-5, 1.0e100, NaN, Infinity */
+    if (isnan(d)) return new_string("NaN");
+    if (isinf(d)) return new_string(d < 0 ? "-Infinity" : "Infinity");
+    char buf[64], out[96];
+    for (int prec = 15; prec <= 17; prec++) { snprintf(buf, sizeof buf, "%.*g", prec, d); if (strtod(buf, NULL) == d) break; }
+    char *e = strchr(buf, 'e');
+    if (!e) { if (!strchr(buf, '.')) strcat(buf, ".0"); return new_string(buf); }
+    *e = 0;                                        /* mantissa / exponent */
+    const char *ex = e + 1; int neg = 0;
+    if (*ex == '+') ex++; else if (*ex == '-') { neg = 1; ex++; }
+    while (*ex == '0' && ex[1]) ex++;
+    snprintf(out, sizeof out, "%s%se%s%s", buf, strchr(buf, '.') ? "" : ".0", neg ? "-" : "", ex);
+    return new_string(out);
 }
+/* ---- file handles for FileStream (small table of FILE*) ---- */
+#define MAX_FILES 128
+static FILE *open_files[MAX_FILES];
+static FILE *file_of(oop h) {
+    if (IS_INT(h)) { intptr_t i = INT_VAL(h); if (i >= 1 && i <= MAX_FILES) return open_files[i - 1]; }
+    return NULL;
+}
+
 static int indexable_size(oop o) {
     if (IS_INT(o)) return 0;
     if (o->kind == KIND_BYTES) return o->size;
@@ -115,6 +135,7 @@ oop call_primitive(int n, oop *args, int nargs, bool *ok) {
     case 56: if (!is_num(self)) FAIL; return new_float(atan(num_val(self)));
     case 57: if (!is_num(self) || !is_num(A(1))) FAIL; return new_float(pow(num_val(self), num_val(A(1))));
     case 58: if (!is_num(self)) FAIL; return new_float(num_val(self) - trunc(num_val(self)));
+    case 59: if (!is_num(self)) FAIL; return new_float(log10(num_val(self)));
     /* ---- Strings, Symbols, byte and pointer collections ---- */
     case 63: if (!is_bytes(self) || !is_bytes(A(1))) FAIL;
         return (self->size == A(1)->size && memcmp(BYTES(self), BYTES(A(1)), self->size) == 0) ? trueobj : falseobj;
@@ -207,6 +228,57 @@ oop call_primitive(int n, oop *args, int nargs, bool *ok) {
         if (!is_bytes(A(1)) || !is_bytes(A(2))) FAIL;
         free(pending_window_title); free(pending_window_text);
         pending_window_title = str_cstr(A(1)); pending_window_text = str_cstr(A(2)); return self; }
+    /* ---- incremental file access (FileStream): handles are small integers; failures answer nil ---- */
+    case 174: { /* primOpen: path mode: 'r' 'w' 'a' 'r+' 'w+' 'a+' -> handle or nil */
+        if (!is_bytes(A(1)) || !is_bytes(A(2)) || A(2)->size < 1 || A(2)->size > 2) FAIL;
+        char *p = str_cstr(A(1)), *m = str_cstr(A(2)); char mode[4] = { m[0], 'b', m[1] ? m[1] : 0, 0 };
+        if (m[1] == '+') { mode[1] = '+'; mode[2] = 'b'; }
+        int slot = -1; for (int i = 0; i < MAX_FILES; i++) if (!open_files[i]) { slot = i; break; }
+        FILE *f = slot < 0 ? NULL : fopen(p, mode); free(p); free(m);
+        if (!f) return nilobj; open_files[slot] = f; return MK_INT(slot + 1); }
+    case 175: { /* primRead: handle count: n -> String of up to n bytes ('' at end of file) */
+        FILE *f = file_of(A(1)); if (!f || !IS_INT(A(2)) || INT_VAL(A(2)) < 0) FAIL;
+        long n = (long)INT_VAL(A(2)); if (n > 1 << 28) FAIL; fseek(f, 0, SEEK_CUR);
+        oop s = new_bytes(classString, (int)n); size_t got = fread(BYTES(s), 1, n, f); s->size = (uint32_t)got; return s; }
+    case 176: { /* primWrite: handle bytes: aString -> count written */
+        FILE *f = file_of(A(1)); if (!f || !is_bytes(A(2))) FAIL; fseek(f, 0, SEEK_CUR);
+        return MK_INT((intptr_t)fwrite(BYTES(A(2)), 1, A(2)->size, f)); }
+    case 177: { /* primClose: handle */
+        FILE *f = file_of(A(1)); if (!f) FAIL; open_files[INT_VAL(A(1)) - 1] = NULL; return fclose(f) == 0 ? trueobj : falseobj; }
+    case 178: { /* primSeek: handle to: offset whence: 0 start 1 current 2 end -> new position */
+        FILE *f = file_of(A(1)); if (!f || !IS_INT(A(2)) || !IS_INT(A(3))) FAIL; int w = (int)INT_VAL(A(3));
+        if (w < 0 || w > 2 || fseek(f, (long)INT_VAL(A(2)), w == 0 ? SEEK_SET : w == 1 ? SEEK_CUR : SEEK_END) != 0) return nilobj;
+        return MK_INT(ftell(f)); }
+    case 179: { /* primSize: handle */
+        FILE *f = file_of(A(1)); if (!f) FAIL; fflush(f); long here = ftell(f); fseek(f, 0, SEEK_END); long sz = ftell(f); fseek(f, here, SEEK_SET); return MK_INT(sz); }
+    case 181: { FILE *f = file_of(A(1)); if (!f) FAIL; return fflush(f) == 0 ? trueobj : falseobj; }   /* primFlush: handle */
+    case 182: { /* primTruncate: handle to: n */
+        FILE *f = file_of(A(1)); if (!f || !IS_INT(A(2))) FAIL; fflush(f); return ftruncate(fileno(f), (off_t)INT_VAL(A(2))) == 0 ? trueobj : falseobj; }
+    case 183: { /* primList: path -> Array of names (without . and ..) or nil */
+        if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); DIR *d = opendir(p); free(p); if (!d) return nilobj;
+        int cap = 64, n = 0; char **names = malloc(cap * sizeof *names); struct dirent *e;
+        while ((e = readdir(d))) { if (!strcmp(e->d_name, ".") || !strcmp(e->d_name, "..")) continue; if (n == cap) { cap *= 2; names = realloc(names, cap * sizeof *names); } names[n++] = strdup(e->d_name); }
+        closedir(d); oop arr = new_array(n); for (int i = 0; i < n; i++) { SLOT(arr, i) = new_string(names[i]); free(names[i]); } free(names); return arr; }
+    case 184: { if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); int r = mkdir(p, 0777); free(p); return r == 0 ? trueobj : falseobj; }   /* primMkdir: */
+    case 185: { if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); int r = rmdir(p); free(p); return r == 0 ? trueobj : falseobj; }      /* primRmdir: */
+    case 186: { /* primStat: path -> Array(isDirectory size modificationSeconds1901) or nil */
+        if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); struct stat st; int r = stat(p, &st); free(p); if (r) return nilobj;
+        oop a = new_array(3); SLOT(a, 0) = S_ISDIR(st.st_mode) ? trueobj : falseobj; SLOT(a, 1) = MK_INT((intptr_t)st.st_size);
+        SLOT(a, 2) = MK_INT((intptr_t)st.st_mtime + 2177452800LL); return a; }
+    case 187: { if (!is_bytes(A(1)) || !is_bytes(A(2))) FAIL; char *a = str_cstr(A(1)), *b = str_cstr(A(2)); int r = rename(a, b); free(a); free(b); return r == 0 ? trueobj : falseobj; }   /* primRename:to: */
+    case 188: { if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); const char *v = getenv(p); free(p); return v ? new_string(v) : nilobj; }   /* primGetenv: */
+    case 189: { char buf[4096]; return getcwd(buf, sizeof buf) ? new_string(buf) : nilobj; }   /* primCwd */
+    case 190: { if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); int r = chdir(p); free(p); return r == 0 ? trueobj : falseobj; }   /* primChdir: */
+    case 191:
+#if defined(__APPLE__)
+        return new_string("macOS");
+#elif defined(_WIN32)
+        return new_string("Windows");
+#else
+        return new_string("Linux");
+#endif
+    case 192: { struct timeval tv; gettimeofday(&tv, NULL); return MK_INT((intptr_t)tv.tv_sec * 1000000 + tv.tv_usec); }   /* microseconds since the Unix epoch */
+    case 193: { char buf[256]; return gethostname(buf, sizeof buf) == 0 ? new_string(buf) : nilobj; }   /* primHostName */
     }
     FAIL;
 }

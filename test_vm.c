@@ -7,6 +7,7 @@
 extern oop pending_inspect;
 
 static int failures = 0;
+static int quiet = 0;      /* when set, check() reports only failures */
 static void check(const char *expr, const char *expected) {
     char err[512];
     oop r = interp_eval(nilobj, expr, err, sizeof err);
@@ -15,8 +16,22 @@ static void check(const char *expr, const char *expected) {
     else s = str_cstr(interp_print_string(r));
     int ok = strcmp(s, expected) == 0;
     if (!ok) failures++;
-    printf("%s  %-50s => %s%s%s\n", ok ? "ok  " : "FAIL", expr, s, ok ? "" : "   expected: ", ok ? "" : expected);
+    if (!ok || !quiet) printf("%s  %-50s => %s%s%s\n", ok ? "ok  " : "FAIL", expr, s, ok ? "" : "   expected: ", ok ? "" : expected);
     free(s);
+}
+
+/* test_lib.txt: one test per line, "expression ==> expected printString" (# starts a comment) */
+static int run_lib_tests(const char *path) {
+    FILE *f = fopen(path, "r"); if (!f) { printf("FAIL  cannot open %s\n", path); failures++; return 0; }
+    char line[8192]; int n = 0; quiet = 1;
+    while (fgets(line, sizeof line, f)) {
+        size_t len = strlen(line); while (len && (line[len - 1] == '\n' || line[len - 1] == '\r')) line[--len] = 0;
+        if (!len || (line[0] == '#' && line[1] == ' ')) continue;   /* a comment starts with '# ' (a literal array or symbol starts with '#' directly) */
+        char *sep = NULL, *p = line; while ((p = strstr(p, " ==> "))) { sep = p; p += 5; }   /* the last separator */
+        if (!sep) { printf("FAIL  bad test line: %s\n", line); failures++; continue; }
+        *sep = 0; check(line, sep + 5); n++;
+    }
+    fclose(f); quiet = 0; return n;
 }
 
 int main(int argc, char **argv) {
@@ -159,7 +174,7 @@ int main(int argc, char **argv) {
     check("(2 raisedTo: 64) = (2 raisedTo: 64)", "true");
     check("(2 raisedTo: 64) hash = (2 raisedTo: 64) hash", "true");
     check("| d | d := Dictionary new. d at: (2 raisedTo: 70) put: #big. d at: (2 raisedTo: 70)", "#big");
-    check("(2 raisedTo: 64) asFloat", "1.8446744073709552e+19");
+    check("(2 raisedTo: 64) asFloat", "1.8446744073709552e19");
     check("1e20 truncated", "100000000000000000000");
     check("(2 raisedTo: 64) bitAnd: 255", "0");
     check("((2 raisedTo: 64) bitShift: -60)", "16");
@@ -286,6 +301,73 @@ int main(int argc, char **argv) {
     check("Tutorial goOn: 99. Tutorial lessonNumber", "27");
     check("Tutorial lessonSelectors asSet size", "27");
     check("Tutorial tutorial size", "27");
+    /* ---- exceptions, unwinding, thisContext (run twice: normally, then with a GC every few allocations) ---- */
+    for (int pass = 0; pass < 2; pass++) {
+        size_t saved_threshold = gc_threshold;
+        if (pass == 1) { gc_threshold = 2000; printf("--- exceptions again under GC stress ---\n"); }
+        check("[1/0] on: ZeroDivide do: [:e | e return: 5]", "5");
+        check("[1/0. 'not reached'] on: ZeroDivide do: [:e | 'handled']", "'handled'");
+        check("[1/0] on: ZeroDivide do: [:e | e messageText]", "'division by zero'");
+        check("[1/0] on: ZeroDivide do: [:e | e dividend]", "1");
+        check("[(1/0) + 10] on: ZeroDivide do: [:e | e resume: 5]", "15");
+        check("[Error signal: 'x'. 7] on: Error do: [:e | e retryUsing: [8]]", "8");
+        check("| n | n := 0. [n := n + 1. n < 3 ifTrue: [Error signal: 'again']. n] on: Error do: [:e | e retry]", "3");
+        check("[Error signal: 'a'. 5] on: Error do: [:e | e return]", "nil");
+        check("[Error new signal. 5] on: Error do: [:e | e messageText]", "'An exception has occurred'");
+        check("[Error signal: 'no'] on: Error do: [:e | e resume: 1]", "ERROR: IllegalResumeAttempt: this exception is not resumable");
+        check("[(Warning signal: 'w') + 1] on: Warning do: [:e | e resume: 7]", "8");
+        check("(Notification signal: 'n') printString", "'nil'");
+        check("[nil foo] on: MessageNotUnderstood do: [:e | e message selector]", "#foo");
+        check("[nil foo: 1 bar: 2] on: MessageNotUnderstood do: [:e | e message arguments]", "#(1 2)");
+        check("[nil foo. 5] on: MessageNotUnderstood do: [:e | e resume: 3]", "5");
+        check("[#(1 2 3) at: 10] on: SubscriptOutOfBounds do: [:e | e messageText]", "'subscript out of bounds: 10'");
+        check("[Dictionary new at: #zz] on: KeyNotFound do: [:e | e key]", "#zz");
+        check("[1/0] on: Error do: [:e | 'ZeroDivide is an Error']", "'ZeroDivide is an Error'");
+        check("[nil foo] on: ZeroDivide, MessageNotUnderstood do: [:e | 'set']", "'set'");
+        check("[nil foo] on: ZeroDivide do: [:e | 'wrong']", "ERROR: does not understand #foo");
+        check("[[1/0] on: MessageNotUnderstood do: [:e | 'inner']] on: ZeroDivide do: [:e | 'outer']", "'outer'");
+        check("[[1/0] on: ZeroDivide do: [:e | e pass]] on: ZeroDivide do: [:e | 'passed']", "'passed'");
+        check("[[1/0] on: ZeroDivide do: [:e | e signal]] on: ZeroDivide do: [:e | 'resignaled']", "'resignaled'");
+        check("[Error signal: 'x'] on: Error do: [:e | [e signal] on: Error do: [:e2 | 'nested']]", "'nested'");
+        check("[[Error signal: 'q'] on: Error do: [:e | e outer. 'after outer']] on: Error do: [:e | e return: 'outer returned']", "'outer returned'");
+        check("[[Warning signal: 'q'. 'resumed'] on: Warning do: [:e | e outer. e resume: 1]] on: Warning do: [:e | e resume: 2]", "'resumed'");
+        check("[[Warning signal: 'q'] on: Warning do: [:e | e outer printString]] on: Warning do: [:e | e resume: 42]", "'42'");
+        check("[[1/0] on: ZeroDivide do: [:e | Error signal: 'in handler']] on: Error do: [:e | e messageText]", "'in handler'");
+        check("[[1/0] on: ZeroDivide do: [:e | 1/0]] on: ZeroDivide do: [:e | 'outside']", "'outside'");
+        check("Error subclass: #MyErr instanceVariableNames: 'code' classVariableNames: '' category: 'T'. MyErr compile: 'code ^code'. MyErr compile: 'code: c code := c'. [MyErr new code: 42; signal: 'm'] on: MyErr do: [:e | e code]", "42");
+        check("MyErr new signal: 'unhandled'", "ERROR: unhandled");
+        /* ensure: / ifCurtailed: */
+        check("| log | log := OrderedCollection new. [[log add: 1. 1/0. log add: 2] ensure: [log add: 3]] on: ZeroDivide do: [:e | log add: 4]. log", "OrderedCollection (1 4 3)");
+        check("| log | log := OrderedCollection new. [[1/0] ifCurtailed: [log add: 3]] on: ZeroDivide do: [:e | log add: 4]. log", "OrderedCollection (4 3)");
+        check("| log | log := OrderedCollection new. [[(1/0) printString. log add: 2] ensure: [log add: 3]] on: ZeroDivide do: [:e | e resume: 0]. log", "OrderedCollection (2 3)");
+        check("| log | log := OrderedCollection new. [[(1/0) printString] ifCurtailed: [log add: 3]] on: ZeroDivide do: [:e | e resume: 0]. log", "OrderedCollection ()");
+        check("| log | log := OrderedCollection new. [[[1/0] ensure: [log add: #inner]] ensure: [log add: #outer]] on: ZeroDivide do: [:e | log add: #handler]. log", "OrderedCollection (#handler #inner #outer)");
+        check("Object subclass: #Nl instanceVariableNames: 'log' classVariableNames: '' category: 'T'. Nl compile: 'run log := OrderedCollection new. #(1 2 3) do: [:i | [i = 2 ifTrue: [^log]. log add: i] ensure: [log add: i negated]]. ^log'. Nl new run", "OrderedCollection (1 -1 -2)");
+        check("[^3] ensure: [Transcript show: 'ensure ran on ^'; cr]", "3");
+        check("[[1/0] ensure: [Transcript show: 'ensure ran on error'; cr]] value", "ERROR: division by zero");
+        check("| log | log := OrderedCollection new. [[1/0] ensure: [log add: 1]] on: Error do: [:e | e retryUsing: [log add: 2]]. log", "OrderedCollection (1 2)");
+        check("| s | s := 0. 1 to: 500 do: [:i | s := s + ([i \\\\ 2 = 0 ifTrue: [Error signal: 'e']. 1] on: Error do: [:e | e return: 2])]. s", "750");
+        /* thisContext */
+        check("Object subclass: #CtxT instanceVariableNames: '' classVariableNames: '' category: 'T'. CtxT compile: 'who ^thisContext sender selector'. CtxT compile: 'caller ^self who'. CtxT new caller", "#caller");
+        check("CtxT compile: 'early thisContext return: 5. ^6'. CtxT new early", "5");
+        check("CtxT compile: 'tmps | a b | a := 10. b := 20. ^thisContext tempAt: 2'. CtxT new tmps", "20");
+        check("CtxT compile: 'setTmp | a | a := 1. thisContext tempAt: 1 put: 99. ^a'. CtxT new setTmp", "99");
+        check("CtxT compile: 'blk ^[thisContext] value'. CtxT new blk isBlockContext", "true");
+        check("CtxT compile: 'kept ^thisContext'. CtxT new kept isDead", "true");
+        check("CtxT compile: 'inner thisContext sender resume: 100. ^0'. CtxT compile: 'outer ^1 + self inner'. CtxT new outer", "101");
+        check("CtxT compile: 'ens | log | log := OrderedCollection new. [self kill: log] ensure: [log add: #ensure]. ^log'. CtxT compile: 'kill: log log add: #before. thisContext sender sender return: 7. log add: #never'. CtxT new ens", "OrderedCollection (#before #ensure)");
+        check("CtxT new kept printString", "'CtxT>>kept'");
+        check("[CtxT new kept resume: 1] on: Error do: [:e | e messageText]", "'cannot resume a dead context'");
+        gc_threshold = saved_threshold;
+    }
+    /* ---- the class library: test_lib.txt, run normally and then with a GC every few allocations ---- */
+    for (int pass = 0; pass < 2; pass++) {
+        size_t saved_threshold = gc_threshold;
+        if (pass == 1) gc_threshold = 2000;
+        int n = run_lib_tests("test_lib.txt");
+        printf("ok    library tests%s: %d run\n", pass ? " under GC stress" : "", n);
+        gc_threshold = saved_threshold;
+    }
     /* ---- the changes file: every route that changes code is logged, and replays ---- */
     {
         changes_path = "test_changes.st"; remove(changes_path);

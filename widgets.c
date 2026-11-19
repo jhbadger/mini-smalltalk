@@ -268,7 +268,7 @@ static void text_key(Pane *p, Event *ev) {
         buf[n] = 0; text_insert(p, buf); return;
     }
     if (k == 9) { text_insert(p, "\t"); return; }
-    if (k >= 32 && k < 1000) {
+    if (k >= 32 && k < 0x110000 && !(k >= 0x7f && k < 0xa0) && !(k >= 0xd800 && k < 0xe000)) {   /* any printable code point; the special keys (KEY_UP ...) are numbered above Unicode */
         char u[5]; int n; uint32_t cp = (uint32_t)k;
         if (cp < 0x80) { u[0] = (char)cp; n = 1; } else if (cp < 0x800) { u[0] = 0xc0 | (cp >> 6); u[1] = 0x80 | (cp & 0x3f); n = 2; }
         else if (cp < 0x10000) { u[0] = 0xe0 | (cp >> 12); u[1] = 0x80 | ((cp >> 6) & 0x3f); u[2] = 0x80 | (cp & 0x3f); n = 3; }

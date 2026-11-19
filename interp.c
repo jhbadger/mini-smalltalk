@@ -41,16 +41,69 @@ static void describe_context(oop ctx, char *buf, int len) {
     free(rn); free(mn); free(sn);
 }
 
+/* Frames of the exception machinery itself (Exception>>signal, defaultAction ...) are noise in a walkback. */
+static bool is_exception_frame(oop ctx) {
+    static oop classException = NULL;
+    if (!classException) { classException = global_lookup("Exception"); if (!classException) return false; }
+    oop home = SLOT(ctx, CTX_HOME);
+    oop m = home != nilobj ? SLOT(home, CTX_METHOD) : SLOT(ctx, CTX_METHOD);
+    oop cls = SLOT(m, M_CLASS);
+    if (IS_INT(cls) || cls == nilobj) return false;
+    if (cls->cls == classMetaclass) cls = SLOT(cls, MC_THISCLASS);
+    return cls == classException;
+}
+
 void interp_signal_error(const char *msg) {
     if (interp.failed) return;
     interp.failed = true;
     snprintf(interp.error, sizeof interp.error, "%s", msg);
     interp.walkback[0] = 0;
     int n = 0;
-    for (oop c = interp.active; c && c != nilobj && n < 60; c = SLOT(c, CTX_SENDER), n++) {
+    oop c = interp.active;
+    while (c && c != nilobj && is_exception_frame(c)) c = SLOT(c, CTX_SENDER);
+    if (!c || c == nilobj) c = interp.active;      /* nothing but exception frames: show them all */
+    for (; c && c != nilobj && n < 60; c = SLOT(c, CTX_SENDER), n++) {
         char line[512]; describe_context(c, line, sizeof line);
         if (strlen(interp.walkback) + strlen(line) + 2 < sizeof interp.walkback) { strcat(interp.walkback, line); strcat(interp.walkback, "\n"); }
     }
+}
+
+/* ---------- unwinding: BlockClosure>>ensure: and ifCurtailed: ----------
+   Both kernel methods keep the block in temp 0 and a "completed" flag in temp 1. When control leaves such a
+   frame any other way than falling off the end (a non-local return, or an error that aborts the run), the
+   VM runs the block first. */
+static bool is_unwind_frame(oop ctx) {
+    static oop s_ensure = NULL, s_curtailed = NULL;
+    if (!s_ensure) { s_ensure = new_symbol("ensure:"); s_curtailed = new_symbol("ifCurtailed:"); }
+    if (SLOT(ctx, CTX_HOME) != nilobj) return false;                 /* block contexts have no selector */
+    oop m = SLOT(ctx, CTX_METHOD);
+    oop sel = SLOT(m, M_SELECTOR);
+    return (sel == s_ensure || sel == s_curtailed) && SLOT(m, M_CLASS) == classBlockClosure
+        && CLASS_OF(SLOT(ctx, CTX_RECEIVER)) == classBlockClosure;
+}
+#define UNWIND_BLOCK(c) SLOT(c, CTX_FIXED + 0)
+#define UNWIND_DONE(c)  SLOT(c, CTX_FIXED + 1)
+/* innermost pending unwind frame strictly between `from` (exclusive) and `stop` (exclusive; NULL = to the bottom) */
+static oop find_pending_unwind(oop from, oop stop) {
+    for (oop c = SLOT(from, CTX_SENDER); c != nilobj && c != stop; c = SLOT(c, CTX_SENDER))
+        if (is_unwind_frame(c) && UNWIND_DONE(c) != trueobj) return c;
+    return NULL;
+}
+/* an error aborted the run: run the pending unwind blocks, innermost first, preserving the error report */
+static void unwind_after_abort(void) {
+    if (!interp.active || interp.active == nilobj) return;
+    bool failed = interp.failed; char err[sizeof interp.error]; char wb[sizeof interp.walkback];
+    memcpy(err, interp.error, sizeof err); memcpy(wb, interp.walkback, sizeof wb);
+    oop c = interp.active;
+    for (;;) {
+        oop p = is_unwind_frame(c) && UNWIND_DONE(c) != trueobj ? c : find_pending_unwind(c, NULL);
+        if (!p) break;
+        UNWIND_DONE(p) = trueobj;
+        oop blk = UNWIND_BLOCK(p);
+        if (!IS_INT(blk) && blk->cls == classBlockClosure && INT_VAL(SLOT(blk, B_NUMARGS)) == 0) interp_send(blk, symValue, NULL, 0);
+        c = p;
+    }
+    memcpy(interp.error, err, sizeof err); memcpy(interp.walkback, wb, sizeof wb); interp.failed = failed;
 }
 
 /* ---------- processes: linked lists, run queues, delays ---------- */
@@ -173,11 +226,28 @@ static oop run(oop base, long deadline) {
             else {
                 oop home = SLOT(ctx, CTX_HOME); origin = home;
                 if (INT_VAL(SLOT(home, CTX_PC)) < 0) { SAVE(); interp_signal_error("Block cannot return: home context has already returned"); goto abort; }
-                target = SLOT(home, CTX_SENDER); SLOT(home, CTX_PC) = MK_INT(-1);
+                /* leaving frames that hold ensure:/ifCurtailed: blocks: run the innermost pending one first, then redo this return */
+                oop pend = find_pending_unwind(ctx, home);
+                if (pend) {
+                    UNWIND_DONE(pend) = trueobj;
+                    oop blk = UNWIND_BLOCK(pend);
+                    PUSH(v);                                    /* keep the return value on the stack under the unwind block's result */
+                    if (!IS_INT(blk) && blk->cls == classBlockClosure && INT_VAL(SLOT(blk, B_NUMARGS)) == 0) {
+                        SAVE();                                 /* pc is now at the OP_RETURN_RETRY that follows this OP_RETURN */
+                        oop outer = SLOT(blk, B_OUTER);
+                        oop bhome = SLOT(outer, CTX_HOME) != nilobj ? SLOT(outer, CTX_HOME) : outer;
+                        oop nctx = new_context(SLOT(blk, B_METHOD), SLOT(blk, B_RECEIVER), ctx, bhome, outer);
+                        SAVE(); interp.active = nctx; LOAD();
+                    } else pc--;                                /* not a block: nothing to run, redo the return (v is still on the stack) */
+                    break;
+                }
+                for (oop c = ctx; c != nilobj; c = SLOT(c, CTX_SENDER)) { SLOT(c, CTX_PC) = MK_INT(-1); if (c == home) break; }   /* every frame being left is dead */
+                target = SLOT(home, CTX_SENDER);
             }
             if (base && origin == base) { result = v; goto done; }
             if (target == nilobj) { SLOT(CUR(), PR_CONTEXT) = nilobj; goto switch_process; }   /* a forked process finished */
             interp.active = target; LOAD(); PUSH(v); break; }
+        case OP_RETURN_RETRY: sp--; pc -= 2; break;
         case OP_BLOCK_RETURN: {
             oop v = POP(); oop target = SLOT(ctx, CTX_SENDER);
             if (base && ctx == base) { result = v; goto done; }
@@ -237,9 +307,19 @@ static oop run(oop base, long deadline) {
                         sp -= 2; for (uint32_t i = 0; i < arr->size; i++) PUSH(SLOT(arr, i));
                         n = arr->size; sel = s; super = 0; goto send;
                     }
-                } else if (prim >= 140 && prim <= 148) {   /* processes and semaphores */
+                } else if (prim >= 140 && prim <= 149) {   /* processes, semaphores, context transfer */
                     oop cur = CUR();
                     switch (prim) {
+                    case 149: {   /* ContextPart>>primResume: value -- abandon the active frames and continue the receiver with value as the result of its pending send */
+                        if (IS_INT(recv) || (recv->cls != classMethodContext && recv->cls != classBlockContext)) break;
+                        if (!IS_INT(SLOT(recv, CTX_PC)) || INT_VAL(SLOT(recv, CTX_PC)) < 0) break;
+                        oop c = ctx; while (c != nilobj && c != recv) c = SLOT(c, CTX_SENDER);
+                        if (c != recv) break;                    /* only a context further down this process's own stack */
+                        oop v = slots[sp - 1];
+                        SAVE();
+                        for (oop d = ctx; d != recv; d = SLOT(d, CTX_SENDER)) SLOT(d, CTX_PC) = MK_INT(-1);
+                        interp.active = recv; LOAD(); PUSH(v);
+                        continue; }
                     case 140:   /* BlockClosure>>newProcess */
                         if (CLASS_OF(recv) == classBlockClosure && INT_VAL(SLOT(recv, B_NUMARGS)) == 0) {
                             SAVE();
@@ -326,6 +406,7 @@ static oop run(oop base, long deadline) {
     }
 abort:
     result = nilobj;
+    unwind_after_abort();                 /* run pending ensure:/ifCurtailed: blocks before the run is abandoned */
     if (CUR() != owner) {                 /* a forked process died: drop it, and unblock the owner if it was waiting */
         SLOT(CUR(), PR_CONTEXT) = nilobj;
         if (base) { if (SLOT(owner, PR_LIST) != nilobj) ll_remove(SLOT(owner, PR_LIST), owner); remove_delay(owner); }
