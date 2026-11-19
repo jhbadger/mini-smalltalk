@@ -457,6 +457,26 @@ printOn: aStream
 
 "---- the operating system ----"
 
+!SystemDictionary methodsFor: 'image'!
+snapshot
+	"Save the whole system -- classes, methods, all objects reachable from Smalltalk -- to the current image file
+	(st.image in the directory you started from, unless you started from another with -i). The changes file is set
+	aside, since everything in it is now in the image. Answers true. Processes and windows are not saved."
+	^self snapshotAs: self imageName!
+snapshotAs: aFileName
+	"Save an image to aFileName. The changes file is set aside only if that is the current image file."
+	| r |
+	r := self primSnapshot: aFileName.
+	r == true ifFalse: [^self error: r].
+	^true!
+primSnapshot: aFileName
+	<primitive: 194>
+	^'cannot save the image'!
+imageName
+	"the file that #snapshot writes"
+	<primitive: 195>
+	^'st.image'! !
+
 !SystemDictionary methodsFor: 'operating system'!
 getenv: aName
 	"the value of an environment variable, or nil"

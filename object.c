@@ -244,6 +244,54 @@ oop all_instances(oop cls) {
     return r;
 }
 
+/* ---------- support for saving and loading images (image.c) ---------- */
+/* every oop the C code keeps in a global: they are written to, and restored from, the image in this order */
+oop **image_globals(int *n) {
+    static oop *g[] = {
+        &nilobj, &trueobj, &falseobj, &smalltalk, &processor, &main_process,
+        &classObject, &classBehavior, &classClass, &classMetaclass, &classUndefinedObject,
+        &classBoolean, &classTrue, &classFalse, &classMagnitude, &classNumber, &classInteger,
+        &classSmallInteger, &classFloat, &classCharacter, &classString, &classSymbol, &classArray,
+        &classByteArray, &classDictionary, &classAssociation, &classCompiledMethod, &classBlockClosure,
+        &classContext, &classMessage, &classCollection, &classSequenceableCollection, &classArrayedCollection,
+        &classOrderedCollection, &classPoint, &classSet, &classIdentitySet, &classIdentityDictionary,
+        &classLargePositiveInteger, &classLargeNegativeInteger, &classMethodContext, &classBlockContext,
+        &classProcess, &classSemaphore, &classProcessorScheduler, &classLinkedList, &classLink,
+        &symDoesNotUnderstand, &symDoIt, &symValue, &symPrintString, &symError, &symMustBeBoolean,
+        &symNew, &symPrintOn, &symHash, &symEquals };
+    *n = (int)(sizeof g / sizeof g[0]);
+    return g;
+}
+struct Obj *heap_head(void) { return all_objects; }
+/* mark everything reachable from the image roots (the globals, the characters, the interned symbols); the caller clears with heap_clear_marks */
+void heap_mark_image_roots(void) {
+    int n; oop **g = image_globals(&n);
+    for (int i = 0; i < n; i++) mark_push(*g[i]);
+    for (int i = 0; i < 256; i++) mark_push(charTable[i]);
+    for (int i = 0; i < symcap; i++) if (symtab[i]) mark_push(symtab[i]);
+    mark_drain();
+}
+void heap_clear_marks(void) { for (struct Obj *o = all_objects; o; o = o->next) o->mark = 0; }
+/* the pad field is borrowed to remember which Symbols are interned */
+void heap_flag_interned(bool on) { for (int i = 0; i < symcap; i++) if (symtab[i]) symtab[i]->pad = on ? 1 : 0; }
+uint32_t heap_next_hash(void) { return next_hash; }
+void heap_set_next_hash(uint32_t h) { next_hash = h; }
+/* a new object of the given shape with an identity hash taken from an image; slots are nil-filled later by the loader */
+oop heap_new_raw(uint32_t size, int kind, uint32_t hash) {
+    size_t bytes = kind == KIND_BYTES ? size : (size_t)size * sizeof(oop);
+    oop o = alloc(NULL, size, kind, bytes); o->hash = hash; return o;
+}
+/* rebuild the symbol table from the Symbols flagged as interned */
+void heap_rebuild_symbols(void) {
+    int count = 0;
+    for (struct Obj *o = all_objects; o; o = o->next) if (o->pad == 1 && o->cls == classSymbol) count++;
+    free(symtab); symcap = 1024; while (symcap < count * 2 + 16) symcap *= 2;
+    symtab = calloc(symcap, sizeof(oop)); symcount = 0;
+    for (struct Obj *o = all_objects; o; o = o->next) if (o->pad == 1 && o->cls == classSymbol) sym_insert(o);
+    for (struct Obj *o = all_objects; o; o = o->next) o->pad = 0;
+}
+void heap_reset_alloc_counter(void) { gc_alloc_since = 0; }
+
 /* ---------- classes ---------- */
 oop global_lookup(const char *name) { oop v = dict_at(smalltalk, new_symbol(name)); return v ? v : nilobj; }
 

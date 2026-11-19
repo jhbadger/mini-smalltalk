@@ -35,10 +35,16 @@ static int run_lib_tests(const char *path) {
 }
 
 int main(int argc, char **argv) {
-    st_init();
-    gc_add_root(&pending_inspect);
     char err[512];
-    if (!load_kernel(".", err, sizeof err)) printf("kernel: %s\n", err);
+    const char *test_image = getenv("ST_TEST_IMAGE");   /* run the whole suite on a system loaded from an image */
+    if (test_image) {
+        if (!image_load(test_image, err, sizeof err)) { printf("FAIL  cannot load image %s: %s\n", test_image, err); return 1; }
+        printf("--- running on the image %s ---\n", test_image);
+    } else {
+        st_init();
+        if (!load_kernel(".", err, sizeof err)) printf("kernel: %s\n", err);
+    }
+    gc_add_root(&pending_inspect);
     if (argc > 1) {   /* evaluate expressions from the command line */
         for (int i = 1; i < argc; i++) {
             oop r = interp_eval(nilobj, argv[i], err, sizeof err);
@@ -392,6 +398,48 @@ int main(int argc, char **argv) {
         changes_logging = false;
         printf("%s  failed write is counted (%d)\n", changes_failures > f0 ? "ok  " : "FAIL", changes_failures - f0); if (changes_failures <= f0) failures++;
         remove("test_changes.st");
+    }
+    /* ---- images: save this system, start `st` from the file, and compare what it answers ---- */
+    if (!test_image) {
+        check("Object subclass: #ImgT instanceVariableNames: 'v' classVariableNames: '' category: 'T'. ImgT compile: 'v ^v ifNil: [7]'. ImgT new v", "7");
+        check("Smalltalk at: #ImgSet put: (Set new add: ImgT new; add: 'str'; add: #sym; add: 42; add: 3.5; yourself). ImgSet size", "5");
+        check("Smalltalk at: #ImgIds put: IdentityDictionary new. ImgIds at: ImgSet put: 99. ImgIds at: ImgSet", "99");
+        check("Smalltalk at: #ImgBig put: 100 factorial. ImgBig printString size", "158");
+        check("Smalltalk at: #ImgWide put: 'héllo' asWideString. ImgWide size", "5");
+        check("Smalltalk snapshotAs: 'test_image.image'", "true");
+        check("Smalltalk snapshotAs: '/nonexistent-dir/x.image'", "ERROR: cannot write /nonexistent-dir/x.image.tmp: No such file or directory");
+        struct { const char *expr, *expect; } img[] = {
+            { "ImgT new v", "7" }, { "ImgSet size", "5" }, { "ImgSet includes: 'str'", "true" }, { "ImgSet includes: #sym", "true" },
+            { "ImgSet includes: 3.5", "true" }, { "ImgSet includes: 42", "true" }, { "ImgIds at: ImgSet", "99" },
+            { "ImgBig printString size", "158" }, { "ImgWide utf8Encoded size", "6" }, { "#foo == #foo", "true" },
+            { "'abc' asSymbol == #abc", "true" }, { "[1/0] on: ZeroDivide do: [:e | e return: 5]", "5" },
+            { "| d | d := Dictionary new. d at: 'k' put: 1. d at: 'k'", "1" }, { "Date today class name", "#Date" },
+            { "Object subclass: #ImgU instanceVariableNames: '' classVariableNames: '' category: 'T'. ImgU new printString", "'an ImgU'" },
+            { "Smalltalk garbageCollect. ImgSet size", "5" }, { "(1 to: 2000) inject: 0 into: [:a :b | a + b]", "2001000" } };
+        int nimg = (int)(sizeof img / sizeof img[0]);
+        char cmd[16384] = "./st -i test_image.image"; 
+        for (int i = 0; i < nimg; i++) {   /* single-quote each expression for the shell, escaping the quotes inside it */
+            strcat(cmd, " -e '");
+            for (const char *c = img[i].expr; *c; c++) { if (*c == '\'') strcat(cmd, "'\\''"); else strncat(cmd, c, 1); }
+            strcat(cmd, "'");
+        }
+        strcat(cmd, " > test_image.out 2>&1");
+        int rc = system(cmd);
+        FILE *f = fopen("test_image.out", "r");
+        for (int i = 0; i < nimg; i++) {
+            char line[1024] = ""; if (!f || !fgets(line, sizeof line, f)) line[0] = 0;
+            size_t n = strlen(line); while (n && (line[n - 1] == '\n')) line[--n] = 0;
+            int ok = rc == 0 && strcmp(line, img[i].expect) == 0; if (!ok) failures++;
+            printf("%s  [image] %-50s => %s%s%s\n", ok ? "ok  " : "FAIL", img[i].expr, line, ok ? "" : "   expected: ", ok ? "" : img[i].expect);
+        }
+        if (f) fclose(f);
+        /* an image that is truncated, or not an image, is refused with a message */
+        system("head -c 3000 test_image.image > test_trunc.image; echo 'not an image' > test_junk.image");
+        system("./st -i test_trunc.image -e 1 > test_image.out 2>&1; ./st -i test_junk.image -e 1 >> test_image.out 2>&1");
+        f = fopen("test_image.out", "r"); char all[2048] = ""; if (f) { size_t got = fread(all, 1, sizeof all - 1, f); all[got] = 0; fclose(f); }
+        int ok = strstr(all, "truncated or damaged") && strstr(all, "not a Smalltalk image"); if (!ok) failures++;
+        printf("%s  [image] damaged and non-image files are refused\n", ok ? "ok  " : "FAIL");
+        remove("test_image.image"); remove("test_image.out"); remove("test_trunc.image"); remove("test_junk.image");
     }
     printf("\n%d failures\n", failures);
     printf("Transcript:\n%s", transcript_text ? transcript_text : "");

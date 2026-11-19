@@ -390,17 +390,23 @@ void open_browser_on(const char *className) {
 }
 
 /* ---------- system menu ---------- */
-static const char *sys_menu[] = { "system browser", "workspace", "system transcript", "smalltalk tutorial", "-", "file in...", "browse class...", "collect garbage", "-", "quit" };
+static const char *sys_menu[] = { "system browser", "workspace", "system transcript", "smalltalk tutorial", "-", "file in...", "browse class...", "save image", "collect garbage", "-", "quit" };
 static void sys_menu_cb(int i) {
     switch (i) {
     case 0: open_browser(); break; case 1: open_workspace(); break; case 2: open_transcript(); break; case 3: open_tutorial(); break;
     case 5: { char *f = dialog_prompt("File in (path to .st file)", ""); if (f && f[0]) { char err[512]; if (file_in(f, err, sizeof err)) ui_status("filed in %s", f); else { ui_status("file in failed: %s", err); dialog_text("File in failed", err); } browsers_refresh(); } free(f); break; }
     case 6: { char *n = dialog_prompt("Browse class", ""); if (n && n[0]) { if (class_named(n)) open_browser_on(n); else ui_status("no class named %s", n); } free(n); break; }
-    case 7: gc_collect(); ui_status("garbage collected"); break;
-    case 9: if (dialog_confirm("Quit", "Quit Smalltalk?")) ui_quit = true; break;
+    case 7: { char err[512], msg[1200];
+        snprintf(msg, sizeof msg, "Save the whole system to %s?\n\nEverything is saved except open windows and processes. The changes file %s is set aside, since the image now contains it.", image_path, changes_abs_path());
+        if (!dialog_confirm("Save image", msg)) break;
+        if (image_snapshot(image_path, err, sizeof err)) ui_status("saved image %s", image_path);
+        else { ui_status("could not save the image: %s", err); dialog_text("Save image failed", err); }
+        break; }
+    case 8: gc_collect(); ui_status("garbage collected"); break;
+    case 10: if (dialog_confirm("Quit", "Quit Smalltalk?")) ui_quit = true; break;
     }
 }
-void tools_system_menu_install(void) { ui_set_desktop_menu(sys_menu, 10, sys_menu_cb); }
+void tools_system_menu_install(void) { ui_set_desktop_menu(sys_menu, 11, sys_menu_cb); }
 
 void tools_after_eval(void) {
     transcripts_refresh();

@@ -34,11 +34,24 @@ static void executable_dir(const char *argv0, char *out, size_t outlen) {
 }
 
 static void usage(void) {
-    fprintf(stderr, "usage: st [-e 'expression'] [-f file.st] [-c changes.st] [-k kerneldir]\n"
-                    "  kernel sources are read from the executable's directory unless -k is given;\n"
+    fprintf(stderr, "usage: st [-e 'expression'] [-f file.st] [-c changes.st] [-k kerneldir] [-i file.image] [-n]\n"
+                    "  starts from an image when there is one: st.image in the current directory (your project's),\n"
+                    "  else kernel.image next to the executable; otherwise the kernel sources are read from the\n"
+                    "  executable's directory.  -i file starts from that image, -n and -k never use an image.\n"
                     "  the changes file and -f files are relative to the current directory.\n"
                     "  with no -e, starts the interactive TUI environment\n");
     exit(1);
+}
+
+/* modification time of the newest kernelN.st in dir (0 if there are none) */
+static time_t newest_kernel_source(const char *dir) {
+    time_t newest = 0;
+    for (int i = 1; i < 100; i++) {
+        char path[PATH_MAX + 32]; snprintf(path, sizeof path, "%s/kernel%d.st", dir, i);
+        time_t m = image_mtime(path); if (!m) break;
+        if (m > newest) newest = m;
+    }
+    return newest;
 }
 static void show_background_error(void) {
     char *buf = malloc(strlen(interp.error) + strlen(interp.walkback) + 64);
@@ -49,26 +62,58 @@ static void show_background_error(void) {
 
 int main(int argc, char **argv) {
     const char *kdir = NULL; const char **evals = NULL; int nevals = 0; const char **files = NULL; int nfiles = 0;
+    const char *image_arg = NULL; bool no_image = false; char notice[2048] = "";
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-e") && i + 1 < argc) { evals = realloc(evals, (nevals + 1) * sizeof(char *)); evals[nevals++] = argv[++i]; }
         else if (!strcmp(argv[i], "-f") && i + 1 < argc) { files = realloc(files, (nfiles + 1) * sizeof(char *)); files[nfiles++] = argv[++i]; }
         else if (!strcmp(argv[i], "-c") && i + 1 < argc) changes_path = argv[++i];
         else if (!strcmp(argv[i], "-k") && i + 1 < argc) kdir = argv[++i];
+        else if (!strcmp(argv[i], "-i") && i + 1 < argc) image_arg = argv[++i];
+        else if (!strcmp(argv[i], "-n")) no_image = true;
         else usage();
     }
     char exedir[PATH_MAX]; executable_dir(argv[0], exedir, sizeof exedir);
-    st_init();
-    gc_add_root(&pending_inspect);
     char err[512];
+    bool kdir_given = kdir != NULL;
     if (!kdir) {   /* default: next to the executable, else the current directory */
         char probe[PATH_MAX + 32]; snprintf(probe, sizeof probe, "%s/kernel1.st", exedir);
         kdir = access(probe, R_OK) == 0 ? exedir : ".";
     }
     kernel_dir = kdir;
-    if (!load_kernel(kdir, err, sizeof err)) {
-        fprintf(stderr, "%s\n", err);
-        if (!strncmp(err, "cannot open", 11)) { fprintf(stderr, "kernel sources (kernel1.st ...) not found in %s; use -k to point at the source directory\n", kdir); return 1; }
+    /* an image replaces st_init() and the kernel sources */
+    bool loaded = false;
+    if (image_arg) {
+        if (!image_load(image_arg, err, sizeof err)) { fprintf(stderr, "st: %s\n", err); return 1; }
+        loaded = true; image_path = image_arg;
+    } else if (!no_image && !kdir_given) {
+        char base[PATH_MAX + 32]; snprintf(base, sizeof base, "%s/kernel.image", exedir);
+        const char *candidates[2] = { "st.image", base };
+        time_t sources = newest_kernel_source(kdir);
+        for (int i = 0; i < 2 && !loaded; i++) {
+            time_t m = image_mtime(candidates[i]);
+            if (!m) continue;
+            if (sources && m < sources) {
+                char msg[1024]; snprintf(msg, sizeof msg, "The image %s is older than the kernel sources in %s, so it was NOT used and the kernel was loaded from source.\n%s",
+                    candidates[i], kdir, i == 0 ? "It still holds the work you saved: start with  st -i st.image  to load it anyway." : "Rebuild it with  make image.");
+                fprintf(stderr, "st: %s\n", msg); if (!notice[0]) snprintf(notice, sizeof notice, "%s", msg);
+                continue;
+            }
+            if (image_load(candidates[i], err, sizeof err)) { loaded = true; if (i == 0) image_path = candidates[0]; }
+            else {
+                char msg[1024]; snprintf(msg, sizeof msg, "Cannot use the image %s: %s.\nThe kernel was loaded from source instead.", candidates[i], err);
+                fprintf(stderr, "st: %s\n", msg); if (!notice[0]) snprintf(notice, sizeof notice, "%s", msg);
+                if (heap_head()) break;   /* a damaged image may have left objects behind: do not try another */
+            }
+        }
     }
+    if (!loaded) {
+        st_init();
+        if (!load_kernel(kdir, err, sizeof err)) {
+            fprintf(stderr, "%s\n", err);
+            if (!strncmp(err, "cannot open", 11)) { fprintf(stderr, "kernel sources (kernel1.st ...) not found in %s; use -k to point at the source directory\n", kdir); return 1; }
+        }
+    }
+    gc_add_root(&pending_inspect);
     if (access(changes_path, R_OK) == 0 && !file_in(changes_path, err, sizeof err)) fprintf(stderr, "%s: %s\n", changes_path, err);
     for (int i = 0; i < nfiles; i++) if (!file_in(files[i], err, sizeof err)) fprintf(stderr, "%s: %s\n", files[i], err);
     if (nevals) {
@@ -92,6 +137,7 @@ int main(int argc, char **argv) {
     open_workspace(); win_top()->r = (Rect){ 1, bh + 1, tui_cols / 2 - 1, tui_rows - bh - 3 };
     open_browser(); win_top()->r = (Rect){ 1, 0, tui_cols - 2, bh };
     win_raise(windows[1]);   /* workspace in front, ready for typing */
+    if (notice[0]) dialog_text("Image not used", notice);
     Event ev;
     while (!ui_quit && !quit_requested) {
         ui_draw(); tui_flush();

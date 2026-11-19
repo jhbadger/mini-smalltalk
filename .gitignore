@@ -5,3 +5,6 @@
 # per-user state
 changes.st
 .claude/
+*.image
+*.image.tmp
+changes.st.bak

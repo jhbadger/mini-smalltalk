@@ -279,6 +279,11 @@ oop call_primitive(int n, oop *args, int nargs, bool *ok) {
 #endif
     case 192: { struct timeval tv; gettimeofday(&tv, NULL); return MK_INT((intptr_t)tv.tv_sec * 1000000 + tv.tv_usec); }   /* microseconds since the Unix epoch */
     case 193: { char buf[256]; return gethostname(buf, sizeof buf) == 0 ? new_string(buf) : nilobj; }   /* primHostName */
+    case 194: { /* primSnapshot: path -> true, or a String saying what went wrong */
+        if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); char err[512];
+        bool ok = image_snapshot(p, err, sizeof err); free(p);
+        return ok ? trueobj : new_string(err); }
+    case 195: return new_string(image_path);   /* imageName: where Smalltalk snapshot saves */
     }
     FAIL;
 }

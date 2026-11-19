@@ -7,18 +7,19 @@ tools: a four-pane **System Browser**, **Workspace**, **System Transcript**,
 overlapping draggable/resizable windows, and a persistent **changes file**.
 
 ```
-make            # builds ./st (needs a C compiler, no other dependencies)
+make            # builds ./st and kernel.image (needs a C compiler, no other dependencies)
 ./st            # start the environment in an xterm-compatible terminal
 make check      # headless VM test-suite (test_vm.c, plus the 389 expression/result pairs in test_lib.txt)
 ./st -e '3 + 4' # evaluate expressions without the UI
 ```
 
-The kernel sources (`kernel1.st` … `kernel6.st`) are loaded from the directory
+The kernel sources (`kernel1.st` …) are loaded from the directory
 containing the `st` executable, so you can put that directory on your `PATH`
-(or symlink `st` into one) and run it from anywhere. The changes file
+(or symlink `st` into one) and run it from anywhere. When an **image** is available
+(see [Images](#images)) it is used instead, and the system starts without parsing any source. The changes file
 (`changes.st`, or the file named with `-c`) and any `-f` files are taken
 relative to the directory you run it from, so each project gets its own
-changes. `-k dir` overrides where the kernel is looked for.
+changes. `-k dir` overrides where the kernel sources are looked for (and means: no image).
 
 ## Using it
 
@@ -60,7 +61,38 @@ changes. `-k dir` overrides where the kernel is looked for.
   example a read-only directory) a warning window says so immediately. `-c file`
   picks another changes file. What is *not* saved: workspace text, window
   positions and variables; use *file out* in the browser to export a class or
-  category as a `.st` file. Scripted `-e` runs do not write the changes file.
+  category as a `.st` file. Scripted `-e` runs do not write the changes file. To make that work permanent and quick to load, save an image.
+
+## Images
+
+An image is a snapshot of the whole object memory (every class, method and object reachable from
+`Smalltalk`) in one file, so the system can start without loading the kernel sources.
+
+```
+Smalltalk snapshot              "save to st.image in the current directory (or the image you started from)"
+Smalltalk snapshotAs: 'x.image' "save somewhere else"
+Smalltalk imageName             "the file that #snapshot writes"
+```
+
+The System menu has **save image** too. `make` builds `kernel.image` (the kernel and nothing else) next to
+the executable. At start-up `st` looks for, in order:
+
+1. `-i file.image`, if given (an error if it cannot be loaded);
+2. `st.image` in the current directory: your project's image;
+3. `kernel.image` next to the executable;
+4. the kernel sources (also with `-n`, or with `-k dir`, which never use an image).
+
+An image is only used if it is **not older than the kernel sources**; otherwise it is ignored with a message
+(and a dialog in the UI) and the sources are loaded. A project image ignored that way still holds your saved
+work: start it with `st -i st.image`. An image that is damaged, truncated, or saved by a different build of
+the virtual machine is refused with a message and the sources are loaded instead.
+
+**The changes file.** Saving an image to the current image file absorbs the changes file: everything in it
+is now in the image, so `changes.st` is renamed to `changes.st.bak` and later changes start a new one, replayed on top of the
+image at the next start as usual. `snapshotAs:` some other file leaves the changes file alone.
+
+An image does not hold processes (forked ones are not resumed; the interface starts afresh), windows, workspace text,
+or open `FileStream`s. It is tied to the word size and byte order of the machine that wrote it.
 
 ## Implementation notes
 
@@ -72,6 +104,7 @@ changes. `-k dir` overrides where the kernel is looked for.
 | `interp.c` | bytecode interpreter with heap contexts, method cache, `perform:`, `doesNotUnderstand:`, walkbacks, and a priority process scheduler (Semaphore, Delay, yield, preemption by priority) |
 | `prims.c` | ~120 primitives (arithmetic, floats, large integers, strings, dictionaries, classes, time, files, Transcript) |
 | `fileio.c` | chunk ("bang") format file-in / file-out, changes log |
+| `image.c` | binary images: save the object memory to a file, and start from one |
 | `kernel1-6.st` | the class library in Smalltalk |
 | `tui.c` | raw terminal, cell double-buffer, SGR mouse, key decoding |
 | `widgets.c` | windows, list/text/button panes, pop-up menus, dialogs |
@@ -101,8 +134,7 @@ blocks, no `become:`, no class-side
 instance variables, no way to run an operating-system command (`system:` is
 deliberately absent), a `FileStream` that is not closed keeps its handle (there are 128;
 use the `...do:` forms), `String` comparison with `<` is by byte value rather than
-case-insensitive, and there is no binary image (the kernel sources plus the changes file
-are the image).
+case-insensitive, and an image does not hold processes or windows.
 
 ## Testing the UI without a terminal
 

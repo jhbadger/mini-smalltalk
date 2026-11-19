@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
+#include <time.h>
 
 /* ---------- objects ---------- */
 typedef struct Obj *oop;
@@ -172,5 +173,25 @@ void changes_log_method(oop cls, const char *category, const char *src);
 void changes_log_class(oop super, const char *name, const char *ivars, const char *cvars, const char *category, int kind);
 void changes_log_remove_method(oop cls, oop selector);
 void changes_log_comment(oop cls, const char *text);
+
+/* object.c: hooks for image.c */
+oop **image_globals(int *n);
+struct Obj *heap_head(void);
+void heap_mark_image_roots(void);
+void heap_clear_marks(void);
+void heap_flag_interned(bool on);
+uint32_t heap_next_hash(void);
+void heap_set_next_hash(uint32_t h);
+oop heap_new_raw(uint32_t size, int kind, uint32_t hash);
+void heap_rebuild_symbols(void);
+void heap_reset_alloc_counter(void);
+
+/* image.c: binary images. An image holds every object reachable from the system roots; loading one replaces
+   st_init() and the kernel sources. Processes and the user interface are not saved. */
+extern const char *image_path;                       /* where Smalltalk snapshot writes (default ./st.image) */
+bool image_save(const char *path, char *err, int errlen);
+bool image_load(const char *path, char *err, int errlen);   /* only into an empty system (before st_init) */
+bool image_snapshot(const char *path, char *err, int errlen);   /* image_save, and when path is the current image, the changes file is set aside */
+time_t image_mtime(const char *path);                /* 0 if there is no such file */
 
 #endif
