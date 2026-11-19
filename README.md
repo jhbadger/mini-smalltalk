@@ -141,7 +141,7 @@ case-insensitive, and an image does not hold processes or windows.
 The `packages/` folder holds optional systems that are not in the standard image. Load one on demand:
 
 ```smalltalk
-Smalltalk availablePackages          "#('Bio' 'Prolog')"
+Smalltalk availablePackages          "#('Bio' 'Prolog' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'      "also: System menu -> load package..., or  st -l Prolog"
 ```
 
@@ -150,6 +150,7 @@ that image. Two packages come with the system:
 
 * [**Prolog**](packages/Prolog/README.md) — Edinburgh/ISO syntax, a standard library, DCGs, `format`, `assert`/`retract`,
   exceptions, a bridge in both directions between Prolog and Smalltalk objects, and a query window.
+* [**SUnit**](packages/SUnit/README.md) — the testing framework: `TestCase`, assertions, suites and a test runner window.
 * [**Bio**](packages/Bio/README.md) — bioinformatics: FASTA, FASTQ and GenBank files, sequences and features, the NCBI genetic
   codes, ORFs, assembly statistics, IUPAC pattern search, k-mers, restriction enzymes, pairwise alignment, a sequence browser,
   and sequence features as Prolog facts.

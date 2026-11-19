@@ -1,0 +1,49 @@
+# Tests for the SUnit package, run by test_vm after loading it.
+# The package tests itself with SUnit; the first line runs that whole suite, and the rest check
+# the pieces make check would otherwise only see through SUnit itself.
+Smalltalk loadPackage: 'SUnit' ==> true
+TestSuite all run hasPassed ==> true
+TestSuite all run errorCount ==> 0
+TestSuite all run failureCount ==> 0
+(TestSuite all run runCount > 30) ==> true
+(SUnitExampleTest run: #testPasses) printString ==> '1 run, 1 passed, 0 failed, 0 errors'
+(SUnitExampleTest run: #testFails) printString ==> '1 run, 0 passed, 1 failed, 0 errors'
+(SUnitExampleTest run: #testErrors) printString ==> '1 run, 0 passed, 0 failed, 1 errors'
+(SUnitExampleTest run: #testFails) failures first isFailure ==> true
+(SUnitExampleTest run: #testErrors) errors first isError ==> true
+(SUnitExampleTest run: #testFails) failures first test name ==> 'SUnitExampleTest>>testFails'
+(SUnitExampleTest run: #testFails) failures first walkback trimBoth ==> 'SUnitExampleTest>>testFails'
+((SUnitExampleTest run: #testFails) failures first message includesSubstring: 'expected 2') ==> true
+SUnitExampleTest testSelectors ==> #(#testErrors #testFails #testPasses)
+SUnitExampleTest suite size ==> 3
+SUnitExampleTest suite run runCount ==> 3
+SUnitExampleTest isAbstract ==> false
+TestCase isAbstract ==> true
+SUnitExampleTest shouldRun ==> false
+SUnitTest shouldRun ==> true
+(TestSuite named: 'empty') run hasPassed ==> true
+(TestSuite named: 'empty') run runCount ==> 0
+(TestSuite forClasses: (Array with: SUnitExampleTest)) size ==> 3
+(SUnitExampleTest selector: #testPasses) name ==> 'SUnitExampleTest>>testPasses'
+# the runner
+TestRunner filter: 'SUnitExample'. TestRunner listItems size ==> 4
+TestRunner filter: 'SUnitExample'. TestRunner listItems first ==> 'SUnitExampleTest'
+TestRunner filter: 'SUnitExample'. (TestRunner runAll includesSubstring: '3 run') ==> true
+TestRunner filter: 'SUnitExample'. TestRunner runAll. ((TestRunner listItems at: 2) includesSubstring: 'E ') ==> true
+TestRunner filter: 'SUnitExample'. ((TestRunner detailAt: 1) includesSubstring: '3 tests') ==> true
+TestRunner filter: 'SUnitExample'. ((TestRunner detailAt: 2) includesSubstring: 'testErrors') ==> true
+TestRunner filter: 'nothing matches this'. TestRunner listItems ==> #('(no TestCase subclasses)')
+TestRunner filter: nil. (TestRunner testClasses size >= 2) ==> true
+TestRunner commandLabels size ==> 8
+# assertions, from the outside
+| t | t := SUnitTest selector: #testAssert. t runCase. t assertionCount ==> 2
+| t r | t := TestCase selector: #foo. r := [t assert: false] on: TestFailure do: [:e | e messageText]. r ==> 'assertion failed'
+| t r | t := TestCase selector: #foo. r := [t assert: 1 equals: 2] on: TestFailure do: [:e | e messageText]. r ==> 'expected 2 but got 1'
+| t r | t := TestCase selector: #foo. r := [t deny: true] on: TestFailure do: [:e | e messageText]. r ==> 'denial failed'
+| t r | t := TestCase selector: #foo. r := [t assert: #(1 2) includes: 5] on: TestFailure do: [:e | e messageText]. r ==> '#(1 2) does not include 5'
+| t r | t := TestCase selector: #foo. r := [t assertEmpty: #(1)] on: TestFailure do: [:e | e messageText]. r ==> '#(1) is not empty'
+| t r | t := TestCase selector: #foo. r := [t assert: 3 isKindOf: String] on: TestFailure do: [:e | e messageText]. r ==> '3 is a SmallInteger, not a String'
+| t r | t := TestCase selector: #foo. r := [t assert: 1.0 closeTo: 2.0] on: TestFailure do: [:e | e messageText]. r ==> 'expected 2.0 to within 0.0001 but got 1.0'
+| t r | t := TestCase selector: #foo. r := [t fail: 'because'] on: TestFailure do: [:e | e messageText]. r ==> 'because'
+| t | t := TestCase selector: #foo. (t should: [1/0] raise: ZeroDivide) class name ==> #ZeroDivide
+| t | t := TestCase selector: #foo. (t shouldnt: [42] raise: Error) ==> 42
