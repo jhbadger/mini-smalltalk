@@ -9,6 +9,10 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <unistd.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <errno.h>
+#include <sys/wait.h>
 
 char *transcript_text = NULL; size_t transcript_len = 0; static size_t transcript_cap = 0;
 oop pending_inspect = NULL; bool quit_requested = false;
@@ -26,6 +30,53 @@ void transcript_append(const char *s, int n) {
 }
 
 static bool is_bytes(oop o) { return !IS_INT(o) && o->kind == KIND_BYTES; }
+
+/* http_get: fetch a URL by running curl directly (fork/exec, no shell, so the URL is never interpreted).
+   Answers Array(true, body) or Array(false, message). Only http(s) is allowed and the whole transfer is capped at
+   60 seconds and 256 MB. curl does the TLS, which keeps the VM free of any network library. */
+static oop http_get(const char *url) {
+    oop res = new_array(2);
+    int out[2], err[2]; const char *fail = NULL;
+    if (strncmp(url, "https://", 8) != 0 && strncmp(url, "http://", 7) != 0) fail = "only http and https URLs can be fetched";
+    else if (pipe(out) != 0) fail = "cannot create a pipe";
+    else if (pipe(err) != 0) { close(out[0]); close(out[1]); fail = "cannot create a pipe"; }
+    if (fail) { SLOT(res, 0) = falseobj; SLOT(res, 1) = new_string(fail); return res; }
+    pid_t pid = fork();
+    if (pid < 0) { close(out[0]); close(out[1]); close(err[0]); close(err[1]);
+        SLOT(res, 0) = falseobj; SLOT(res, 1) = new_string("cannot start curl"); return res; }
+    if (pid == 0) {
+        int dn = open("/dev/null", O_RDONLY); if (dn >= 0) { dup2(dn, 0); close(dn); }
+        dup2(out[1], 1); dup2(err[1], 2);
+        close(out[0]); close(out[1]); close(err[0]); close(err[1]);
+        execlp("curl", "curl", "-sS", "-f", "-L", "--max-time", "60", "--max-filesize", "268435456",
+               "--proto", "=http,https", "--proto-redir", "=http,https", "-A", "mini-smalltalk-Bio", "--url", url, (char *)NULL);
+        _exit(127);
+    }
+    close(out[1]); close(err[1]);
+    size_t ocap = 65536, olen = 0, ecap = 4096, elen = 0; char *ob = malloc(ocap), *eb = malloc(ecap);
+    struct pollfd p[2] = { { out[0], POLLIN, 0 }, { err[0], POLLIN, 0 } };
+    int open_n = 2;
+    while (open_n > 0) {
+        if (poll(p, 2, -1) < 0) { if (errno == EINTR) continue; break; }
+        for (int i = 0; i < 2; i++) {
+            if (p[i].fd < 0 || !(p[i].revents & (POLLIN | POLLHUP | POLLERR))) continue;
+            char **b = i ? &eb : &ob; size_t *len = i ? &elen : &olen, *cap = i ? &ecap : &ocap;
+            if (*len + 8192 > *cap) { *cap *= 2; *b = realloc(*b, *cap); }
+            ssize_t n = read(p[i].fd, *b + *len, 8192);
+            if (n > 0) { *len += (size_t)n; if (i && elen > 4000) elen = 4000; }
+            else if (n == 0 || errno != EINTR) { close(p[i].fd); p[i].fd = -1; open_n--; }
+        }
+    }
+    int status = 0; waitpid(pid, &status, 0);
+    bool good = WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    if (WIFEXITED(status) && WEXITSTATUS(status) == 127) { memcpy(eb, "curl is not installed", 21); elen = 21; }
+    if (good) { oop s = new_bytes(classString, (int)olen); memcpy(BYTES(s), ob, olen); SLOT(res, 0) = trueobj; SLOT(res, 1) = s; }
+    else {
+        while (elen > 0 && (eb[elen - 1] == '\n' || eb[elen - 1] == '\r')) elen--;
+        eb[elen] = 0; SLOT(res, 0) = falseobj; SLOT(res, 1) = new_string(elen ? eb : "the transfer failed");
+    }
+    free(ob); free(eb); return res;
+}
 static bool is_num(oop o) { return IS_INT(o) || (!IS_INT(o) && o->cls == classFloat); }
 static double num_val(oop o) { return IS_INT(o) ? (double)INT_VAL(o) : FLOATVAL(o); }
 static bool fits(intptr_t v) { return v >= -INT_MAX_VAL && v < INT_MAX_VAL; }
@@ -287,6 +338,8 @@ oop call_primitive(int n, oop *args, int nargs, bool *ok) {
         if (!is_bytes(A(1))) FAIL; char *p = str_cstr(A(1)); char err[512];
         bool ok = image_snapshot(p, err, sizeof err); free(p);
         return ok ? trueobj : new_string(err); }
+    case 206: { /* primHttpGet: url -> Array(true, body) or Array(false, message); needs curl on the PATH */
+        if (!is_bytes(A(1))) FAIL; char *u = str_cstr(A(1)); oop r = http_get(u); free(u); return r; }
     case 195: return new_string(image_path);   /* imageName: where Smalltalk snapshot saves */
     /* ---- packages and tools ---- */
     case 196: return new_string(kernel_dir ? kernel_dir : ".");   /* kernelDirectory */

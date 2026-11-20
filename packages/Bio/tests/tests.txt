@@ -230,6 +230,21 @@ Smalltalk loadPackage: 'Prolog' ==> true
 BioProlog isAvailable ==> true
 BioProlog reset ==> true
 BioProlog assertAll: (Bio read: (Bio exampleFile: 'example.gb')) ==> 1
+# downloading: URLs, accession checks and failures (nothing here touches the network)
+(SequenceFetcher isProteinAccession: 'NP_000509.1') ==> true
+(SequenceFetcher isProteinAccession: 'P69905') ==> true
+(SequenceFetcher isProteinAccession: 'AAA12345.1') ==> true
+(SequenceFetcher isProteinAccession: 'NM_000518') ==> false
+(SequenceFetcher isProteinAccession: 'U00096.3') ==> false
+(SequenceFetcher accessionsIn: 'A1, B2,C3') ==> #('A1' 'B2' 'C3')
+(SequenceFetcher accessionsIn: #('A1' ' B2 ')) ==> #('A1' 'B2')
+[SequenceFetcher accessionsIn: 'x;rm -rf /'] on: BioError do: [:e | e messageText] ==> 'not an accession: ''x;rm'' (letters, digits, _ . - only)'
+[SequenceFetcher accessionsIn: ''] on: BioError do: [:e | e messageText] ==> 'no accession given'
+(SequenceFetcher urlFor: #('NM_000518') format: #fasta database: nil) ==> 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=NM_000518&rettype=fasta&retmode=text'
+(SequenceFetcher urlFor: #('NM_000518' 'NM_000519') format: #genbank database: nil) ==> 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=nuccore&id=NM_000518,NM_000519&rettype=gb&retmode=text'
+(SequenceFetcher urlFor: #('NP_000509') format: #genbank database: nil) ==> 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=protein&id=NP_000509&rettype=gp&retmode=text'
+[SequenceFetcher fetch: 'X1' format: #embl] on: BioError do: [:e | e messageText] ==> 'unknown format #embl (use #fasta or #genbank)'
+(SequenceFetcher httpGet: 'file:///etc/passwd') ==> #(false 'only http and https URLs can be fetched')
 Prolog answerLine: 'sequence(Id, Len, Mol)' ==> 'Id = ''BIOTEST01'', Len = 420, Mol = dna.'
 Prolog answerLine: 'organism(_, O)' ==> 'O = ''synthetic construct''.'
 Prolog answerLine: 'taxon(''BIOTEST01'', 2, T)' ==> 'T = ''artificial sequences''.'

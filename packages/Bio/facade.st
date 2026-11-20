@@ -3,6 +3,7 @@
 	Bio read: 'genome.gb'                every record, whatever the format
 	Bio readFasta: 'reads.fa'
 	Bio dna: 'ACGTTTGCA'
+	Bio fetch: 'NM_000518'               download from NCBI by accession (Bio fetchGenBank: for GenBank)
 	Bio openBrowser                      the window on the System menu
 
 Everything it answers is an ordinary object you can keep working with: SequenceCollection, SeqRecord, DNASequence."
@@ -58,6 +59,30 @@ write: aCollection toFasta: aPath
 	^FastaWriter write: aCollection to: aPath!
 write: aCollection toFastq: aPath
 	^FastqWriter write: aCollection to: aPath! !
+
+!Bio class methodsFor: 'downloading'!
+fetch: anAccession
+	"download a record from NCBI by accession (several may be given: 'U00096.3, NC_001416.1'), as FASTA"
+	^SequenceFetcher fetch: anAccession format: #fasta!
+fetchFasta: anAccession
+	^SequenceFetcher fetch: anAccession format: #fasta!
+fetchGenBank: anAccession
+	"download as a GenBank flat file (GenPept for a protein), parsed with its features"
+	^SequenceFetcher fetch: anAccession format: #genbank!
+fetch: anAccession format: aFormat
+	"aFormat is #fasta or #genbank"
+	^SequenceFetcher fetch: anAccession format: aFormat!
+fastaTextFor: anAccession
+	^SequenceFetcher fastaFor: anAccession!
+genBankTextFor: anAccession
+	^SequenceFetcher genBankFor: anAccession!
+download: anAccession format: aFormat to: aPath
+	"save NCBI's text unchanged in a file, which Bio read: can read back; answers the path"
+	^SequenceFetcher download: anAccession format: aFormat to: aPath!
+downloadFasta: anAccession to: aPath
+	^SequenceFetcher download: anAccession format: #fasta to: aPath!
+downloadGenBank: anAccession to: aPath
+	^SequenceFetcher download: anAccession format: #genbank to: aPath! !
 
 !Bio class methodsFor: 'sequences'!
 dna: aString

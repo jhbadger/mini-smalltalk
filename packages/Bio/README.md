@@ -184,6 +184,28 @@ reads trimQualityBelow: 20.
 Phred+33 is assumed unless a quality character is too high to be one, in which case Phred+64 is used; writing is
 always Phred+33. `FastqReader onFile: path offset: 64` forces the encoding.
 
+## Downloading by accession
+
+Records can be fetched from NCBI (nucleotide or protein) by accession, as FASTA or GenBank:
+
+```smalltalk
+Bio fetch: 'NM_000518'                     "FASTA, parsed: a SequenceCollection"
+Bio fetchGenBank: 'NM_000518'              "GenBank, parsed, with its features (GenPept for a protein)"
+Bio fetch: 'U00096.3, NC_001416.1' format: #fasta     "several at once, comma separated"
+Bio download: 'NM_000518' format: #genbank to: 'hbb.gb'   "save NCBI's text unchanged; Bio read: reads it back"
+Bio downloadFasta: 'NP_000509' to: 'hbb.fasta'
+Bio genBankTextFor: 'NM_000518'.           "just the text, nothing parsed"
+```
+
+The request goes to NCBI's E-utilities (`efetch`) by way of the system's `curl`, so `curl` must be installed and the
+machine online; the VM itself has no network code. The database is guessed from the accession (`NP_`/`XP_`/`YP_`/`WP_`,
+three letters and digits such as `AAA12345`, and UniProt `O`/`P`/`Q` accessions are protein; everything else is
+nucleotide); `SequenceFetcher fetch: 'X' format: #fasta database: #protein` overrides the guess. Accessions may contain
+only letters, digits and `_ . -`, so nothing in one can alter the request. An unknown accession, a failed transfer or a
+reply in the wrong format raises a `BioError` that says which. `SequenceFetcher apiKey: 'key'` sends an NCBI API key
+(10 requests a second instead of 3), and `SequenceFetcher baseUrl:` points at another efetch-compatible server. A
+download blocks until it finishes, for at most 60 seconds.
+
 ## The sequence browser
 
 *System menu → sequence browser* (or `Bio openBrowser`, `Bio openBrowserOn: 'file.gb'`) opens a window with the records on
@@ -226,7 +248,7 @@ lists them and `Bio exampleFile: 'example.gb'` gives the path.
 * A `SequenceCollection` is not a Smalltalk `Collection`; it answers `do:`, `select:`, `collect:`, `detect:ifNone:`,
   `at:`, `size` and the statistics, and `records` gives the underlying `OrderedCollection`.
 * Not implemented: multiple alignment, BLAST-style database search, phylogenetics, SAM/BAM/VCF/BED, GFF, writing
-  GenBank, and indexed random access to a FASTA file.
+  GenBank, and indexed random access to a FASTA file. (Downloading is limited to NCBI efetch by accession.)
 * The package adds one method to a kernel class: `Number>>printShowingDecimalPlaces:`, in `extend.st`, which is the
   standard Smalltalk method of that name.
 * Tests are in `tests/tests.txt` and run as part of `make check`.
