@@ -729,6 +729,11 @@ timesRepeat: aBlock
 printString: base
 	<primitive: 37>
 	^self error: 'bad radix'!
+printString
+	"the common case, without a stream"
+	^self printString: 10!
+displayString
+	^self printString: 10!
 printOn: aStream base: base
 	aStream nextPutAll: (self printString: base)!
 radix: base

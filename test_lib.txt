@@ -497,3 +497,9 @@ TutT class compile: 'lessonSelectors ^#(#one #two)'. TutT unreadableExamples siz
 (OrderedCollection new add: 5; yourself) at: 1 ==> 5
 (Dictionary new at: 1 put: 2; yourself) at: 1 ==> 2
 'abc' reversed ==> 'cba'
+12 printString ==> '12'
+-5 displayString ==> '-5'
+(1 bitShift: 70) printString ==> '1180591620717411303424'
+(1 bitShift: 70) negated displayString ==> '-1180591620717411303424'
+255 printString: 16 ==> 'FF'
+(WriteStream on: String new) print: 42; contents ==> '42'
