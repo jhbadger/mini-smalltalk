@@ -18,6 +18,7 @@ struct Pane {
     /* text */
     char *text; int len, cap; int cursor, anchor; int tline; int hoff; int prefcol; bool readonly; bool dirty; bool wrap;
     bool (*on_key)(Pane *, Event *);          /* return true if handled */
+    void (*line_style)(Pane *, int pos, int *fg, int *bg);   /* optional: colours for the line starting at pos */
     /* button */
     char label[64]; void (*on_click)(Pane *);
     /* popup menu (right button) */
@@ -27,6 +28,7 @@ struct Pane {
 struct Window {
     Rect r; char title[128]; Pane *panes[16]; int npanes; Pane *focus; void *user; int kind;
     void (*layout)(Window *); void (*on_close)(Window *); bool (*on_key)(Window *, Event *);
+    bool (*may_close)(Window *);              /* optional: asked before the close box closes the window */
     bool closed;
 };
 
@@ -67,6 +69,7 @@ void text_select_range(Pane *p, int from, int to);
 void text_copy(Pane *p); void text_cut(Pane *p); void text_paste(Pane *p);
 void text_append(Pane *p, const char *s);
 void text_scroll_to_end(Pane *p);
+void text_show_cursor(Pane *p);                         /* scroll so the cursor is visible */
 
 /* modal helpers */
 int menu_popup(int x, int y, const char **items, int n);     /* -1 if cancelled */

@@ -91,7 +91,7 @@ static int pos_at_col(Pane *p, int ls, int col) {
     while (i < p->len && p->text[i] != '\n') { uint32_t cp; int n = utf8_decode(p->text + i, &cp); int w = cp == '\t' ? 4 - c % 4 : tui_cell_width(cp); if (c + w > col) break; c += w; i += n; }
     return i;
 }
-static void text_show_cursor(Pane *p) {
+void text_show_cursor(Pane *p) {
     int line = line_of(p, p->cursor), col = col_of(p, p->cursor);
     if (line < p->tline) p->tline = line; if (line >= p->tline + p->r.h) p->tline = line - p->r.h + 1; if (p->tline < 0) p->tline = 0;
     if (col < p->hoff) p->hoff = col; if (col >= p->hoff + p->r.w - 1) p->hoff = col - p->r.w + 2; if (p->hoff < 0) p->hoff = 0;
@@ -132,8 +132,11 @@ static void draw_text(Pane *p, bool active) {
     int a = -1, b = -1; if (has_sel(p)) sel_range(p, &a, &b);
     int pos = pos_of_line(p, p->tline);
     for (int row = 0; row < p->r.h; row++) {
-        tui_fill(p->r.x, p->r.y + row, p->r.w, 1, ' ', C_WIN_FG, C_WIN_BG, 0);
-        if (pos > p->len || (pos == p->len && row > 0 && p->tline + row > line_of(p, p->len))) continue;
+        bool past = pos > p->len || (pos == p->len && row > 0 && p->tline + row > line_of(p, p->len));
+        int lfg = C_WIN_FG, lbg = C_WIN_BG;
+        if (!past && p->line_style) p->line_style(p, pos, &lfg, &lbg);
+        tui_fill(p->r.x, p->r.y + row, p->r.w, 1, ' ', lfg, lbg, 0);
+        if (past) continue;
         int col = 0;
         while (pos < p->len && p->text[pos] != '\n') {
             uint32_t cp; int n = utf8_decode(p->text + pos, &cp);
@@ -141,7 +144,7 @@ static void draw_text(Pane *p, bool active) {
             bool insel = pos >= a && pos < b;
             for (int k = 0; k < w; k++) {
                 int sx = col + k - p->hoff;
-                if (sx >= 0 && sx < p->r.w) tui_put(p->r.x + sx, p->r.y + row, (cp == '\t' || k > 0) ? ' ' : (cp < 32 ? '?' : cp), C_WIN_FG, insel ? C_SEL_BG : C_WIN_BG, 0);
+                if (sx >= 0 && sx < p->r.w) tui_put(p->r.x + sx, p->r.y + row, (cp == '\t' || k > 0) ? ' ' : (cp < 32 ? '?' : cp), lfg, insel ? C_SEL_BG : lbg, 0);
             }
             col += w; pos += n;
         }
@@ -327,7 +330,7 @@ void ui_handle(Event *ev) {
     if (!w) { if (ev->button == BTN_RIGHT && desk_cb) { int i = menu_popup(ev->x, ev->y, desk_menu, ndesk); if (i >= 0) desk_cb(i); } return; }
     win_raise(w);
     if (ev->y == w->r.y) {   /* title bar */
-        if (ev->x >= w->r.x + 1 && ev->x <= w->r.x + 3 && ev->button == BTN_LEFT) { win_close(w); return; }
+        if (ev->x >= w->r.x + 1 && ev->x <= w->r.x + 3 && ev->button == BTN_LEFT) { if (!w->may_close || w->may_close(w)) win_close(w); return; }
         if (ev->button == BTN_LEFT) { drag.w = w; drag.mode = 1; drag.dx = ev->x - w->r.x; drag.dy = ev->y - w->r.y; }
         return;
     }

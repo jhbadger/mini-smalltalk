@@ -4,10 +4,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <strings.h>
 
 extern oop pending_inspect;
 bool ui_quit = false;
-enum { W_BROWSER = 1, W_WORKSPACE, W_TRANSCRIPT, W_INSPECTOR, W_LESSON, W_LISTTOOL };
+enum { W_BROWSER = 1, W_WORKSPACE, W_TRANSCRIPT, W_INSPECTOR, W_LESSON, W_LISTTOOL, W_NOTEBOOK };
 static void browsers_refresh(void);
 
 /* ---------- helpers ---------- */
@@ -109,6 +110,224 @@ static void open_tool_workspace(const char *title, const char *tool, const char 
     Pane *t = win_add_text(w, false); t->menu = ws_menu; t->nmenu = 8; t->on_menu = ws_menu_cb; t->on_key = code_key;
     EvalCtx *c = calloc(1, sizeof *c); c->tool = strdup(tool); t->user = c;
     text_set(t, text);
+}
+
+/* ---------- Notebook ----------
+   A text file of prose with Smalltalk in it, written the Markdown way: code goes between fence lines of three
+   backquotes (``` alone, or ```smalltalk or ```st), and printing a cell puts its value in a ```result block under it,
+   which the next run of the cell replaces. Fences with any other word after them are shown as code but not run. */
+enum { NB_PROSE, NB_CODE, NB_RESULT, NB_OTHER };
+typedef struct { int open, body, body_end, end, kind; bool closed; } Cell;   /* positions in the text; body..body_end is the code */
+typedef struct { char *path; } Notebook;
+#define NB_CODE_BG 254
+#define NB_FENCE_FG C_DIM_FG
+#define NB_RESULT_FG 24
+
+/* a fence line: up to three spaces, then ``` and an optional word; *kind says what the fence opens */
+static bool nb_fence(const char *s, const char *e, int *kind) {
+    int sp = 0; while (s < e && *s == ' ' && sp < 3) { s++; sp++; }
+    if (e - s < 3 || strncmp(s, "```", 3)) return false;
+    s += 3; while (s < e && *s == '`') s++;
+    while (s < e && (*s == ' ' || *s == '\t')) s++;
+    const char *w = s; while (s < e && *s != ' ' && *s != '\t' && *s != '\r') s++;
+    int n = (int)(s - w);
+    if (n == 0 || (n == 9 && !strncasecmp(w, "smalltalk", 9)) || (n == 2 && !strncasecmp(w, "st", 2))) *kind = NB_CODE;
+    else if (n == 6 && !strncasecmp(w, "result", 6)) *kind = NB_RESULT;
+    else *kind = NB_OTHER;
+    return true;
+}
+static bool nb_bare_fence(const char *s, const char *e) {   /* a closing fence: ``` and nothing after it */
+    int k; if (!nb_fence(s, e, &k)) return false;
+    while (s < e && *s == ' ') s++; while (s < e && *s == '`') s++;
+    while (s < e && (*s == ' ' || *s == '\t' || *s == '\r')) s++;
+    return s == e;
+}
+/* the fenced cells of the text, up to (and including) the one that contains pos; pass len to get them all */
+static Cell *nb_cells(const char *t, int len, int upto, int *count) {
+    int n = 0, cap = 16; Cell *cs = malloc(cap * sizeof *cs);
+    int pos = 0; bool in = false;
+    while (pos < len) {
+        const char *nl = memchr(t + pos, '\n', len - pos);
+        int eol = nl ? (int)(nl - t) : len, next = nl ? eol + 1 : len;
+        int kind;
+        if (!in) {
+            if (pos > upto) break;
+            if (nb_fence(t + pos, t + eol, &kind)) {
+                if (n == cap) cs = realloc(cs, (cap *= 2) * sizeof *cs);
+                cs[n++] = (Cell){ pos, next, len, len, kind, false }; in = true;
+            }
+        } else {
+            if (nb_bare_fence(t + pos, t + eol)) {
+                cs[n - 1].body_end = pos; cs[n - 1].end = next; cs[n - 1].closed = true; in = false;
+            }
+        }
+        pos = next;
+    }
+    *count = n; return cs;
+}
+/* the cell that the cursor is in (on its fence lines counts), or -1 */
+static int nb_cell_at(Cell *cs, int n, int pos, int len) {
+    for (int i = 0; i < n; i++) if (pos >= cs[i].open && (pos < cs[i].end || (pos == len && cs[i].end == len))) return i;
+    return -1;
+}
+static void nb_line_style(Pane *p, int pos, int *fg, int *bg) {
+    int n; Cell *cs = nb_cells(p->text, p->len, pos, &n);
+    int i = nb_cell_at(cs, n, pos, p->len);
+    if (i >= 0) {
+        Cell c = cs[i]; bool fence = pos == c.open || (c.closed && pos >= c.body_end);
+        if (c.kind == NB_RESULT) *fg = fence ? NB_FENCE_FG : NB_RESULT_FG;
+        else { *bg = NB_CODE_BG; if (fence) *fg = NB_FENCE_FG; }
+    }
+    free(cs);
+}
+static char *nb_copy(Pane *p, int a, int b) { char *s = malloc(b - a + 1); memcpy(s, p->text + a, b - a); s[b - a] = 0; return s; }
+
+/* the code cell under the cursor when nothing is selected: its index among all cells, or -1 */
+static int nb_current_cell(Pane *p, Cell **cs, int *n) {
+    *cs = nb_cells(p->text, p->len, p->len, n);
+    if (p->anchor >= 0 && p->anchor != p->cursor) return -1;
+    int i = nb_cell_at(*cs, *n, p->cursor, p->len);
+    return i >= 0 && (*cs)[i].kind == NB_CODE ? i : -1;
+}
+/* write a cell's value into the result block under it (replacing the one already there) */
+static void nb_put_result(Pane *p, Cell *cs, int n, int i, const char *value) {
+    Cell c = cs[i]; int to = c.end;
+    if (c.closed && i + 1 < n && cs[i + 1].kind == NB_RESULT && cs[i + 1].open == c.end) to = cs[i + 1].end;
+    size_t vl = strlen(value); char *ins = malloc(vl + 32); ins[0] = 0;
+    if (c.end > 0 && p->text[c.end - 1] != '\n') strcat(ins, "\n");
+    if (!c.closed) strcat(ins, "```\n");
+    strcat(ins, "```result\n"); strcat(ins, value);
+    if (vl == 0 || value[vl - 1] != '\n') strcat(ins, "\n");
+    strcat(ins, "```");
+    if (to < p->len || (to > 0 && p->text[to - 1] == '\n')) strcat(ins, "\n");
+    int cur = p->cursor, line = p->tline;
+    text_select_range(p, c.end, to); text_insert(p, ins); free(ins);
+    p->cursor = cur; p->anchor = -1; p->tline = line; text_show_cursor(p);
+}
+/* run cell i; print: also show its value under it. False if it failed (the error is shown). */
+static bool nb_run_cell(Pane *p, Cell *cs, int n, int i, bool print, oop *result) {
+    char *src = nb_copy(p, cs[i].body, cs[i].body_end); bool ok;
+    oop r = evaluate(src, nilobj, &ok); free(src);
+    if (!ok) { p->cursor = cs[i].body; p->anchor = -1; text_show_cursor(p); return false; }
+    if (result) *result = r;
+    if (print) { char *s = str_cstr(interp_print_string(r)); nb_put_result(p, cs, n, i, s); free(s); }
+    return true;
+}
+static void nb_do(Pane *p, int what) {   /* 0 do it, 1 print it, 2 inspect it: the cell under the cursor, else as a workspace does */
+    Cell *cs; int n; int i = nb_current_cell(p, &cs, &n);
+    if (i < 0) { free(cs); if (what == 0) do_it(p); else if (what == 1) print_it(p); else inspect_it(p); return; }
+    oop r = nilobj;
+    if (nb_run_cell(p, cs, n, i, what == 1, &r)) { if (what == 2) open_inspector(r); else ui_status("done"); }
+    free(cs); tools_after_eval();
+}
+static void nb_run_all(Pane *p) {
+    int ran = 0;
+    for (int k = 0;; k++) {   /* the cells are found again after each run, since printing a value moves the ones below */
+        int n, i, seen = -1; Cell *cs = nb_cells(p->text, p->len, p->len, &n);
+        for (i = 0; i < n; i++) if (cs[i].kind == NB_CODE && ++seen == k) break;
+        if (i == n) { free(cs); break; }
+        bool ok = nb_run_cell(p, cs, n, i, true, NULL); free(cs); tools_after_eval();
+        if (!ok) { ui_status("stopped at cell %d: it failed", k + 1); return; }
+        ran++;
+    }
+    ui_status("ran %d cell%s", ran, ran == 1 ? "" : "s");
+}
+static void nb_clear_results(Pane *p) {
+    int n, removed = 0; Cell *cs = nb_cells(p->text, p->len, p->len, &n);
+    int cur = p->cursor;
+    for (int i = n - 1; i >= 0; i--) if (cs[i].kind == NB_RESULT) {
+        text_select_range(p, cs[i].open, cs[i].end); text_insert(p, ""); removed++;
+        if (cur >= cs[i].end) cur -= cs[i].end - cs[i].open; else if (cur > cs[i].open) cur = cs[i].open;
+    }
+    free(cs); p->cursor = cur; p->anchor = -1; text_show_cursor(p);
+    ui_status("removed %d result%s", removed, removed == 1 ? "" : "s");
+}
+static char *nb_read_file(const char *path) {
+    FILE *f = fopen(path, "rb"); if (!f) return NULL;
+    size_t cap = 4096, len = 0; char *s = malloc(cap); size_t k;
+    while ((k = fread(s + len, 1, cap - len - 1, f)) > 0) { len += k; if (cap - len < 2) s = realloc(s, cap *= 2); }
+    fclose(f); s[len] = 0; return s;
+}
+static const char *nb_base(const char *path) { const char *b = strrchr(path, '/'); return b ? b + 1 : path; }
+static void nb_title(Window *w) {
+    Notebook *nb = w->user; char t[128];
+    snprintf(t, sizeof t, "Notebook: %s%s", nb_base(nb->path), w->panes[0]->dirty ? " *" : "");
+    if (strcmp(t, w->title)) win_set_title(w, t);
+}
+static bool nb_save(Window *w) {
+    Notebook *nb = w->user; Pane *p = w->panes[0];
+    FILE *f = fopen(nb->path, "wb");
+    bool ok = f && fwrite(p->text, 1, p->len, f) == (size_t)p->len;
+    if (f && fclose(f) != 0) ok = false;
+    if (!ok) { char msg[1400]; snprintf(msg, sizeof msg, "Cannot write the notebook to\n  %s", nb->path); ui_status("could not save %s", nb->path); dialog_text("Notebook not saved", msg); return false; }
+    p->dirty = false; nb_title(w); ui_status("saved %s", nb->path); return true;
+}
+static void nb_save_as(Window *w) {
+    Notebook *nb = w->user; char *f = dialog_prompt("Save notebook as", nb->path);
+    if (f && f[0]) { char *old = nb->path; nb->path = f; if (nb_save(w)) free(old); else { nb->path = old; free(f); } }
+    else free(f);
+}
+static void nb_revert(Window *w) {
+    Notebook *nb = w->user; Pane *p = w->panes[0];
+    if (p->dirty && !dialog_confirm("Revert", "Throw away the changes made since the notebook was last saved?")) return;
+    char *s = nb_read_file(nb->path);
+    if (!s) { ui_status("cannot read %s", nb->path); return; }
+    text_set(p, s); free(s); nb_title(w); ui_status("read %s again", nb->path);
+}
+static bool nb_may_close(Window *w) {
+    Notebook *nb = w->user; if (!w->panes[0]->dirty) return true;
+    char *items[] = { "save, then close", "close without saving", "do not close" };
+    char prompt[300]; snprintf(prompt, sizeof prompt, "%s has changes that are not saved", nb_base(nb->path));
+    int c = dialog_choose("Close notebook", prompt, items, 3);
+    return c == 0 ? nb_save(w) : c == 1;
+}
+static void nb_close(Window *w) { Notebook *nb = w->user; free(nb->path); free(nb); }
+static const char *nb_menu[] = { "do it", "print it", "inspect it", "run all cells", "clear results", "-", "save", "save as...", "revert", "-", "copy", "cut", "paste", "select all" };
+static void nb_menu_cb(Pane *p, int i) {
+    switch (i) { case 0: case 1: case 2: nb_do(p, i); break; case 3: nb_run_all(p); break; case 4: nb_clear_results(p); break;
+    case 6: nb_save(p->win); break; case 7: nb_save_as(p->win); break; case 8: nb_revert(p->win); break;
+    case 10: text_copy(p); break; case 11: text_cut(p); break; case 12: text_paste(p); break; case 13: text_select_all(p); break; }
+}
+static bool nb_key(Pane *p, Event *ev) {
+    if (!(ev->mods & MOD_CTRL)) return false;
+    switch (ev->key) { case 'd': nb_do(p, 0); return true; case 'p': nb_do(p, 1); return true; case 't': nb_do(p, 2); return true;
+    case 'r': nb_run_all(p); return true; case 's': nb_save(p->win); return true; }
+    return false;
+}
+static const char *nb_new_text =
+    "# Notes\n\n"
+    "A notebook is a text file of prose with Smalltalk in it. The code goes between\n"
+    "fence lines of three backquotes, as in Markdown:\n\n"
+    "```smalltalk\n"
+    "squares := (1 to: 10) collect: [:i | i * i].\n"
+    "squares inject: 0 into: [:a :b | a + b]\n"
+    "```\n\n"
+    "Put the cursor anywhere in a cell and print it (ctrl-P) to run the whole cell:\n"
+    "its value appears in a result block under it, replaced each time the cell runs.\n"
+    "ctrl-D runs it without showing the value, ctrl-R runs every cell from the top,\n"
+    "and ctrl-S saves the file. Select some text to run just that, as in a workspace.\n"
+    "A variable assigned without being declared is kept from one cell to the next:\n\n"
+    "```smalltalk\n"
+    "squares last\n"
+    "```\n";
+int tools_unsaved_notebooks(void) {
+    int n = 0; for (int i = 0; i < nwindows; i++) if (windows[i]->kind == W_NOTEBOOK && windows[i]->panes[0]->dirty) n++;
+    return n;
+}
+static void notebooks_refresh(void) { for (int i = 0; i < nwindows; i++) if (windows[i]->kind == W_NOTEBOOK) nb_title(windows[i]); }
+void open_notebook(const char *path) {
+    for (int i = 0; i < nwindows; i++)   /* already open: bring it forward */
+        if (windows[i]->kind == W_NOTEBOOK && !strcmp(((Notebook *)windows[i]->user)->path, path)) { win_raise(windows[i]); return; }
+    char *s = nb_read_file(path); bool fresh = !s;
+    int ww = tui_cols - 4 < 90 ? tui_cols - 4 : 90, wh = tui_rows - 4;
+    Window *w = win_new("Notebook", (tui_cols - ww) / 2 + cascade, 1 + cascade, ww, wh); cascade = (cascade + 1) % 5;
+    w->kind = W_NOTEBOOK; w->layout = single_layout; w->on_close = nb_close; w->may_close = nb_may_close;
+    Notebook *nb = calloc(1, sizeof *nb); nb->path = strdup(path); w->user = nb;
+    Pane *t = win_add_text(w, false); t->menu = nb_menu; t->nmenu = 14; t->on_menu = nb_menu_cb; t->on_key = nb_key; t->line_style = nb_line_style;
+    text_set(t, fresh ? nb_new_text : s); free(s);
+    if (fresh) t->dirty = true;   /* not on disk until it is saved */
+    nb_title(w); win_focus(w, t);
+    ui_status(fresh ? "new notebook %s (not saved yet: ctrl-S saves it)" : "opened %s", path);
 }
 
 /* ---------- Transcript ---------- */
@@ -528,8 +747,8 @@ static void open_list_tool(const char *clsName, const char *title) {
 static char *tools_prompt(const char *title, const char *initial) { return dialog_prompt(title, initial); }
 
 /* The System menu: the built-in items, then whatever packages registered with SystemMenu (Smalltalk), then quit. */
-static const char *sys_base[] = { "system browser", "workspace", "system transcript", "tutorial...", "-", "file in...", "load package...", "browse class...", "save image", "collect garbage" };
-#define NBASE 10
+static const char *sys_base[] = { "system browser", "workspace", "notebook...", "system transcript", "tutorial...", "-", "file in...", "load package...", "browse class...", "save image", "collect garbage" };
+#define NBASE 11
 static const char *sys_items[NBASE + 40]; static int sys_n = 0, sys_extra = 0;   /* sys_extra: how many package items follow the base */
 static char *sys_extra_labels[32];
 static void sys_menu_cb(int i);
@@ -558,11 +777,13 @@ static void sys_menu_cb(int i) {
         if (interp.failed) show_error();
         tools_after_eval(); return;
     }
-    if (i == quit) { if (dialog_confirm("Quit", "Quit Smalltalk?")) ui_quit = true; return; }
+    if (i == quit) { if (dialog_confirm("Quit", tools_quit_message())) ui_quit = true; return; }
     switch (i) {
-    case 0: open_browser(); break; case 1: open_workspace(); break; case 2: open_transcript(); break; case 3: open_tutorial(); break;
-    case 5: { char *f = dialog_prompt("File in (path to .st file)", ""); if (f && f[0]) { char err[512]; if (file_in(f, err, sizeof err)) ui_status("filed in %s", f); else { ui_status("file in failed: %s", err); dialog_text("File in failed", err); } browsers_refresh(); } free(f); break; }
-    case 6: { /* load package: pick one from the list rather than typing its name */
+    case 0: open_browser(); break; case 1: open_workspace(); break;
+    case 2: { char *f = dialog_prompt("Notebook (path to a text file, new or existing)", "notes.md"); if (f && f[0]) open_notebook(f); free(f); break; }
+    case 3: open_transcript(); break; case 4: open_tutorial(); break;
+    case 6: { char *f = dialog_prompt("File in (path to .st file)", ""); if (f && f[0]) { char err[512]; if (file_in(f, err, sizeof err)) ui_status("filed in %s", f); else { ui_status("file in failed: %s", err); dialog_text("File in failed", err); } browsers_refresh(); } free(f); break; }
+    case 7: { /* load package: pick one from the list rather than typing its name */
         char *raw[64], *items[64];
         int n = strings_from_array(interp_send(smalltalk, new_symbol("availablePackages"), NULL, 0), raw, 64);
         if (n == 0) { ui_status("there are no packages to load"); break; }
@@ -578,15 +799,21 @@ static void sys_menu_cb(int i) {
         }
         for (int k = 0; k < n; k++) free(raw[k]);
         break; }
-    case 7: { char *n = dialog_prompt("Browse class", ""); if (n && n[0]) { if (class_named(n)) open_browser_on(n); else ui_status("no class named %s", n); } free(n); break; }
-    case 8: { char err[512], msg[1200];
+    case 8: { char *n = dialog_prompt("Browse class", ""); if (n && n[0]) { if (class_named(n)) open_browser_on(n); else ui_status("no class named %s", n); } free(n); break; }
+    case 9: { char err[512], msg[1200];
         snprintf(msg, sizeof msg, "Save the whole system to %s?\n\nEverything is saved except open windows and processes. The changes file %s is set aside, since the image now contains it.", image_path, changes_abs_path());
         if (!dialog_confirm("Save image", msg)) break;
         if (image_snapshot(image_path, err, sizeof err)) ui_status("saved image %s", image_path);
         else { ui_status("could not save the image: %s", err); dialog_text("Save image failed", err); }
         break; }
-    case 9: gc_collect(); ui_status("garbage collected"); break;
+    case 10: gc_collect(); ui_status("garbage collected"); break;
     }
+}
+const char *tools_quit_message(void) {
+    static char msg[1400]; int n = tools_unsaved_notebooks();
+    if (n) snprintf(msg, sizeof msg, "Quit Smalltalk?  Code changes are saved in %s\n\n%d notebook%s %s changes that are NOT saved.", changes_abs_path(), n, n == 1 ? "" : "s", n == 1 ? "has" : "have");
+    else snprintf(msg, sizeof msg, "Quit Smalltalk?  Code changes are saved in %s", changes_abs_path());
+    return msg;
 }
 void tools_system_menu_install(void) { ui_prompt_hook = tools_prompt; sys_menu_rebuild(); }
 
@@ -602,6 +829,8 @@ void tools_after_eval(void) {
         seen_count = changes_count;
         ui_status("saved to %s  (%d change%s this session)", changes_abs_path(), changes_count, changes_count == 1 ? "" : "s");
     }
+    if (pending_notebook_path) { char *f = pending_notebook_path; pending_notebook_path = NULL; open_notebook(f); free(f); }
+    notebooks_refresh();
     if (pending_inspect) { oop o = pending_inspect; pending_inspect = NULL; open_inspector(o); }
     if (pending_tool_class) { open_tool_workspace(pending_tool_title, pending_tool_class, pending_tool_text); free(pending_tool_class); free(pending_tool_title); free(pending_tool_text); pending_tool_class = pending_tool_title = pending_tool_text = NULL; }
     if (menu_items_changed) { menu_items_changed = false; sys_menu_rebuild(); }

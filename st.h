@@ -164,6 +164,7 @@ extern char *pending_tool_class, *pending_tool_title, *pending_tool_text;   /* a
 extern char *pending_list_tool_class, *pending_list_tool_title;            /* a list browser requested by primitive 203 */
 extern char *(*ui_prompt_hook)(const char *title, const char *initial);    /* set by the UI; NULL when there is none */
 extern bool menu_items_changed;                       /* set by primitive 200: the UI rebuilds the System menu */
+extern char *pending_notebook_path;                  /* a notebook window requested by primitive 205 */
 extern char *pending_window_title, *pending_window_text;   /* a window requested by primitive 180 (tutorial lessons) */
 
 /* fileio.c */

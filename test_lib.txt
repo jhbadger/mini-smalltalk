@@ -432,3 +432,13 @@ TutT exampleCheck ==> #(2 0)
 (AbstractTutorial isExampleLine: '| a | a := 1') ==> true
 TutT class compile: 'three ^TutorialLesson title: ''Bad'' text: ''Object new foo: '''. TutT class compile: 'lessonSelectors ^#(#one #two #three)'. TutT unreadableExamples size ==> 1
 TutT class compile: 'lessonSelectors ^#(#one #two)'. TutT unreadableExamples size ==> 0
+# notebooks: prose with fenced Smalltalk cells
+(Notebook codeCellsIn: 'Prose.', (String with: Character lf), '```smalltalk', (String with: Character lf), '3 + 4', (String with: Character lf), '```') first trimBoth ==> '3 + 4'
+(Notebook codeCellsIn: '```python', (String with: Character lf), 'print(1)', (String with: Character lf), '```', (String with: Character lf), '```', (String with: Character lf), '1') size ==> 1
+(Notebook resultsIn: '```', (String with: Character lf), '1', (String with: Character lf), '```', (String with: Character lf), '```result', (String with: Character lf), '7', (String with: Character lf), '```') first trimBoth ==> '7'
+(Notebook fenceKind: '   ```st') ==> #code
+(Notebook fenceKind: '    ```') ==> nil
+(Notebook fenceKind: '```Smalltalk') ==> #code
+(Notebook isClosingFence: '```st') ==> false
+(Notebook runString: '```', (String with: Character lf), 'NbX := 6', (String with: Character lf), '```', (String with: Character lf), 'text', (String with: Character lf), '```', (String with: Character lf), 'NbX * 7', (String with: Character lf), '```') ==> 42
+(Notebook open: 'x.md') ==> false

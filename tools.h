@@ -7,6 +7,9 @@ void open_browser_on(const char *className);
 void open_workspace(void);
 void open_transcript(void);
 void open_inspector(oop obj);
+void open_notebook(const char *path);  /* a window on a text file of prose and Smalltalk cells */
+int tools_unsaved_notebooks(void);
+const char *tools_quit_message(void);
 void tools_after_eval(void);          /* refresh transcript windows, open pending inspectors, update browsers */
 void tools_system_menu_install(void);
 bool tools_open_debugger(void);       /* true if the Debugger package took the last error */

@@ -32,7 +32,7 @@ changes. `-k dir` overrides where the kernel sources are looked for (and means: 
 * **Mouse**: left click selects / positions the cursor, drag selects text,
   double-click selects a word, triple-click a line. **Right click** opens the pane's menu
   (the Smalltalk-80 "yellow button"); right click on the desktop opens the
-  **System menu** (browser, workspace, transcript, file in, quit). Drag a
+  **System menu** (browser, workspace, notebook, transcript, file in, quit). Drag a
   window by its title bar, resize with the `╯` corner, close with `[x]`.
   The mouse wheel scrolls lists and text.
 * **Keyboard**: `ctrl-D` do it, `ctrl-P` print it, `ctrl-T` inspect it,
@@ -49,6 +49,17 @@ changes. `-k dir` overrides where the kernel sources are looked for (and means: 
   create the class. Select a protocol with no selector to get a method
   template. The `[instance]`/`[class]` button switches sides. Menus offer
   senders / implementors, file out, remove, add protocol, class comment.
+* **Notebook**: *notebook...* in the System menu opens a window on a text file of prose with Smalltalk in it
+  (a new file if there is none; it is written only when you save). The file is plain Markdown: code goes between
+  fence lines of three backquotes (```` ``` ````, ```` ```smalltalk ```` or ```` ```st ````). With the cursor anywhere in
+  a cell, `ctrl-P` runs the whole cell and writes its value in a ```` ```result ```` block under it (replacing the old
+  one), `ctrl-D` runs it without the value, `ctrl-T` inspects it; with text selected they act on the selection as in
+  a workspace. `ctrl-R` (*run all cells*) runs every cell from the top and stops at the first error, *clear results*
+  removes the result blocks, `ctrl-S` saves, and *save as...* / *revert* do what they say. Code cells are shaded and
+  results shown in blue; a fence with another word after it (```` ```python ````) is kept but never run. Variables
+  assigned without being declared carry over from cell to cell. The title shows `*` while there are unsaved changes,
+  and closing or quitting asks first. From code: `Notebook open: 'notes.md'`, and `Notebook run: 'notes.md'` runs
+  every cell without a window (answering the last value), so `st -e "Notebook run: 'notes.md'"` works too.
 * **Workspace / Inspector**: evaluate code with the menu or shortcuts.
   In an Inspector, `self` is the inspected object and its instance
   variables are visible by name.
@@ -105,7 +116,7 @@ or open `FileStream`s. It is tied to the word size and byte order of the machine
 | `prims.c` | ~120 primitives (arithmetic, floats, large integers, strings, dictionaries, classes, time, files, Transcript) |
 | `fileio.c` | chunk ("bang") format file-in / file-out, changes log |
 | `image.c` | binary images: save the object memory to a file, and start from one |
-| `kernel1-6.st` | the class library in Smalltalk |
+| `kernel1-13.st` | the class library in Smalltalk |
 | `tui.c` | raw terminal, cell double-buffer, SGR mouse, key decoding |
 | `widgets.c` | windows, list/text/button panes, pop-up menus, dialogs |
 | `tools.c` | System Browser, Workspace, Transcript, Inspector, system menu, and the window hooks packages use |

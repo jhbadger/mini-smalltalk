@@ -155,8 +155,7 @@ int main(int argc, char **argv) {
             continue;
         }
         if (ev.type == EV_KEY && (ev.mods & MOD_CTRL) && ev.key == 'q') {
-            char qmsg[1200]; snprintf(qmsg, sizeof qmsg, "Quit Smalltalk?  Code changes are saved in %s", changes_abs_path());
-            if (dialog_confirm("Quit", qmsg)) break; else continue;
+            if (dialog_confirm("Quit", tools_quit_message())) break; else continue;
         }
         ui_handle(&ev);
         tools_after_eval();

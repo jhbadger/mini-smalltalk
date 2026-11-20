@@ -15,6 +15,7 @@ oop pending_inspect = NULL; bool quit_requested = false;
 char *pending_tool_class = NULL, *pending_tool_title = NULL, *pending_tool_text = NULL; bool menu_items_changed = false;
 char *pending_list_tool_class = NULL, *pending_list_tool_title = NULL;                   /* set by primitive 203 */
 char *(*ui_prompt_hook)(const char *title, const char *initial) = NULL;                  /* set by the UI for primitive 204 */
+char *pending_notebook_path = NULL;   /* set by primitive 205 */
 char *pending_window_title = NULL, *pending_window_text = NULL;   /* set by primitive 180, consumed by the UI */
 void interp_flush_cache(void);
 
@@ -313,6 +314,10 @@ oop call_primitive(int n, oop *args, int nargs, bool *ok) {
         char *r = ui_prompt_hook(t, d); free(t); free(d);
         if (!r) return nilobj;
         oop s = new_string(r); free(r); return s; }
+    case 205: { /* primOpenNotebook: path -- a notebook window on the file (false when there is no user interface) */
+        if (!is_bytes(A(1))) FAIL;
+        if (!ui_prompt_hook) return falseobj;
+        free(pending_notebook_path); pending_notebook_path = str_cstr(A(1)); return trueobj; }
     case 201: { /* primOpenTool: className title: aString contents: text -- a workspace whose do it / print it send className evaluate: */
         if (!is_bytes(A(1)) || !is_bytes(A(2)) || !is_bytes(A(3))) FAIL;
         free(pending_tool_class); free(pending_tool_title); free(pending_tool_text);
