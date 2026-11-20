@@ -182,7 +182,7 @@ static oop run(oop base, long deadline) {
     oop owner = SLOT(processor, PS_ACTIVE); gc_add_root(&owner);
     interp.failed = false;
     oop ctx = NULL, method = NULL, rcvr = NULL, lits = NULL; unsigned char *code = NULL; int pc = 0, sp = 0; oop *slots = NULL; oop result = nilobj;
-    bool need_switch = base == NULL; unsigned icount = 0;
+    unsigned icount = 0;
 #define LOAD() do { ctx = interp.active; method = SLOT(ctx, CTX_METHOD); rcvr = SLOT(ctx, CTX_RECEIVER); lits = SLOT(method, M_LITERALS); \
         code = BYTES(SLOT(method, M_BYTECODES)); pc = (int)INT_VAL(SLOT(ctx, CTX_PC)); sp = (int)INT_VAL(SLOT(ctx, CTX_SP)); slots = ctx->slots; } while (0)
 #define SAVE() do { SLOT(ctx, CTX_PC) = MK_INT(pc); SLOT(ctx, CTX_SP) = MK_INT(sp); } while (0)
@@ -192,12 +192,14 @@ static oop run(oop base, long deadline) {
 #define PARK_CURRENT() do { SAVE(); SLOT(CUR(), PR_CONTEXT) = ctx; ctx_capture(ctx); } while (0)   /* save the running process so it can be resumed */
     if (base) { interp.active = base; LOAD(); }
     oop sel = nilobj; int n = 0, super = 0;
+    /* Housekeeping that used to run before every instruction now runs only where it can matter: the collector at sends,
+       block creation and backward jumps (the only places that allocate or loop), preemption at sends and backward jumps. */
+#define GC_POINT() do { if (GC_DUE()) { SAVE(); gc_collect(); LOAD(); } } while (0)
+#define PREEMPT_POINT() do { if (__builtin_expect(deadline != 0, 0) && (++icount & 255) == 0 && now_ms() > deadline) {   /* preempt the background slice */ \
+            pc--;   /* redo this instruction when the process is resumed */ \
+            PARK_CURRENT(); ll_add_first(run_queue(proc_prio(CUR())), CUR()); CUR() = main_process; result = nilobj; goto done; } } while (0)
+    if (base == NULL) goto switch_process;
     for (;;) {
-        if (need_switch) { need_switch = false; goto switch_process; }
-        if (GC_DUE()) { SAVE(); gc_collect(); LOAD(); }
-        if (deadline && (++icount & 1023) == 0 && now_ms() > deadline) {   /* preempt the background slice */
-            PARK_CURRENT(); ll_add_first(run_queue(proc_prio(CUR())), CUR()); CUR() = main_process; result = nilobj; goto done;
-        }
         int op = code[pc++];
         switch (op) {
         case OP_PUSH_INST: PUSH(SLOT(rcvr, code[pc++])); break;
@@ -217,13 +219,14 @@ static oop run(oop base, long deadline) {
         case OP_STORE_GLOBAL: SLOT(SLOT(lits, code[pc++]), A_VALUE) = slots[sp - 1]; break;
         case OP_POP: sp--; break;
         case OP_DUP: { oop t = slots[sp - 1]; PUSH(t); break; }
-        case OP_JUMP: { int off = (int16_t)((code[pc] << 8) | code[pc + 1]); pc += 2 + off; break; }
+        case OP_JUMP: { int off = (int16_t)((code[pc] << 8) | code[pc + 1]); if (off < 0) { GC_POINT(); PREEMPT_POINT(); } pc += 2 + off; break; }
         case OP_JUMP_FALSE: case OP_JUMP_TRUE: {
             int off = (int16_t)((code[pc] << 8) | code[pc + 1]); pc += 2; oop v = POP();
             if (v == (op == OP_JUMP_FALSE ? falseobj : trueobj)) pc += off;
             else if (v != trueobj && v != falseobj) { SAVE(); interp_signal_error("NonBoolean receiver"); goto abort; }
             break; }
         case OP_PUSH_BLOCK: {
+            GC_POINT();
             oop bm = SLOT(lits, code[pc++]);
             ctx_capture(ctx);
             oop b = new_object(classBlockClosure, 0);
@@ -309,12 +312,13 @@ static oop run(oop base, long deadline) {
                 if (i >= 1 && i <= (intptr_t)r->size) { SLOT(r, i - 1) = slots[sp - 1]; sp -= 2; slots[sp - 1] = SLOT(r, i - 1); pc += 2; break; }
             }
             SPECIAL_FALLBACK(2); }
-        case OP_SEND: sel = SLOT(lits, code[pc++]); n = code[pc++]; super = 0; goto send;
-        case OP_SUPER_SEND: sel = SLOT(lits, code[pc++]); n = code[pc++]; super = 1; goto send;
+        case OP_SEND: PREEMPT_POINT(); sel = SLOT(lits, code[pc++]); n = code[pc++]; super = 0; goto send;
+        case OP_SUPER_SEND: PREEMPT_POINT(); sel = SLOT(lits, code[pc++]); n = code[pc++]; super = 1; goto send;
         default: SAVE(); interp_signal_error("bad bytecode"); goto abort;
         }
         continue;
     send: {
+            GC_POINT();
             oop recv = slots[sp - n - 1];
             oop cls = super ? SLOT(SLOT(method, M_CLASS), C_SUPER) : CLASS_OF(recv);
             if (trace) { char *cn = str_cstr(class_name_of(cls)); char *sn = str_cstr(sel); fprintf(stderr, "send %s>>%s\n", cn, sn); free(cn); free(sn); }
@@ -485,6 +489,8 @@ done:
 #undef POP
 #undef CUR
 #undef PARK_CURRENT
+#undef GC_POINT
+#undef PREEMPT_POINT
 }
 
 bool interp_run_background(int max_ms) {

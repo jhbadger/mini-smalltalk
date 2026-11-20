@@ -419,6 +419,21 @@ int main(int argc, char **argv) {
         printf("ok    Greek package tests%s: %d run\n", pass ? " under GC stress" : "", n);
         gc_threshold = saved_threshold; gc_growth_pct = 100;
     }
+    /* ---- background time slices: a busy forked process is preempted by the deadline and resumed where it stopped ---- */
+    {
+        check("BgN := 0. BgP := [[true] whileTrue: [BgN := BgN + 1]] fork. BgN", "0");
+        interp_run_background(15);
+        check("BgN > 1000", "true");
+        check("BgSeen := BgN. BgSeen > 0", "true");
+        interp_run_background(15);
+        check("BgN > BgSeen", "true");
+        /* the same, through sends rather than a bare loop (preemption at sends); a preempted process goes back to the front of its queue, so stop the first one */
+        check("BgP terminate. 1", "1");
+        check("BgM := 0. BgQ := [[true] whileTrue: [BgM := BgM + (BgM printString size)]] fork. BgM", "0");
+        interp_run_background(15);
+        check("BgM > 100", "true");
+        check("BgQ terminate. 1", "1");
+    }
     /* ---- the tutorials: once, not in both passes. They are read in from disk on demand, and keeping
        them all in the image would slow every later collection down for no gain. ---- */
     {
