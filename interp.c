@@ -20,10 +20,16 @@ static oop cached_lookup(oop cls, oop sel) {
     return m;
 }
 
+/* the context may now be referred to from outside the stack (a closure, thisContext, a process, an error report):
+   never recycle it, nor anything below it */
+static inline void ctx_capture(oop c) { while (c && c != nilobj && !c->pad) { c->pad = 2; c = SLOT(c, CTX_SENDER); } }
+
 static oop new_context(oop method, oop receiver, oop sender, oop home, oop outer) {
     oop h = SLOT(method, M_HEADER);
     int ntemps = HDR_TEMPS(h), nstack = HDR_STACK(h);
-    oop ctx = new_object(home != nilobj ? classBlockContext : classMethodContext, ntemps + nstack);
+    oop ctx = ctx_alloc(home != nilobj ? classBlockContext : classMethodContext, ntemps + nstack);
+    SLOT(ctx, CTX_CLOSURE) = nilobj;
+    for (int i = 0; i < ntemps; i++) SLOT(ctx, CTX_FIXED + i) = nilobj;    /* a pooled context's stack area is stale, which is harmless: the collector only ever marks what was valid */
     SLOT(ctx, CTX_SENDER) = sender; SLOT(ctx, CTX_PC) = MK_INT(0); SLOT(ctx, CTX_SP) = MK_INT(CTX_FIXED + ntemps);
     SLOT(ctx, CTX_METHOD) = method; SLOT(ctx, CTX_RECEIVER) = receiver; SLOT(ctx, CTX_HOME) = home; SLOT(ctx, CTX_OUTER) = outer;
     return ctx;
@@ -57,6 +63,7 @@ void interp_signal_error(const char *msg) {
     if (interp.failed) return;
     interp.failed = true;
     interp.errorContext = interp.active;
+    ctx_capture(interp.active);
     snprintf(interp.error, sizeof interp.error, "%s", msg);
     interp.walkback[0] = 0;
     int n = 0;
@@ -182,12 +189,12 @@ static oop run(oop base, long deadline) {
 #define PUSH(v) (slots[sp++] = (v))
 #define POP() (slots[--sp])
 #define CUR() SLOT(processor, PS_ACTIVE)
-#define PARK_CURRENT() do { SAVE(); SLOT(CUR(), PR_CONTEXT) = ctx; } while (0)   /* save the running process so it can be resumed */
+#define PARK_CURRENT() do { SAVE(); SLOT(CUR(), PR_CONTEXT) = ctx; ctx_capture(ctx); } while (0)   /* save the running process so it can be resumed */
     if (base) { interp.active = base; LOAD(); }
     oop sel = nilobj; int n = 0, super = 0;
     for (;;) {
         if (need_switch) { need_switch = false; goto switch_process; }
-        if (gc_alloc_since > gc_threshold) { SAVE(); gc_collect(); LOAD(); }
+        if (GC_DUE()) { SAVE(); gc_collect(); LOAD(); }
         if (deadline && (++icount & 1023) == 0 && now_ms() > deadline) {   /* preempt the background slice */
             PARK_CURRENT(); ll_add_first(run_queue(proc_prio(CUR())), CUR()); CUR() = main_process; result = nilobj; goto done;
         }
@@ -203,7 +210,7 @@ static oop run(oop base, long deadline) {
         case OP_PUSH_TRUE: PUSH(trueobj); break;
         case OP_PUSH_FALSE: PUSH(falseobj); break;
         case OP_PUSH_INT: PUSH(MK_INT((signed char)code[pc++])); break;
-        case OP_PUSH_CONTEXT: SAVE(); PUSH(ctx); break;
+        case OP_PUSH_CONTEXT: SAVE(); ctx_capture(ctx); PUSH(ctx); break;
         case OP_STORE_INST: SLOT(rcvr, code[pc++]) = slots[sp - 1]; break;
         case OP_STORE_TEMP: slots[CTX_FIXED + code[pc++]] = slots[sp - 1]; break;
         case OP_STORE_OUTER: { int d = code[pc++], i = code[pc++]; oop c = ctx; while (d--) c = SLOT(c, CTX_OUTER); SLOT(c, CTX_FIXED + i) = slots[sp - 1]; break; }
@@ -218,6 +225,7 @@ static oop run(oop base, long deadline) {
             break; }
         case OP_PUSH_BLOCK: {
             oop bm = SLOT(lits, code[pc++]);
+            ctx_capture(ctx);
             oop b = new_object(classBlockClosure, 0);
             SLOT(b, B_OUTER) = ctx; SLOT(b, B_METHOD) = bm; SLOT(b, B_RECEIVER) = rcvr; SLOT(b, B_NUMARGS) = MK_INT(HDR_ARGS(SLOT(bm, M_HEADER)));
             PUSH(b); break; }
@@ -247,13 +255,60 @@ static oop run(oop base, long deadline) {
             }
             if (base && origin == base) { result = v; goto done; }
             if (target == nilobj) { SLOT(CUR(), PR_CONTEXT) = nilobj; goto switch_process; }   /* a forked process finished */
-            interp.active = target; LOAD(); PUSH(v); break; }
+            { oop dead = ctx; interp.active = target; LOAD(); PUSH(v); if (!dead->pad && SLOT(dead, CTX_HOME) == nilobj) ctx_release(dead); }
+            break; }
         case OP_RETURN_RETRY: sp--; pc -= 2; break;
         case OP_BLOCK_RETURN: {
             oop v = POP(); oop target = SLOT(ctx, CTX_SENDER);
             if (base && ctx == base) { result = v; goto done; }
             if (target == nilobj) { SLOT(CUR(), PR_CONTEXT) = nilobj; goto switch_process; }
-            interp.active = target; LOAD(); PUSH(v); break; }
+            { oop dead = ctx; interp.active = target; LOAD(); PUSH(v); if (!dead->pad) ctx_release(dead); }
+            break; }
+        /* special sends: fast path when the operands are plain SmallIntegers (same results as the primitives), else a real send */
+#define SPECIAL_FALLBACK(nargs) do { sel = SLOT(lits, code[pc]); n = (nargs); super = 0; pc += 2; goto send; } while (0)
+        case OP_ADD: {
+            oop a = slots[sp - 2], b = slots[sp - 1];
+            if (IS_INT(a) && IS_INT(b)) { intptr_t r = INT_VAL(a) + INT_VAL(b);
+                if (r >= -INT_MAX_VAL && r < INT_MAX_VAL) { sp--; slots[sp - 1] = MK_INT(r); pc += 2; break; } }
+            SPECIAL_FALLBACK(1); }
+        case OP_SUB: {
+            oop a = slots[sp - 2], b = slots[sp - 1];
+            if (IS_INT(a) && IS_INT(b)) { intptr_t r = INT_VAL(a) - INT_VAL(b);
+                if (r >= -INT_MAX_VAL && r < INT_MAX_VAL) { sp--; slots[sp - 1] = MK_INT(r); pc += 2; break; } }
+            SPECIAL_FALLBACK(1); }
+        case OP_MUL: case OP_MOD: case OP_DIV: {
+            oop a = slots[sp - 2], b = slots[sp - 1];
+            if (IS_INT(a) && IS_INT(b)) {
+                intptr_t x = INT_VAL(a), y = INT_VAL(b), r = 0; bool ok = true;
+                if (op == OP_MUL) ok = !__builtin_mul_overflow(x, y, &r);
+                else if (y == 0) ok = false;
+                else if (op == OP_MOD) { r = x % y; if (r != 0 && ((r < 0) != (y < 0))) r += y; }
+                else { r = x / y; if ((x % y != 0) && ((x < 0) != (y < 0))) r--; }
+                if (ok && r >= -INT_MAX_VAL && r < INT_MAX_VAL) { sp--; slots[sp - 1] = MK_INT(r); pc += 2; break; }
+            }
+            SPECIAL_FALLBACK(1); }
+#define CMP_CASE(OPC, CMP) case OPC: { \
+            oop a = slots[sp - 2], b = slots[sp - 1]; \
+            if (IS_INT(a) && IS_INT(b)) { sp--; slots[sp - 1] = INT_VAL(a) CMP INT_VAL(b) ? trueobj : falseobj; pc += 2; break; } \
+            SPECIAL_FALLBACK(1); }
+        CMP_CASE(OP_LT, <) CMP_CASE(OP_GT, >) CMP_CASE(OP_LE, <=) CMP_CASE(OP_GE, >=) CMP_CASE(OP_EQ, ==) CMP_CASE(OP_NE, !=)
+#undef CMP_CASE
+        case OP_IDENT: { oop a = slots[sp - 2], b = slots[sp - 1]; sp--; slots[sp - 1] = a == b ? trueobj : falseobj; pc += 2; break; }
+        case OP_AT: {
+            oop r = slots[sp - 2], ix = slots[sp - 1];
+            if (!IS_INT(r) && IS_INT(ix)) {
+                intptr_t i = INT_VAL(ix);
+                if (r->cls == classArray) { if (i >= 1 && i <= (intptr_t)r->size) { sp--; slots[sp - 1] = SLOT(r, i - 1); pc += 2; break; } }
+                else if (r->cls == classString) { if (i >= 1 && i <= (intptr_t)r->size) { sp--; slots[sp - 1] = charTable[BYTES(r)[i - 1]]; pc += 2; break; } }
+            }
+            SPECIAL_FALLBACK(1); }
+        case OP_ATPUT: {
+            oop r = slots[sp - 3], ix = slots[sp - 2];
+            if (!IS_INT(r) && IS_INT(ix) && r->cls == classArray) {
+                intptr_t i = INT_VAL(ix);
+                if (i >= 1 && i <= (intptr_t)r->size) { SLOT(r, i - 1) = slots[sp - 1]; sp -= 2; slots[sp - 1] = SLOT(r, i - 1); pc += 2; break; }
+            }
+            SPECIAL_FALLBACK(2); }
         case OP_SEND: sel = SLOT(lits, code[pc++]); n = code[pc++]; super = 0; goto send;
         case OP_SUPER_SEND: sel = SLOT(lits, code[pc++]); n = code[pc++]; super = 1; goto send;
         default: SAVE(); interp_signal_error("bad bytecode"); goto abort;

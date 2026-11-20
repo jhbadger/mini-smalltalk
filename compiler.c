@@ -129,9 +129,144 @@ static void gen_inline_block(Gen *g, Node *b) {
 }
 static int is_literal_block(Node *n, int nparams) { return n && n->kind == N_BLOCK && n->nparams == nparams; }
 
-static int try_inline(Gen *g, Node *recv, const char *sel, Node **args, int nargs) {
+/* ---------- special sends: arithmetic, comparison and indexing get their own opcodes (see st.h) ---------- */
+static const struct { const char *sel; int nargs; int op; } special_sends[] = {
+    {"+", 1, OP_ADD}, {"-", 1, OP_SUB}, {"*", 1, OP_MUL}, {"<", 1, OP_LT}, {">", 1, OP_GT}, {"<=", 1, OP_LE}, {">=", 1, OP_GE},
+    {"=", 1, OP_EQ}, {"~=", 1, OP_NE}, {"==", 1, OP_IDENT}, {"\\\\", 1, OP_MOD}, {"//", 1, OP_DIV},
+    {"at:", 1, OP_AT}, {"at:put:", 2, OP_ATPUT},
+};
+static int send_opcode(const char *sel, int nargs) {
+    for (size_t i = 0; i < sizeof special_sends / sizeof special_sends[0]; i++)
+        if (nargs == special_sends[i].nargs && !strcmp(sel, special_sends[i].sel)) return special_sends[i].op;
+    return OP_SEND;
+}
+/* the arguments are already on the stack */
+static void emit_send(Gen *g, const char *sel, int nargs) {
+    emit(g, send_opcode(sel, nargs)); emit(g, addlit(g, new_symbol(sel))); emit(g, nargs);
+    adj(g, -nargs);
+}
+
+/* ---------- which sends the compiler inlines ---------- */
+enum { IL_NONE, IL_COND1, IL_COND2, IL_WHILE, IL_TODO, IL_TOBYDO, IL_TIMES };
+static int inline_kind(Node *recv, const char *sel, Node **args, int nargs);
+
+/* Does `n` mention one of names[0..nn) from inside a real (not inlined) block, or assign to the loop variable names[0]?
+   The inlined loops keep their variable in the enclosing context, so a block that captured it would see the
+   later iterations instead of its own; such loops are not inlined. Over-approximate: shadowing is ignored. */
+static int touches(Node *n, const char **names, int nn, int inreal) {
+    if (!n) return 0;
+    switch (n->kind) {
+    case N_LIT: return 0;
+    case N_VAR: if (inreal) for (int i = 0; i < nn; i++) if (!strcmp(n->name, names[i])) return 1; return 0;
+    case N_ASSIGN:
+        for (int i = 0; i < nn; i++) if (!strcmp(n->name, names[i]) && (inreal || i == 0)) return 1;
+        return touches(n->recv, names, nn, inreal);
+    case N_RETURN: return touches(n->recv, names, nn, inreal);
+    case N_BLOCK:
+        for (int i = 0; i < n->nstmts; i++) if (touches(n->stmts[i], names, nn, 1)) return 1;
+        return 0;
+    case N_BRACE: for (int i = 0; i < n->nargs; i++) if (touches(n->args[i], names, nn, inreal)) return 1; return 0;
+    case N_CASCADE:
+        if (touches(n->recv, names, nn, inreal)) return 1;
+        for (int i = 0; i < n->nargs; i++) for (int j = 0; j < n->args[i]->nargs; j++) if (touches(n->args[i]->args[j], names, nn, inreal)) return 1;
+        return 0;
+    case N_SEND: {
+        int kind = n->recv ? inline_kind(n->recv, n->sel, n->args, n->nargs) : IL_NONE;
+        Node *inl[3] = {NULL, NULL, NULL};     /* the blocks that will be inlined: their bodies run in the enclosing context */
+        switch (kind) {
+        case IL_COND1: case IL_TIMES: inl[0] = n->args[0]; break;
+        case IL_COND2: inl[0] = n->args[0]; inl[1] = n->args[1]; break;
+        case IL_WHILE: inl[0] = n->recv; if (n->nargs) inl[1] = n->args[0]; break;
+        case IL_TODO: inl[0] = n->args[1]; break;
+        case IL_TOBYDO: inl[0] = n->args[2]; break;
+        }
+        Node *kids[4]; int nk = 0; kids[nk++] = n->recv; for (int i = 0; i < n->nargs && nk < 4; i++) kids[nk++] = n->args[i];
+        int more = n->nargs > 3;
+        for (int k = 0; k < nk; k++) {
+            Node *c = kids[k]; int isinl = c && (c == inl[0] || c == inl[1] || c == inl[2]);
+            if (isinl) { for (int i = 0; i < c->nstmts; i++) if (touches(c->stmts[i], names, nn, inreal)) return 1; }
+            else if (touches(c, names, nn, inreal)) return 1;
+        }
+        if (more) for (int i = 3; i < n->nargs; i++) if (touches(n->args[i], names, nn, inreal)) return 1;
+        return 0; }
+    }
+    return 0;
+}
+/* a one-parameter literal block whose parameter and temporaries can live in the enclosing context */
+static int loop_block_ok(Node *blk) {
+    const char *names[64]; int nn = 0;
+    names[nn++] = blk->params[0];
+    for (int i = 0; i < blk->ntemps && nn < 64; i++) names[nn++] = blk->temps[i];
+    if (blk->ntemps >= 63) return 0;
+    for (int i = 0; i < blk->nstmts; i++) if (touches(blk->stmts[i], names, nn, 0)) return 0;
+    return 1;
+}
+static int timesrepeat_block_ok(Node *blk) {      /* no parameter; its temporaries must not be captured either */
+    if (blk->ntemps == 0) return 1;
+    if (blk->ntemps >= 64) return 0;
+    const char *names[64]; int nn = 0;
+    for (int i = 0; i < blk->ntemps; i++) names[nn++] = blk->temps[i];
+    for (int i = 0; i < blk->nstmts; i++) if (touches(blk->stmts[i], names, nn, 0)) return 0;
+    return 1;
+}
+
+static int inline_kind(Node *recv, const char *sel, Node **args, int nargs) {
     if (nargs == 1 && (!strcmp(sel, "ifTrue:") || !strcmp(sel, "ifFalse:") || !strcmp(sel, "and:") || !strcmp(sel, "or:"))
-        && is_literal_block(args[0], 0)) {
+        && is_literal_block(args[0], 0)) return IL_COND1;
+    if (nargs == 2 && (!strcmp(sel, "ifTrue:ifFalse:") || !strcmp(sel, "ifFalse:ifTrue:"))
+        && is_literal_block(args[0], 0) && is_literal_block(args[1], 0)) return IL_COND2;
+    if ((nargs == 1 && (!strcmp(sel, "whileTrue:") || !strcmp(sel, "whileFalse:")) && is_literal_block(args[0], 0) && is_literal_block(recv, 0))
+        || (nargs == 0 && (!strcmp(sel, "whileTrue") || !strcmp(sel, "whileFalse")) && is_literal_block(recv, 0))) return IL_WHILE;
+    if (nargs == 2 && !strcmp(sel, "to:do:") && is_literal_block(args[1], 1) && loop_block_ok(args[1])) return IL_TODO;
+    if (nargs == 3 && !strcmp(sel, "to:by:do:") && args[1]->kind == N_LIT && IS_INT(args[1]->lit) && INT_VAL(args[1]->lit) != 0
+        && is_literal_block(args[2], 1) && loop_block_ok(args[2])) return IL_TOBYDO;
+    if (nargs == 1 && !strcmp(sel, "timesRepeat:") && is_literal_block(args[0], 0) && timesrepeat_block_ok(args[0])) return IL_TIMES;
+    return IL_NONE;
+}
+
+/* a counting loop: start to: stop [by: step] do: [:i | body], or n timesRepeat: [body] (var == NULL).
+   Locals: a hidden limit (unless stop is a literal), the loop variable, the body's temporaries - all in this context.
+   Like the methods in Number, the expression's value is the receiver. */
+static void gen_counted_loop(Gen *g, Node *recv, Node *stop, Node *step, Node *blk, int times) {
+    Scope *s = scope_new(g->scope, 1);
+    int stop_lit = !times && stop->kind == N_LIT;
+    int need_limit = times || !stop_lit;
+    int limit_idx = -1, var_idx;
+    if (need_limit) { scope_add(g, s, "(limit)"); limit_idx = s->idx[s->n - 1]; }
+    scope_add(g, s, times ? "(count)" : blk->params[0]); var_idx = s->idx[s->n - 1];
+    int first_temp = s->n;
+    for (int i = 0; i < blk->ntemps; i++) scope_add(g, s, blk->temps[i]);
+    /* initial values, evaluated in the enclosing scope; the receiver stays on the stack as the expression's value */
+    gen_expr(g, recv);
+    if (times) {
+        emit1(g, OP_STORE_TEMP, limit_idx);
+        emit1(g, OP_PUSH_INT, 1); adj(g, 1); emit1(g, OP_STORE_TEMP, var_idx); emit(g, OP_POP); adj(g, -1);
+    } else {
+        emit1(g, OP_STORE_TEMP, var_idx);
+        if (need_limit) { gen_expr(g, stop); emit1(g, OP_STORE_TEMP, limit_idx); emit(g, OP_POP); adj(g, -1); }
+    }
+    int descending = step && INT_VAL(step->lit) < 0;
+    int top = g->n;
+    emit1(g, OP_PUSH_TEMP, var_idx); adj(g, 1);
+    if (need_limit) { emit1(g, OP_PUSH_TEMP, limit_idx); adj(g, 1); } else gen_expr(g, stop);
+    emit_send(g, descending ? ">=" : "<=", 1);
+    int jend = emit_jump(g, OP_JUMP_FALSE); adj(g, -1);
+    g->scope = s;
+    for (int i = 0; i < blk->ntemps; i++) { emit(g, OP_PUSH_NIL); adj(g, 1); emit1(g, OP_STORE_TEMP, s->idx[first_temp + i]); emit(g, OP_POP); adj(g, -1); }
+    gen_stmts_value(g, blk->stmts, blk->nstmts); emit(g, OP_POP); adj(g, -1);
+    g->scope = s->parent;
+    emit1(g, OP_PUSH_TEMP, var_idx); adj(g, 1);
+    if (step) gen_expr(g, step); else { emit1(g, OP_PUSH_INT, 1); adj(g, 1); }
+    emit_send(g, "+", 1);
+    emit1(g, OP_STORE_TEMP, var_idx); emit(g, OP_POP); adj(g, -1);
+    int jb = emit_jump(g, OP_JUMP); patch(g, jb, top);
+    patch(g, jend, g->n);
+    free(s);
+}
+
+static int try_inline(Gen *g, Node *recv, const char *sel, Node **args, int nargs) {
+    switch (inline_kind(recv, sel, args, nargs)) {
+    case IL_COND1: {
         gen_expr(g, recv);
         int neg = !strcmp(sel, "ifFalse:") || !strcmp(sel, "or:");
         int j1 = emit_jump(g, neg ? OP_JUMP_TRUE : OP_JUMP_FALSE); adj(g, -1);
@@ -140,10 +275,8 @@ static int try_inline(Gen *g, Node *recv, const char *sel, Node **args, int narg
         patch(g, j1, g->n);
         emit(g, !strcmp(sel, "and:") ? OP_PUSH_FALSE : !strcmp(sel, "or:") ? OP_PUSH_TRUE : OP_PUSH_NIL); adj(g, 1);
         patch(g, j2, g->n);
-        return 1;
-    }
-    if (nargs == 2 && (!strcmp(sel, "ifTrue:ifFalse:") || !strcmp(sel, "ifFalse:ifTrue:"))
-        && is_literal_block(args[0], 0) && is_literal_block(args[1], 0)) {
+        return 1; }
+    case IL_COND2: {
         gen_expr(g, recv);
         int j1 = emit_jump(g, !strcmp(sel, "ifTrue:ifFalse:") ? OP_JUMP_FALSE : OP_JUMP_TRUE); adj(g, -1);
         gen_inline_block(g, args[0]);
@@ -151,10 +284,8 @@ static int try_inline(Gen *g, Node *recv, const char *sel, Node **args, int narg
         patch(g, j1, g->n);
         gen_inline_block(g, args[1]);
         patch(g, j2, g->n);
-        return 1;
-    }
-    if ((nargs == 1 && (!strcmp(sel, "whileTrue:") || !strcmp(sel, "whileFalse:")) && is_literal_block(args[0], 0) && is_literal_block(recv, 0))
-        || (nargs == 0 && (!strcmp(sel, "whileTrue") || !strcmp(sel, "whileFalse")) && is_literal_block(recv, 0))) {
+        return 1; }
+    case IL_WHILE: {
         int neg = !strncmp(sel, "whileFalse", 10);
         int top = g->n;
         gen_inline_block(g, recv);
@@ -163,15 +294,18 @@ static int try_inline(Gen *g, Node *recv, const char *sel, Node **args, int narg
         int jb = emit_jump(g, OP_JUMP); patch(g, jb, top);
         patch(g, jend, g->n);
         emit(g, OP_PUSH_NIL); adj(g, 1);
-        return 1;
+        return 1; }
+    case IL_TODO: gen_counted_loop(g, recv, args[0], NULL, args[1], 0); return 1;
+    case IL_TOBYDO: gen_counted_loop(g, recv, args[0], args[1], args[2], 0); return 1;
+    case IL_TIMES: gen_counted_loop(g, recv, NULL, NULL, args[0], 1); return 1;
     }
     return 0;
 }
 
 static void gen_send_tail(Gen *g, const char *sel, Node **args, int nargs, int super) {
     for (int i = 0; i < nargs; i++) gen_expr(g, args[i]);
-    emit(g, super ? OP_SUPER_SEND : OP_SEND); emit(g, addlit(g, new_symbol(sel))); emit(g, nargs);
-    adj(g, -nargs);
+    if (super) { emit(g, OP_SUPER_SEND); emit(g, addlit(g, new_symbol(sel))); emit(g, nargs); adj(g, -nargs); }
+    else emit_send(g, sel, nargs);
 }
 
 static void gen_expr(Gen *g, Node *n) {

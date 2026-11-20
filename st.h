@@ -70,7 +70,11 @@ enum {
     OP_STORE_INST, OP_STORE_TEMP, OP_STORE_OUTER, OP_STORE_GLOBAL,
     OP_POP, OP_DUP, OP_SEND, OP_SUPER_SEND, OP_RETURN, OP_BLOCK_RETURN,
     OP_PUSH_BLOCK, OP_JUMP, OP_JUMP_FALSE, OP_JUMP_TRUE,
-    OP_RETURN_RETRY     /* follows every OP_RETURN inside a block: after an unwind block has run, drop its value and redo the return */
+    OP_RETURN_RETRY,    /* follows every OP_RETURN inside a block: after an unwind block has run, drop its value and redo the return */
+    /* Special sends. Each is laid out exactly like OP_SEND (selector literal, argument count) and means the same thing;
+       the interpreter just tries an inline fast path first (SmallIntegers, Arrays, Strings, identity) and otherwise
+       falls back to a real send. Appended at the end so that existing images keep their meaning. */
+    OP_ADD, OP_SUB, OP_MUL, OP_LT, OP_GT, OP_LE, OP_GE, OP_EQ, OP_NE, OP_IDENT, OP_MOD, OP_DIV, OP_AT, OP_ATPUT
 };
 
 /* ---------- well known objects (object.c) ---------- */
@@ -121,8 +125,15 @@ oop all_instances(oop cls);             /* Array of all instances of a class */
 void gc_add_root(oop *p);
 void gc_remove_root(oop *p);
 void gc_collect(void);
+/* context pool (object.c): contexts that returned and were never captured are reused instead of freed and reallocated.
+   A context is "captured" (Obj.pad == 2; image.c uses pad == 1 for interned symbols) once a block closure, thisContext, a parked process or an error report may refer to it. */
+oop ctx_alloc(oop cls, int extra);         /* a MethodContext/BlockContext with `extra` slots beyond CTX_FIXED; temporaries must be set by the caller */
+void ctx_release(oop ctx);
 extern size_t gc_alloc_since;
 extern size_t gc_threshold;
+extern size_t gc_live_bytes;
+extern int gc_growth_pct;
+#define GC_DUE() (gc_alloc_since > gc_threshold && gc_alloc_since > gc_live_bytes / 100 * (size_t)gc_growth_pct)
 
 /* compiler.c */
 oop compile_method(oop cls, const char *src, const char *category, char *err, int errlen);

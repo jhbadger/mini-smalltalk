@@ -442,3 +442,58 @@ TutT class compile: 'lessonSelectors ^#(#one #two)'. TutT unreadableExamples siz
 (Notebook isClosingFence: '```st') ==> false
 (Notebook runString: '```', (String with: Character lf), 'NbX := 6', (String with: Character lf), '```', (String with: Character lf), 'text', (String with: Character lf), '```', (String with: Character lf), 'NbX * 7', (String with: Character lf), '```') ==> 42
 (Notebook open: 'x.md') ==> false
+
+# ---- inlined loops (to:do:, to:by:do:, timesRepeat:) and special-send opcodes ----
+| s | s := 0. 1 to: 10 do: [:i | s := s + i]. s ==> 55
+(1 to: 3 do: [:i | i]) ==> 1
+(3 timesRepeat: [nil]) ==> 3
+| r | r := OrderedCollection new. 5 to: 1 by: -2 do: [:i | r add: i]. r ==> OrderedCollection (5 3 1)
+| r | r := OrderedCollection new. 1 to: 10 by: 4 do: [:i | r add: i]. r ==> OrderedCollection (1 5 9)
+| n | n := 0. 10 to: 1 do: [:i | n := n + 1]. n ==> 0
+| n | n := 0. 1 to: 0 by: -1 do: [:i | n := n + 1]. n ==> 2
+| n | n := 0. 0 timesRepeat: [n := 1]. n ==> 0
+| n | n := 0. 5 timesRepeat: [n := n + 2]. n ==> 10
+| bs | bs := OrderedCollection new. 1 to: 3 do: [:i | bs add: [i]]. bs collect: [:b | b value] ==> OrderedCollection (1 2 3)
+| bs | bs := OrderedCollection new. 1 to: 3 do: [:i | | t | t := i * 10. bs add: [t]]. bs collect: [:b | b value] ==> OrderedCollection (10 20 30)
+| bs | bs := OrderedCollection new. 3 to: 1 by: -1 do: [:i | bs add: [i]]. bs collect: [:b | b value] ==> OrderedCollection (3 2 1)
+| r | r := OrderedCollection new. 1 to: 3 do: [:i | | t | r add: t. t := i]. r ==> OrderedCollection (nil nil nil)
+| r | r := OrderedCollection new. 2 timesRepeat: [| t | r add: t. t := 7]. r ==> OrderedCollection (nil nil)
+| n c | n := 3. c := 0. 1 to: n do: [:i | n := 10. c := c + 1]. c ==> 3
+| s | s := 0. 1 to: 2.5 do: [:i | s := s + i]. s ==> 3
+| s | s := 0. 1.5 to: 3 do: [:i | s := s + i]. s ==> 4.0
+| s | s := 0. 1 to: 1000 do: [:i | s := s + 1]. s ==> 1000
+| s | s := 0. 1 to: 3 do: [:i | 1 to: i do: [:j | s := s + j]]. s ==> 10
+| s | s := 0. 1 to: 3 do: [:i | i timesRepeat: [s := s + i]]. s ==> 14
+| s | s := 0. 1 to: 3 do: [:i | #(10 20) do: [:e | s := s + (e * i)]]. s ==> 180
+1 to: 10 do: [:i | i = 4 ifTrue: [^i]]. 0 ==> 4
+| i | i := 99. 1 to: 2 do: [:i | i]. i ==> 99
+| i | i := 0. 3 timesRepeat: [i := i + 1]. i ==> 3
+| s | s := 0. #(1 2 3) do: [:x | 1 to: x do: [:i | s := s + i]]. s ==> 10
+[1 to: 3 do: [:i | i / 0]] on: ZeroDivide do: [:e | e return: #caught] ==> #caught
+| log | log := OrderedCollection new. [1 to: 3 do: [:i | [i = 2 ifTrue: [1/0]. log add: i] ensure: [log add: i negated]]] on: ZeroDivide do: [:e | e return: nil]. log ==> OrderedCollection (1 -1 -2)
+(1 bitShift: 60) + (1 bitShift: 60) ==> 2305843009213693952
+(1 bitShift: 60) * 8 ==> 9223372036854775808
+(1 bitShift: 60) * 4 - (1 bitShift: 61) ==> 2305843009213693952
+-7 \\ 2 ==> 1
+-7 // 2 ==> -4
+7 \\ -2 ==> -1
+7 // -2 ==> -4
+[1 // 0] on: ZeroDivide do: [:e | 0] ==> 0
+[5 \\ 0] on: ZeroDivide do: [:e | -1] ==> -1
+1.5 + 2 ==> 3.5
+(1/2) + (1/2) ==> 1
+3 < 4.5 ==> true
+3 = 3.0 ==> true
+3 ~= 4 ==> true
+(1@2) + (3@4) ==> 4@6
+3 == 3 ==> true
+'a' == 'a' ==> false
+#(1 2 3) at: 2 ==> 2
+'abc' at: 2 ==> $b
+(Array new: 2) at: 1 put: 9 ==> 9
+| a | a := Array new: 3. a at: 2 put: 7. a ==> #(nil 7 nil)
+[#(1 2) at: 3] on: SubscriptOutOfBounds do: [:e | 0] ==> 0
+[#(1 2) at: 0 put: 1] on: Error do: [:e | 0] ==> 0
+(OrderedCollection new add: 5; yourself) at: 1 ==> 5
+(Dictionary new at: 1 put: 2; yourself) at: 1 ==> 2
+'abc' reversed ==> 'cba'

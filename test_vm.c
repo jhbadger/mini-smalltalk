@@ -321,7 +321,7 @@ int main(int argc, char **argv) {
     /* ---- exceptions, unwinding, thisContext (run twice: normally, then with a GC every few allocations) ---- */
     for (int pass = 0; pass < 2; pass++) {
         size_t saved_threshold = gc_threshold;
-        if (pass == 1) { gc_threshold = 2000; printf("--- exceptions again under GC stress ---\n"); }
+        if (pass == 1) { gc_threshold = 2000; gc_growth_pct = 0; printf("--- exceptions again under GC stress ---\n"); }
         check("[1/0] on: ZeroDivide do: [:e | e return: 5]", "5");
         check("[1/0. 'not reached'] on: ZeroDivide do: [:e | 'handled']", "'handled'");
         check("[1/0] on: ZeroDivide do: [:e | e messageText]", "'division by zero'");
@@ -375,12 +375,12 @@ int main(int argc, char **argv) {
         check("CtxT compile: 'ens | log | log := OrderedCollection new. [self kill: log] ensure: [log add: #ensure]. ^log'. CtxT compile: 'kill: log log add: #before. thisContext sender sender return: 7. log add: #never'. CtxT new ens", "OrderedCollection (#before #ensure)");
         check("CtxT new kept printString", "'CtxT>>kept'");
         check("[CtxT new kept resume: 1] on: Error do: [:e | e messageText]", "'cannot resume a dead context'");
-        gc_threshold = saved_threshold;
+        gc_threshold = saved_threshold; gc_growth_pct = 100;
     }
     /* ---- the class library: test_lib.txt, run normally and then with a GC every few allocations ---- */
     for (int pass = 0; pass < 2; pass++) {
         size_t saved_threshold = gc_threshold;
-        if (pass == 1) gc_threshold = 2000;
+        if (pass == 1) { gc_threshold = 2000; gc_growth_pct = 0; }    /* stress: no proportional growth, collect every few allocations */
         int n = run_lib_tests("test_lib.txt");
         printf("ok    library tests%s: %d run\n", pass ? " under GC stress" : "", n);
         check("Smalltalk loadPackage: 'Prolog'", "true");
@@ -417,7 +417,7 @@ int main(int argc, char **argv) {
         check("('μεγάλος' asGreekAdjective with: 'θάλασσα' asGreekNoun) case: #accusative number: #singular", "'τη μεγάλη θάλασσα'");
         n = run_lib_tests("packages/Greek/tests/tests.txt");
         printf("ok    Greek package tests%s: %d run\n", pass ? " under GC stress" : "", n);
-        gc_threshold = saved_threshold;
+        gc_threshold = saved_threshold; gc_growth_pct = 100;
     }
     /* ---- the tutorials: once, not in both passes. They are read in from disk on demand, and keeping
        them all in the image would slow every later collection down for no gain. ---- */

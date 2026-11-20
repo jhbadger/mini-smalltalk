@@ -34,7 +34,10 @@ check: test_vm st kernel.image
 	./test_vm
 	ST_TEST_IMAGE=kernel.image ./test_vm
 
+bench: st kernel.image
+	./bench.sh ./st
+
 clean:
 	rm -f *.o st test_vm kernel.image
 
-.PHONY: all clean check image
+.PHONY: all clean check image bench

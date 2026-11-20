@@ -22,7 +22,10 @@ oop charTable[256];
 static struct Obj *all_objects = NULL;
 static uint32_t next_hash = 1;
 size_t gc_alloc_since = 0;
-size_t gc_threshold = 8 * 1024 * 1024;
+size_t gc_threshold = 8 * 1024 * 1024;   /* minimum bytes allocated between collections */
+size_t gc_live_bytes = 0;                /* bytes surviving the last collection */
+int gc_growth_pct = 100;                 /* also wait until this percentage of gc_live_bytes has been allocated, so a large
+                                            heap is not re-marked every few megabytes (0 = use gc_threshold alone) */
 
 static oop *roots[4096];
 static int nroots = 0;
@@ -50,6 +53,26 @@ oop new_object(oop cls, int indexed) {
     oop o = alloc(cls, n, kind, sizeof(oop) * n);
     for (int i = 0; i < n; i++) SLOT(o, i) = nilobj;
     return o;
+}
+
+/* ---------- context pool ----------
+   Sends allocate a context each; most die at once. Returned, uncaptured contexts go on a free list per size (linked through
+   slot 0) and are handed out again. The pool is emptied by every collection, so a pooled context is never marked and its
+   stale slots are never followed; contexts still reachable from elsewhere simply stay in the heap. */
+#define CTX_POOL_MAX 96
+static oop ctx_pool[CTX_POOL_MAX + 1];
+oop ctx_alloc(oop cls, int extra) {
+    int n = CTX_FIXED + extra;
+    if (n <= CTX_POOL_MAX && ctx_pool[n]) {
+        oop c = ctx_pool[n]; ctx_pool[n] = SLOT(c, 0);
+        c->cls = cls; c->pad = 0;
+        return c;
+    }
+    return new_object(cls, extra);
+}
+void ctx_release(oop c) {
+    if ((int)c->size > CTX_POOL_MAX) return;
+    SLOT(c, 0) = ctx_pool[c->size]; ctx_pool[c->size] = c;
 }
 
 oop new_array(int n) { return new_object(classArray, n); }
@@ -112,6 +135,7 @@ static void mark_drain(void) {
     }
 }
 void gc_collect(void) {
+    memset(ctx_pool, 0, sizeof ctx_pool);
     mark_push(nilobj); mark_push(trueobj); mark_push(falseobj); mark_push(smalltalk);
     mark_push(processor); mark_push(main_process);
     for (int i = 0; i < 256; i++) mark_push(charTable[i]);
@@ -120,11 +144,13 @@ void gc_collect(void) {
     mark_push(interp.active); mark_push(interp.errorContext);
     mark_drain();
     struct Obj **pp = &all_objects;
+    size_t live = 0;
     while (*pp) {
         struct Obj *o = *pp;
-        if (o->mark) { o->mark = 0; pp = &o->next; }
+        if (o->mark) { o->mark = 0; live += sizeof(struct Obj) + (o->kind == KIND_BYTES ? o->size : sizeof(oop) * (size_t)o->size); pp = &o->next; }
         else { *pp = o->next; free(o); }
     }
+    gc_live_bytes = live;
     gc_alloc_since = 0;
 }
 
