@@ -34,12 +34,40 @@ void gc_remove_root(oop *p) {
     for (int i = nroots - 1; i >= 0; i--) if (roots[i] == p) { roots[i] = roots[--nroots]; return; }
 }
 
+/* Small objects come from size-class free lists carved out of big chunks, which is faster than malloc/free and has no
+   per-object malloc header. Freed by the collector's sweep back onto the list of their class. */
+#define POOL_MAX 1024
+#define POOL_CHUNK (256 * 1024)
+static void *pool_free[POOL_MAX / 16 + 1];
+static char *chunk_cur = NULL, *chunk_end = NULL;
+static void *pool_get(size_t total) {
+    size_t c = (total + 15) >> 4, sz = c << 4;
+    void *p = pool_free[c];
+    if (p) pool_free[c] = *(void **)p;
+    else {
+        if (chunk_cur + sz > chunk_end) {
+            chunk_cur = malloc(POOL_CHUNK);
+            if (!chunk_cur) { fprintf(stderr, "out of memory\n"); exit(1); }
+            chunk_end = chunk_cur + POOL_CHUNK;
+        }
+        p = chunk_cur; chunk_cur += sz;
+    }
+    memset(p, 0, sz);
+    return p;
+}
+static void obj_release(struct Obj *o) {
+    if (o->asize > POOL_MAX) { free(o); return; }
+    size_t c = (o->asize + 15) >> 4;
+    *(void **)o = pool_free[c]; pool_free[c] = o;
+}
+
 static oop alloc(oop cls, uint32_t size, int kind, size_t bytes) {
-    struct Obj *o = calloc(1, sizeof(struct Obj) + bytes);
+    size_t total = sizeof(struct Obj) + bytes;
+    struct Obj *o = total <= POOL_MAX ? pool_get(total) : calloc(1, total);
     if (!o) { fprintf(stderr, "out of memory\n"); exit(1); }
-    o->cls = cls; o->size = size; o->kind = kind; o->hash = next_hash++ & 0xffffff;
+    o->cls = cls; o->size = size; o->kind = kind; o->hash = next_hash++ & 0xffffff; o->asize = (uint32_t)total;
     o->next = all_objects; all_objects = o;
-    gc_alloc_since += sizeof(struct Obj) + bytes;
+    gc_alloc_since += total;
     return o;
 }
 
@@ -147,8 +175,8 @@ void gc_collect(void) {
     size_t live = 0;
     while (*pp) {
         struct Obj *o = *pp;
-        if (o->mark) { o->mark = 0; live += sizeof(struct Obj) + (o->kind == KIND_BYTES ? o->size : sizeof(oop) * (size_t)o->size); pp = &o->next; }
-        else { *pp = o->next; free(o); }
+        if (o->mark) { o->mark = 0; live += o->asize; pp = &o->next; }
+        else { *pp = o->next; obj_release(o); }
     }
     gc_live_bytes = live;
     gc_alloc_since = 0;

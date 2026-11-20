@@ -15,6 +15,7 @@ struct Obj {
     uint8_t mark;
     uint16_t pad;
     uint32_t hash;      /* identity hash */
+    uint32_t asize;     /* bytes allocated for this object, header included (a string's size may later shrink) */
     struct Obj *next;   /* allocation list for GC sweep */
     oop slots[];
 };

@@ -10,6 +10,7 @@ overlapping draggable/resizable windows, and a persistent **changes file**.
 make            # builds ./st and kernel.image (needs a C compiler, no other dependencies)
 ./st            # start the environment in an xterm-compatible terminal
 make check      # headless VM test-suite (test_vm.c, test_lib.txt, the tutorials, and every package's tests; also run on a system loaded from an image)
+make bench      # micro-benchmarks (bench.sh): loops, sends, blocks, collections, printString, GC with a large live heap
 ./st -e '3 + 4' # evaluate expressions without the UI
 ```
 
