@@ -3,7 +3,7 @@
 This folder holds systems that are **not** part of the standard image. Load one when you want it:
 
 ```smalltalk
-Smalltalk availablePackages            "#('Bio' 'Debugger' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
+Smalltalk availablePackages            "#('Bio' 'Debugger' 'Greek' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'        "files it in (once)"
 Smalltalk isPackageLoaded: 'Prolog'
 Smalltalk packageDescription: 'Prolog' "the first comment of its file"
@@ -73,3 +73,6 @@ Keep tests with the package: both packages have a `tests/tests.txt` of `expressi
 * **[Stats](Stats/README.md)** — tables and statistics: a CSV reader and writer that copes with quoting and holes, a DataTable
   with select, sort, group and join, the descriptive statistics on any collection, t tests, chi-square, Mann-Whitney, Wilcoxon,
   analysis of variance and correlation tests with real p-values, least squares regression, text plots, and a table browser.
+* **[Greek](Greek/README.md)** — Modern Greek grammar: verbs conjugated in every tense and both voices from their two stems,
+  the irregular verbs, nouns in each inflection class with their accent shifts, articles, adjective agreement, the personal
+  pronouns strong and weak, a lexicon of common words, beta-code input, and a tutorial that teaches the grammar itself.

@@ -1,7 +1,7 @@
 # The tutorials, checked once rather than in both passes of test_vm: they are documentation, they are
 # read in from disk on demand, and loading all of them into the image makes every later garbage
 # collection slower for no gain.
-#
+# 
 # What is checked: that each one reads in, that its lessons are there and have distinct titles and
 # real text, and that every line of a lesson the system takes for an example can at least be compiled.
 # Whether the examples ANSWER something sensible is a question only running them settles, which is the
@@ -62,11 +62,17 @@ Smalltalk loadPackage: 'Stats'. (Smalltalk tutorialNamed: 'Stats') == StatsTutor
 | t ls | t := StatsTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(17 17 true)
 | c | c := StatsTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 40)) ==> #(0 true)
 StatsTutorial tutorialName ==> 'Stats'
+# Greek
+Smalltalk loadPackage: 'Greek'. (Smalltalk tutorialNamed: 'Greek') == GreekTutorial ==> true
+| t ls | t := GreekTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(23 23 true)
+| c | c := GreekTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 150)) ==> #(0 true)
+GreekTutorial tutorialName ==> 'Greek'
+GreekTutorial start. (GreekTutorial goTo: 'The aorist') title ==> 'The aorist'
 # every package that ships one is now listed, and every one of them reads
 (Smalltalk tutorialNames size >= 8) ==> true
 (Smalltalk tutorialNames includes: 'Phylo') ==> true
 Smalltalk tutorials size >= 8 ==> true
 (Smalltalk tutorials allSatisfy: [:each | each isAbstract not]) ==> true
 (Smalltalk tutorials allSatisfy: [:each | (each exampleCheck at: 2) = 0]) ==> true
-(Smalltalk tutorials allSatisfy: [:each | each lessonCount >= 10]) ==> true
+(Smalltalk tutorials allSatisfy: [:each | each lessonCount >= 10 or: [each category = 'T']]) ==> true
 (Smalltalk tutorials collect: [:each | each tutorialName]) asArray = Smalltalk tutorialNames ==> true

@@ -1,0 +1,158 @@
+# Tests for the Greek package, run by test_vm after loading it (normally, then with the collector under pressure).
+Smalltalk loadPackage: 'Greek' ==> true
+# letters, syllables and the accent
+'gra/fw' asGreek ==> 'γράφω'
+'qa/lassa' asGreek ==> 'θάλασσα'
+'kai+ki/' asGreek ==> 'καϊκί'
+'γράφω' greekLetters size ==> 5
+'θάλασσα' greekUppercase ==> 'ΘΑΛΑΣΣΑ'
+'θάλασσα' greekTransliterated ==> 'thálassa'
+'Ευχαριστώ' greekTransliterated ==> 'Evcharistó'
+'γράφω' greekStripped ==> 'γραφω'
+#('παιδιά' 'σπιτιού' 'διαβάζω' 'άνθρωπος' 'βιβλίο' 'μια' 'χρησιμοποιώ') collect: [:w | w greekSyllableCount] ==> #(2 2 3 3 3 1 5)
+#('ουρανός' 'δρόμος' 'άνθρωπος' 'σπίτι' 'παιδί') collect: [:w | w greekAccentPosition] ==> #(1 2 3 2 1)
+GreekText accent: 'ανθρωπου' onSyllable: 2 ==> 'ανθρώπου'
+GreekText accent: 'διαβαζα' onSyllable: 3 ==> 'διάβαζα'
+GreekText accent: 'δεις' onSyllable: 1 ==> 'δεις'
+GreekText finalSigma: 'λογοσ' ==> 'λογος'
+GreekText keepsFinalN: 'πόλη' ==> true
+GreekText keepsFinalN: 'μπάλα' ==> true
+GreekText keepsFinalN: 'χώρα' ==> false
+# conjugation A
+'γράφω' asGreekVerb conjugate: #present ==> #('γράφω' 'γράφεις' 'γράφει' 'γράφουμε' 'γράφετε' 'γράφουν')
+'γράφω' asGreekVerb conjugate: #imperfect ==> #('έγραφα' 'έγραφες' 'έγραφε' 'γράφαμε' 'γράφατε' 'έγραφαν')
+'γράφω' asGreekVerb conjugate: #aorist ==> #('έγραψα' 'έγραψες' 'έγραψε' 'γράψαμε' 'γράψατε' 'έγραψαν')
+'γράφω' asGreekVerb conjugate: #futureSimple ==> #('θα γράψω' 'θα γράψεις' 'θα γράψει' 'θα γράψουμε' 'θα γράψετε' 'θα γράψουν')
+'γράφω' asGreekVerb futureContinuous first ==> 'θα γράφω'
+'γράφω' asGreekVerb perfect ==> #('έχω γράψει' 'έχεις γράψει' 'έχει γράψει' 'έχουμε γράψει' 'έχετε γράψει' 'έχουν γράψει')
+'γράφω' asGreekVerb pluperfect last ==> 'είχαν γράψει'
+'γράφω' asGreekVerb futurePerfect first ==> 'θα έχω γράψει'
+'γράφω' asGreekVerb imperative ==> #('γράψε' 'γράψτε')
+'γράφω' asGreekVerb form: #aorist person: 1 number: #plural ==> 'γράψαμε'
+'διαβάζω' asGreekVerb imperfect ==> #('διάβαζα' 'διάβαζες' 'διάβαζε' 'διαβάζαμε' 'διαβάζατε' 'διάβαζαν')
+'διαβάζω' asGreekVerb aorist first ==> 'διάβασα'
+'ανοίγω' asGreekVerb aorist ==> #('άνοιξα' 'άνοιξες' 'άνοιξε' 'ανοίξαμε' 'ανοίξατε' 'άνοιξαν')
+'θέλω' asGreekVerb imperfect first ==> 'ήθελα'
+'μένω' asGreekVerb aorist first ==> 'έμεινα'
+'δουλεύω' asGreekVerb aorist first ==> 'δούλεψα'
+'φεύγω' asGreekVerb imperative ==> #('φύγε' 'φύγετε')
+# guessed, not in the lexicon
+'τρέχω' asGreekVerb aorist ==> #('έτρεξα' 'έτρεξες' 'έτρεξε' 'τρέξαμε' 'τρέξατε' 'έτρεξαν')
+'λύνω' asGreekVerb futureSimple first ==> 'θα λύσω'
+'κρύβω' asGreekVerb participle ==> 'κρυμμένος'
+# conjugation B1 and B2
+'αγαπάω' asGreekVerb present ==> #('αγαπάω' 'αγαπάς' 'αγαπάει' 'αγαπάμε' 'αγαπάτε' 'αγαπάνε')
+'αγαπώ' asGreekVerb lemma ==> 'αγαπάω'
+'αγαπάω' asGreekVerb imperfect first ==> 'αγαπούσα'
+'αγαπάω' asGreekVerb aorist ==> #('αγάπησα' 'αγάπησες' 'αγάπησε' 'αγαπήσαμε' 'αγαπήσατε' 'αγάπησαν')
+'αγαπάω' asGreekVerb subjunctive first ==> 'αγαπήσω'
+'αγαπάω' asGreekVerb imperative ==> #('αγάπησε' 'αγαπήστε')
+'ξεχνάω' asGreekVerb aorist first ==> 'ξέχασα'
+'μπορώ' asGreekVerb present ==> #('μπορώ' 'μπορείς' 'μπορεί' 'μπορούμε' 'μπορείτε' 'μπορούν')
+'μπορώ' asGreekVerb aorist first ==> 'μπόρεσα'
+'μπορώ' asGreekVerb hasPassive ==> false
+'ζω' asGreekVerb present ==> #('ζω' 'ζεις' 'ζει' 'ζούμε' 'ζείτε' 'ζουν')
+'ζω' asGreekVerb aorist first ==> 'έζησα'
+'χρησιμοποιώ' asGreekVerb aorist first ==> 'χρησιμοποίησα'
+# irregular verbs
+'είμαι' asGreekVerb present ==> #('είμαι' 'είσαι' 'είναι' 'είμαστε' 'είστε' 'είναι')
+'είμαι' asGreekVerb imperfect ==> #('ήμουν' 'ήσουν' 'ήταν' 'ήμασταν' 'ήσασταν' 'ήταν')
+'είμαι' asGreekVerb aorist ==> nil
+'έχω' asGreekVerb imperfect first ==> 'είχα'
+'λέω' asGreekVerb present ==> #('λέω' 'λες' 'λέει' 'λέμε' 'λέτε' 'λένε')
+'λέω' asGreekVerb imperfect first ==> 'έλεγα'
+'λέω' asGreekVerb aorist ==> #('είπα' 'είπες' 'είπε' 'είπαμε' 'είπατε' 'είπαν')
+'λέω' asGreekVerb subjunctive ==> #('πω' 'πεις' 'πει' 'πούμε' 'πείτε' 'πουν')
+'βλέπω' asGreekVerb aorist first ==> 'είδα'
+'βλέπω' asGreekVerb futureSimple ==> #('θα δω' 'θα δεις' 'θα δει' 'θα δούμε' 'θα δείτε' 'θα δουν')
+'βλέπω' asGreekVerb perfect first ==> 'έχω δει'
+'πάω' asGreekVerb imperfect ==> #('πήγαινα' 'πήγαινες' 'πήγαινε' 'πηγαίναμε' 'πηγαίνατε' 'πήγαιναν')
+'πάω' asGreekVerb aorist first ==> 'πήγα'
+'τρώω' asGreekVerb aorist ==> #('έφαγα' 'έφαγες' 'έφαγε' 'φάγαμε' 'φάγατε' 'έφαγαν')
+'τρώω' asGreekVerb perfect first ==> 'έχω φάει'
+'κάνω' asGreekVerb aorist first ==> 'έκανα'
+'ακούω' asGreekVerb imperfect first ==> 'άκουγα'
+'ακούω' asGreekVerb aorist first ==> 'άκουσα'
+'πίνω' asGreekVerb aorist first ==> 'ήπια'
+'παίρνω' asGreekVerb futureSimple first ==> 'θα πάρω'
+'έρχομαι' asGreekVerb present ==> #('έρχομαι' 'έρχεσαι' 'έρχεται' 'ερχόμαστε' 'έρχεστε' 'έρχονται')
+'έρχομαι' asGreekVerb aorist first ==> 'ήρθα'
+'έρχομαι' asGreekVerb futureSimple first ==> 'θα έρθω'
+'έρχομαι' asGreekVerb conjugate: #present voice: #active ==> nil
+'σκέφτομαι' asGreekVerb aorist first ==> 'σκέφτηκα'
+# the passive
+'γράφω' asGreekVerb passive: #present ==> #('γράφομαι' 'γράφεσαι' 'γράφεται' 'γραφόμαστε' 'γράφεστε' 'γράφονται')
+'γράφω' asGreekVerb passive: #imperfect ==> #('γραφόμουν' 'γραφόσουν' 'γραφόταν' 'γραφόμασταν' 'γραφόσασταν' 'γράφονταν')
+'γράφω' asGreekVerb passive: #aorist ==> #('γράφτηκα' 'γράφτηκες' 'γράφτηκε' 'γραφτήκαμε' 'γραφτήκατε' 'γράφτηκαν')
+'γράφω' asGreekVerb passive: #futureSimple ==> #('θα γραφτώ' 'θα γραφτείς' 'θα γραφτεί' 'θα γραφτούμε' 'θα γραφτείτε' 'θα γραφτούν')
+'γράφω' asGreekVerb passive: #perfect ==> #('έχω γραφτεί' 'έχεις γραφτεί' 'έχει γραφτεί' 'έχουμε γραφτεί' 'έχετε γραφτεί' 'έχουν γραφτεί')
+'γράφω' asGreekVerb participle ==> 'γραμμένος'
+'αγαπάω' asGreekVerb passive: #present ==> #('αγαπιέμαι' 'αγαπιέσαι' 'αγαπιέται' 'αγαπιόμαστε' 'αγαπιέστε' 'αγαπιούνται')
+'αγαπάω' asGreekVerb passive: #aorist ==> #('αγαπήθηκα' 'αγαπήθηκες' 'αγαπήθηκε' 'αγαπηθήκαμε' 'αγαπηθήκατε' 'αγαπήθηκαν')
+'αγαπάω' asGreekVerb participle ==> 'αγαπημένος'
+'θεωρώ' asGreekVerb passive: #present ==> #('θεωρούμαι' 'θεωρείσαι' 'θεωρείται' 'θεωρούμαστε' 'θεωρείστε' 'θεωρούνται')
+'ανοίγω' asGreekVerb passive: #aorist ==> #('ανοίχτηκα' 'ανοίχτηκες' 'ανοίχτηκε' 'ανοιχτήκαμε' 'ανοιχτήκατε' 'ανοίχτηκαν')
+'διαβάζω' asGreekVerb participle ==> 'διαβασμένος'
+[('γράφω' asGreekVerb conjugate: #nonsense)] on: Error do: [:e | 'caught'] ==> 'caught'
+# nouns
+GreekNoun plural: 'δρόμος' ==> 'δρόμοι'
+'δρόμος' asGreekNoun forms ==> #('δρόμος' 'δρόμου' 'δρόμο' 'δρόμε' 'δρόμοι' 'δρόμων' 'δρόμους' 'δρόμοι')
+'άνθρωπος' asGreekNoun forms ==> #('άνθρωπος' 'ανθρώπου' 'άνθρωπο' 'άνθρωπε' 'άνθρωποι' 'ανθρώπων' 'ανθρώπους' 'άνθρωποι')
+'ουρανός' asGreekNoun forms ==> #('ουρανός' 'ουρανού' 'ουρανό' 'ουρανέ' 'ουρανοί' 'ουρανών' 'ουρανούς' 'ουρανοί')
+'άντρας' asGreekNoun forms ==> #('άντρας' 'άντρα' 'άντρα' 'άντρα' 'άντρες' 'αντρών' 'άντρες' 'άντρες')
+'πατέρας' asGreekNoun case: #genitive number: #plural ==> 'πατέρων'
+'μαθητής' asGreekNoun forms ==> #('μαθητής' 'μαθητή' 'μαθητή' 'μαθητή' 'μαθητές' 'μαθητών' 'μαθητές' 'μαθητές')
+'χώρα' asGreekNoun forms ==> #('χώρα' 'χώρας' 'χώρα' 'χώρα' 'χώρες' 'χωρών' 'χώρες' 'χώρες')
+'θάλασσα' asGreekNoun forms ==> #('θάλασσα' 'θάλασσας' 'θάλασσα' 'θάλασσα' 'θάλασσες' 'θαλασσών' 'θάλασσες' 'θάλασσες')
+'μητέρα' asGreekNoun case: #genitive number: #plural ==> 'μητέρων'
+'τέχνη' asGreekNoun case: #genitive number: #plural ==> 'τεχνών'
+'πόλη' asGreekNoun forms ==> #('πόλη' 'πόλης' 'πόλη' 'πόλη' 'πόλεις' 'πόλεων' 'πόλεις' 'πόλεις')
+'απόφαση' asGreekNoun plurals ==> #('αποφάσεις' 'αποφάσεων' 'αποφάσεις' 'αποφάσεις')
+'παιδί' asGreekNoun forms ==> #('παιδί' 'παιδιού' 'παιδί' 'παιδί' 'παιδιά' 'παιδιών' 'παιδιά' 'παιδιά')
+'σπίτι' asGreekNoun forms ==> #('σπίτι' 'σπιτιού' 'σπίτι' 'σπίτι' 'σπίτια' 'σπιτιών' 'σπίτια' 'σπίτια')
+'όνομα' asGreekNoun forms ==> #('όνομα' 'ονόματος' 'όνομα' 'όνομα' 'ονόματα' 'ονομάτων' 'ονόματα' 'ονόματα')
+'πρόσωπο' asGreekNoun plurals ==> #('πρόσωπα' 'προσώπων' 'πρόσωπα' 'πρόσωπα')
+'βιβλίο' asGreekNoun genitive ==> 'βιβλίου'
+'δάσος' asGreekNoun forms ==> #('δάσος' 'δάσους' 'δάσος' 'δάσος' 'δάση' 'δασών' 'δάση' 'δάση')
+'αυτοκίνητο' asGreekNoun genitive ==> 'αυτοκινήτου'
+'πόρτα' asGreekNoun plural ==> 'πόρτες'
+'θέση' asGreekNoun plural ==> 'θέσεις'
+'δρόμος' asGreekNoun gender ==> #masculine
+'δάσος' asGreekNoun gender ==> #neuter
+# articles
+'χώρα' asGreekNoun withArticle: #accusative number: #singular ==> 'τη χώρα'
+'πόλη' asGreekNoun withArticle: #accusative number: #singular ==> 'την πόλη'
+'δρόμος' asGreekNoun withArticle: #accusative number: #plural ==> 'τους δρόμους'
+'παιδί' asGreekNoun withArticle: #genitive number: #plural ==> 'των παιδιών'
+'φίλος' asGreekNoun withIndefiniteArticle ==> 'ένας φίλος'
+GreekArticle definite: #feminine case: #accusative number: #plural ==> 'τις'
+GreekArticle indefinite: #neuter case: #genitive ==> 'ενός'
+# adjectives
+'καλός' asGreekAdjective feminine ==> #('καλή' 'καλής' 'καλή' 'καλή' 'καλές' 'καλών' 'καλές' 'καλές')
+'όμορφος' asGreekAdjective masculine ==> #('όμορφος' 'όμορφου' 'όμορφο' 'όμορφε' 'όμορφοι' 'όμορφων' 'όμορφους' 'όμορφοι')
+'ωραίος' asGreekAdjective feminine first ==> 'ωραία'
+'παλιός' asGreekAdjective feminine first ==> 'παλιά'
+'βαθύς' asGreekAdjective masculine ==> #('βαθύς' 'βαθιού' 'βαθύ' 'βαθύ' 'βαθιοί' 'βαθιών' 'βαθιούς' 'βαθιοί')
+'βαθύς' asGreekAdjective feminine first ==> 'βαθιά'
+'γλυκός' asGreekAdjective feminine first ==> 'γλυκιά'
+('μεγάλος' asGreekAdjective with: 'θάλασσα' asGreekNoun) case: #genitive number: #singular ==> 'της μεγάλης θάλασσας'
+('καλός' asGreekAdjective with: 'παιδί' asGreekNoun) case: #nominative number: #plural ==> 'τα καλά παιδιά'
+('ωραίος' asGreekAdjective with: 'πόλη' asGreekNoun) indefinite ==> 'μια ωραία πόλη'
+'καλός' asGreekAdjective agreeWith: 'χώρα' asGreekNoun case: #accusative number: #plural ==> 'καλές'
+'γράφω' asGreekVerb participleAdjective feminine first ==> 'γραμμένη'
+# pronouns
+GreekPronoun strong: 1 number: #singular case: #accusative ==> 'εμένα'
+GreekPronoun weak: 3 number: #singular gender: #feminine case: #accusative ==> 'την'
+GreekPronoun weak: 3 number: #plural gender: #neuter case: #accusative ==> 'τα'
+GreekPronoun weak: 2 number: #plural case: #genitive ==> 'σας'
+# the lexicon and the tables
+(GreekLexicon verbs size > 40) ==> true
+GreekLexicon verbs first ==> 'αγαπάω'
+(GreekLexicon english: 'sea') first lemma ==> 'θάλασσα'
+(GreekLexicon lookup: 'δεν υπάρχει') ==> nil
+('γράφω' asGreekVerb paradigm printString includesSubstring: 'έχουμε γράψει') ==> true
+('διαβάζω' asGreekVerb passiveParadigm printString includesSubstring: 'διαβασμένος') ==> true
+('θάλασσα' asGreekNoun declension printString includesSubstring: 'των θαλασσών') ==> true
+('έρχομαι' greekParadigm printString includesSubstring: 'ήρθαμε') ==> true
+(GreekTool textFor: 'γράφω') size > 1000 ==> true
+GreekVerb tenses size ==> 9

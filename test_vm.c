@@ -405,6 +405,18 @@ int main(int argc, char **argv) {
         check("Smalltalk loadPackage: 'Stats'", "true");
         n = run_lib_tests("packages/Stats/tests/tests.txt");
         printf("ok    Stats package tests%s: %d run\n", pass ? " under GC stress" : "", n);
+        /* Greek: a few conjugations and declensions here, the rest in its tests.txt */
+        check("Smalltalk loadPackage: 'Greek'", "true");
+        check("'γράφω' asGreekVerb conjugate: #present", "#('γράφω' 'γράφεις' 'γράφει' 'γράφουμε' 'γράφετε' 'γράφουν')");
+        check("'γράφω' asGreekVerb conjugate: #aorist", "#('έγραψα' 'έγραψες' 'έγραψε' 'γράψαμε' 'γράψατε' 'έγραψαν')");
+        check("'αγαπάω' asGreekVerb passive: #aorist", "#('αγαπήθηκα' 'αγαπήθηκες' 'αγαπήθηκε' 'αγαπηθήκαμε' 'αγαπηθήκατε' 'αγαπήθηκαν')");
+        check("'βλέπω' asGreekVerb futureSimple", "#('θα δω' 'θα δεις' 'θα δει' 'θα δούμε' 'θα δείτε' 'θα δουν')");
+        check("GreekNoun plural: 'άνθρωπος'", "'άνθρωποι'");
+        check("'άνθρωπος' asGreekNoun genitive", "'ανθρώπου'");
+        check("'όνομα' asGreekNoun plurals", "#('ονόματα' 'ονομάτων' 'ονόματα' 'ονόματα')");
+        check("('μεγάλος' asGreekAdjective with: 'θάλασσα' asGreekNoun) case: #accusative number: #singular", "'τη μεγάλη θάλασσα'");
+        n = run_lib_tests("packages/Greek/tests/tests.txt");
+        printf("ok    Greek package tests%s: %d run\n", pass ? " under GC stress" : "", n);
         gc_threshold = saved_threshold;
     }
     /* ---- the tutorials: once, not in both passes. They are read in from disk on demand, and keeping

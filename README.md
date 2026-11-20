@@ -9,7 +9,7 @@ overlapping draggable/resizable windows, and a persistent **changes file**.
 ```
 make            # builds ./st and kernel.image (needs a C compiler, no other dependencies)
 ./st            # start the environment in an xterm-compatible terminal
-make check      # headless VM test-suite (test_vm.c, test_lib.txt, and the Prolog package's tests; also run on a system loaded from an image)
+make check      # headless VM test-suite (test_vm.c, test_lib.txt, the tutorials, and every package's tests; also run on a system loaded from an image)
 ./st -e '3 + 4' # evaluate expressions without the UI
 ```
 
@@ -142,7 +142,7 @@ case-insensitive, and an image does not hold processes or windows.
 The `packages/` folder holds optional systems that are not in the standard image. Load one on demand:
 
 ```smalltalk
-Smalltalk availablePackages          "#('Bio' 'Debugger' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
+Smalltalk availablePackages          "#('Bio' 'Debugger' 'Greek' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'      "also: System menu -> load package..., or  st -l Prolog"
 ```
 
@@ -163,6 +163,11 @@ that image. These come with the system:
   and out, trees drawn with characters, progressive multiple alignment, the bootstrap, and a tree browser.
 * [**Stats**](packages/Stats/README.md) — tables and statistics: CSV, a DataTable you can select, sort, group and join, the
   descriptive statistics, t tests, chi-square, the rank tests, analysis of variance, regression, and plots made of characters.
+
+* [**Greek**](packages/Greek/README.md) — Modern Greek grammar: verbs in every tense and both voices (conjugations A, B1 and
+  B2, the irregular verbs, deponents), nouns in all their inflection classes with the accent shifts, articles, adjectives that
+  agree with their nouns, the strong and weak pronouns, a lexicon, and a 23-lesson tutorial on the grammar:
+  `'γράφω' asGreekVerb conjugate: #aorist`, `GreekNoun plural: 'άνθρωπος'`.
 
 See [packages/README.md](packages/README.md) for how packages work and how to write one.
 
