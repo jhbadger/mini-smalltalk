@@ -2,8 +2,7 @@
 
 This notebook measures the annotated ORFs (the CDS features recorded in the GenBank file) of the complete genome of
 *Hyphomonas neptunium* ATCC 15444 (`hyphomonas.gb`, a GenBank file of about 3.7 Mb)
-and reports their average, minimum and maximum size. Run it from the top with ctrl-R,
-from a directory that contains `hyphomonas.gb`.
+and reports their average, minimum and maximum size. Run it from the top with ctrl-R
 
 ## 1. Load the packages
 
@@ -19,18 +18,23 @@ Smalltalk loadPackage: 'Stats'.
 ```result
 true
 ```
-
 ## 2. Read the genome
 
 `Bio read:` picks the format from the file name and answers a `SequenceCollection` of
 records. A bacterial genome is a single record; we keep the first one.
 
 ```smalltalk
-genome := (Bio read: 'hyphomonas.gb') first.
-genome printString
+path := 'hyphomonas.gb'.
+(FileStream exists: path)
+	ifTrue: [Transcript show: path, ' already exists'; cr]
+	ifFalse: [
+		Bio download: 'CP000158.1' format: #genbank to: path.
+		Transcript show: 'CP000158.1 downloaded'
+	].
+genome := (Bio read: path) first
 ```
 ```result
-'SeqRecord(CP000158, 3705021 bp, 7121 features)'
+SeqRecord(CP000158, 3705021 bp, 7121 features)
 ```
 
 ## 3. Get the annotated ORFs
