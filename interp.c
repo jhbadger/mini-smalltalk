@@ -198,33 +198,53 @@ static oop run(oop base, long deadline) {
 #define PREEMPT_POINT() do { if (__builtin_expect(deadline != 0, 0) && (++icount & 255) == 0 && now_ms() > deadline) {   /* preempt the background slice */ \
             pc--;   /* redo this instruction when the process is resumed */ \
             PARK_CURRENT(); ll_add_first(run_queue(proc_prio(CUR())), CUR()); CUR() = main_process; result = nilobj; goto done; } } while (0)
+    /* Threaded dispatch (GCC/clang labels as values): the hot, simple instructions jump straight to the next handler,
+       which predicts better than one shared indirect jump. Everything else goes through the switch below. */
+#ifdef __GNUC__
+    static const void *dispatch[OP_ATPUT + 1]; static bool dispatch_ready = false;
+    if (!dispatch_ready) {
+        for (int i = 0; i <= OP_ATPUT; i++) dispatch[i] = &&T_generic;
+#define THREAD(o) dispatch[OP_##o] = &&T_##o
+        THREAD(PUSH_INST); THREAD(PUSH_TEMP); THREAD(PUSH_LIT); THREAD(PUSH_SELF); THREAD(PUSH_NIL); THREAD(PUSH_TRUE); THREAD(PUSH_FALSE);
+        THREAD(PUSH_INT); THREAD(STORE_INST); THREAD(STORE_TEMP); THREAD(POP); THREAD(DUP);
+        THREAD(JUMP_FALSE); THREAD(JUMP_TRUE); THREAD(ADD); THREAD(SUB); THREAD(LT); THREAD(GT); THREAD(LE); THREAD(GE); THREAD(EQ); THREAD(NE);
+        THREAD(IDENT); THREAD(AT);
+#undef THREAD
+        dispatch_ready = true;
+    }
+#define NEXT() do { op = code[pc++]; goto *dispatch[op]; } while (0)
+#else
+#define NEXT() break      /* other compilers: back to the loop and its switch */
+#endif
+    int op;
     if (base == NULL) goto switch_process;
     for (;;) {
-        int op = code[pc++];
+        op = code[pc++];
+    T_generic:
         switch (op) {
-        case OP_PUSH_INST: PUSH(SLOT(rcvr, code[pc++])); break;
-        case OP_PUSH_TEMP: PUSH(slots[CTX_FIXED + code[pc++]]); break;
+        case OP_PUSH_INST: T_PUSH_INST: PUSH(SLOT(rcvr, code[pc++])); NEXT();
+        case OP_PUSH_TEMP: T_PUSH_TEMP: PUSH(slots[CTX_FIXED + code[pc++]]); NEXT();
         case OP_PUSH_OUTER: { int d = code[pc++], i = code[pc++]; oop c = ctx; while (d--) c = SLOT(c, CTX_OUTER); PUSH(SLOT(c, CTX_FIXED + i)); break; }
-        case OP_PUSH_LIT: PUSH(SLOT(lits, code[pc++])); break;
+        case OP_PUSH_LIT: T_PUSH_LIT: PUSH(SLOT(lits, code[pc++])); NEXT();
         case OP_PUSH_GLOBAL: PUSH(SLOT(SLOT(lits, code[pc++]), A_VALUE)); break;
-        case OP_PUSH_SELF: PUSH(rcvr); break;
-        case OP_PUSH_NIL: PUSH(nilobj); break;
-        case OP_PUSH_TRUE: PUSH(trueobj); break;
-        case OP_PUSH_FALSE: PUSH(falseobj); break;
-        case OP_PUSH_INT: PUSH(MK_INT((signed char)code[pc++])); break;
+        case OP_PUSH_SELF: T_PUSH_SELF: PUSH(rcvr); NEXT();
+        case OP_PUSH_NIL: T_PUSH_NIL: PUSH(nilobj); NEXT();
+        case OP_PUSH_TRUE: T_PUSH_TRUE: PUSH(trueobj); NEXT();
+        case OP_PUSH_FALSE: T_PUSH_FALSE: PUSH(falseobj); NEXT();
+        case OP_PUSH_INT: T_PUSH_INT: PUSH(MK_INT((signed char)code[pc++])); NEXT();
         case OP_PUSH_CONTEXT: SAVE(); ctx_capture(ctx); PUSH(ctx); break;
-        case OP_STORE_INST: SLOT(rcvr, code[pc++]) = slots[sp - 1]; break;
-        case OP_STORE_TEMP: slots[CTX_FIXED + code[pc++]] = slots[sp - 1]; break;
+        case OP_STORE_INST: T_STORE_INST: SLOT(rcvr, code[pc++]) = slots[sp - 1]; NEXT();
+        case OP_STORE_TEMP: T_STORE_TEMP: slots[CTX_FIXED + code[pc++]] = slots[sp - 1]; NEXT();
         case OP_STORE_OUTER: { int d = code[pc++], i = code[pc++]; oop c = ctx; while (d--) c = SLOT(c, CTX_OUTER); SLOT(c, CTX_FIXED + i) = slots[sp - 1]; break; }
         case OP_STORE_GLOBAL: SLOT(SLOT(lits, code[pc++]), A_VALUE) = slots[sp - 1]; break;
-        case OP_POP: sp--; break;
-        case OP_DUP: { oop t = slots[sp - 1]; PUSH(t); break; }
+        case OP_POP: T_POP: sp--; NEXT();
+        case OP_DUP: T_DUP: { oop t = slots[sp - 1]; PUSH(t); NEXT(); }
         case OP_JUMP: { int off = (int16_t)((code[pc] << 8) | code[pc + 1]); if (off < 0) { GC_POINT(); PREEMPT_POINT(); } pc += 2 + off; break; }
-        case OP_JUMP_FALSE: case OP_JUMP_TRUE: {
+        case OP_JUMP_FALSE: case OP_JUMP_TRUE: T_JUMP_FALSE: T_JUMP_TRUE: {
             int off = (int16_t)((code[pc] << 8) | code[pc + 1]); pc += 2; oop v = POP();
             if (v == (op == OP_JUMP_FALSE ? falseobj : trueobj)) pc += off;
             else if (v != trueobj && v != falseobj) { SAVE(); interp_signal_error("NonBoolean receiver"); goto abort; }
-            break; }
+            NEXT(); }
         case OP_PUSH_BLOCK: {
             GC_POINT();
             oop bm = SLOT(lits, code[pc++]);
@@ -269,15 +289,15 @@ static oop run(oop base, long deadline) {
             break; }
         /* special sends: fast path when the operands are plain SmallIntegers (same results as the primitives), else a real send */
 #define SPECIAL_FALLBACK(nargs) do { sel = SLOT(lits, code[pc]); n = (nargs); super = 0; pc += 2; goto send; } while (0)
-        case OP_ADD: {
+        case OP_ADD: T_ADD: {
             oop a = slots[sp - 2], b = slots[sp - 1];
             if (IS_INT(a) && IS_INT(b)) { intptr_t r = INT_VAL(a) + INT_VAL(b);
-                if (r >= -INT_MAX_VAL && r < INT_MAX_VAL) { sp--; slots[sp - 1] = MK_INT(r); pc += 2; break; } }
+                if (r >= -INT_MAX_VAL && r < INT_MAX_VAL) { sp--; slots[sp - 1] = MK_INT(r); pc += 2; NEXT(); } }
             SPECIAL_FALLBACK(1); }
-        case OP_SUB: {
+        case OP_SUB: T_SUB: {
             oop a = slots[sp - 2], b = slots[sp - 1];
             if (IS_INT(a) && IS_INT(b)) { intptr_t r = INT_VAL(a) - INT_VAL(b);
-                if (r >= -INT_MAX_VAL && r < INT_MAX_VAL) { sp--; slots[sp - 1] = MK_INT(r); pc += 2; break; } }
+                if (r >= -INT_MAX_VAL && r < INT_MAX_VAL) { sp--; slots[sp - 1] = MK_INT(r); pc += 2; NEXT(); } }
             SPECIAL_FALLBACK(1); }
         case OP_MUL: case OP_MOD: case OP_DIV: {
             oop a = slots[sp - 2], b = slots[sp - 1];
@@ -290,19 +310,19 @@ static oop run(oop base, long deadline) {
                 if (ok && r >= -INT_MAX_VAL && r < INT_MAX_VAL) { sp--; slots[sp - 1] = MK_INT(r); pc += 2; break; }
             }
             SPECIAL_FALLBACK(1); }
-#define CMP_CASE(OPC, CMP) case OPC: { \
+#define CMP_CASE(NAME, CMP) case OP_##NAME: T_##NAME: { \
             oop a = slots[sp - 2], b = slots[sp - 1]; \
-            if (IS_INT(a) && IS_INT(b)) { sp--; slots[sp - 1] = INT_VAL(a) CMP INT_VAL(b) ? trueobj : falseobj; pc += 2; break; } \
+            if (IS_INT(a) && IS_INT(b)) { sp--; slots[sp - 1] = INT_VAL(a) CMP INT_VAL(b) ? trueobj : falseobj; pc += 2; NEXT(); } \
             SPECIAL_FALLBACK(1); }
-        CMP_CASE(OP_LT, <) CMP_CASE(OP_GT, >) CMP_CASE(OP_LE, <=) CMP_CASE(OP_GE, >=) CMP_CASE(OP_EQ, ==) CMP_CASE(OP_NE, !=)
+        CMP_CASE(LT, <) CMP_CASE(GT, >) CMP_CASE(LE, <=) CMP_CASE(GE, >=) CMP_CASE(EQ, ==) CMP_CASE(NE, !=)
 #undef CMP_CASE
-        case OP_IDENT: { oop a = slots[sp - 2], b = slots[sp - 1]; sp--; slots[sp - 1] = a == b ? trueobj : falseobj; pc += 2; break; }
-        case OP_AT: {
+        case OP_IDENT: T_IDENT: { oop a = slots[sp - 2], b = slots[sp - 1]; sp--; slots[sp - 1] = a == b ? trueobj : falseobj; pc += 2; NEXT(); }
+        case OP_AT: T_AT: {
             oop r = slots[sp - 2], ix = slots[sp - 1];
             if (!IS_INT(r) && IS_INT(ix)) {
                 intptr_t i = INT_VAL(ix);
-                if (r->cls == classArray) { if (i >= 1 && i <= (intptr_t)r->size) { sp--; slots[sp - 1] = SLOT(r, i - 1); pc += 2; break; } }
-                else if (r->cls == classString) { if (i >= 1 && i <= (intptr_t)r->size) { sp--; slots[sp - 1] = charTable[BYTES(r)[i - 1]]; pc += 2; break; } }
+                if (r->cls == classArray) { if (i >= 1 && i <= (intptr_t)r->size) { sp--; slots[sp - 1] = SLOT(r, i - 1); pc += 2; NEXT(); } }
+                else if (r->cls == classString) { if (i >= 1 && i <= (intptr_t)r->size) { sp--; slots[sp - 1] = charTable[BYTES(r)[i - 1]]; pc += 2; NEXT(); } }
             }
             SPECIAL_FALLBACK(1); }
         case OP_ATPUT: {
@@ -490,6 +510,7 @@ done:
 #undef CUR
 #undef PARK_CURRENT
 #undef GC_POINT
+#undef NEXT
 #undef PREEMPT_POINT
 }
 
