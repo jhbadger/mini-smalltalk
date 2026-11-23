@@ -154,7 +154,7 @@ case-insensitive, and an image does not hold processes or windows.
 The `packages/` folder holds optional systems that are not in the standard image. Load one on demand:
 
 ```smalltalk
-Smalltalk availablePackages          "#('Bio' 'Debugger' 'Forth' 'Greek' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
+Smalltalk availablePackages          "#('Bio' 'Debugger' 'Forth' 'Greek' 'Immuno' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'      "also: System menu -> load package..., or  st -l Prolog"
 ```
 
@@ -178,6 +178,11 @@ that image. These come with the system:
   and out, trees drawn with characters, progressive multiple alignment, the bootstrap, and a tree browser.
 * [**Stats**](packages/Stats/README.md) — tables and statistics: CSV, a DataTable you can select, sort, group and join, the
   descriptive statistics, t tests, chi-square, the rank tests, analysis of variance, regression, and plots made of characters.
+
+* [**Immuno**](packages/Immuno/README.md) — computational immunology around the MHC: HLA allele names, binding models for twenty
+  alleles with exact percentile ranks (teaching models), protein scanning, models you train and test, antigen processing,
+  population coverage, Hardy-Weinberg and linkage, donor matching, and an 18-lesson tutorial:
+  `Immuno predict: 'GILGFVFTL' for: 'HLA-A*02:01'`.
 
 * [**Greek**](packages/Greek/README.md) — Modern Greek grammar: verbs in every tense and both voices (conjugations A, B1 and
   B2, the irregular verbs, deponents), nouns in all their inflection classes with the accent shifts, articles, adjectives that

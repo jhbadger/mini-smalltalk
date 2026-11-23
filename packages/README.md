@@ -3,14 +3,14 @@
 This folder holds systems that are **not** part of the standard image. Load one when you want it:
 
 ```smalltalk
-Smalltalk availablePackages            "#('Bio' 'Debugger' 'Forth' 'Greek' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
+Smalltalk availablePackages            "#('Bio' 'Debugger' 'Forth' 'Greek' 'Immuno' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'        "files it in (once)"
 Smalltalk isPackageLoaded: 'Prolog'
 Smalltalk packageDescription: 'Prolog' "the first comment of its file"
 ```
 
 From the UI use **System menu → load package...**; from the shell start with `st -l Prolog`
-(`-l` may be repeated). A package can add items to the System menu (the Prolog package adds *prolog workspace*, Forth adds *forth workspace*).
+(`-l` may be repeated). A package can add items to the System menu (the Prolog package adds *prolog workspace*, Forth adds *forth workspace*, Immuno adds *immuno workspace*).
 
 What loading does:
 
@@ -79,3 +79,7 @@ Keep tests with the package: both packages have a `tests/tests.txt` of `expressi
 * **[Greek](Greek/README.md)** — Modern Greek grammar: verbs conjugated in every tense and both voices from their two stems,
   the irregular verbs, nouns in each inflection class with their accent shifts, articles, adjective agreement, the personal
   pronouns strong and weak, a lexicon of common words, beta-code input, and a tutorial that teaches the grammar itself.
+* **[Immuno](Immuno/README.md)** — computational immunology around the MHC: peptides and HLA allele names, position-specific
+  binding models for twenty class I and class II alleles (teaching models, with exact percentile ranks), protein scanning,
+  models you train yourself and test by AUC, antigen processing, self and non-self, genotypes, population coverage,
+  Hardy-Weinberg and linkage, donor matching, epitope selection for a vaccine, a workspace, and an 18-lesson tutorial.

@@ -62,6 +62,11 @@ Smalltalk loadPackage: 'Phylo'. (Smalltalk tutorialNamed: 'Phylo') == PhyloTutor
 | t ls | t := PhyloTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(16 16 true)
 | c | c := PhyloTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 40)) ==> #(0 true)
 PhyloTutorial tutorialName ==> 'Phylo'
+# Immuno
+Smalltalk loadPackage: 'Immuno'. (Smalltalk tutorialNamed: 'Immuno') == ImmunoTutorial ==> true
+| t ls | t := ImmunoTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(18 18 true)
+| c | c := ImmunoTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 100)) ==> #(0 true)
+ImmunoTutorial tutorialName ==> 'Immuno'
 # Stats
 Smalltalk loadPackage: 'Stats'. (Smalltalk tutorialNamed: 'Stats') == StatsTutorial ==> true
 | t ls | t := StatsTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(17 17 true)

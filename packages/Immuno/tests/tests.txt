@@ -1,0 +1,553 @@
+# Tests for the Immuno package, run by test_vm after loading it.
+# Each line is  expression ==> expected printString  (a comment starts with "# ").
+# The binding models are teaching models written from published anchor motifs, so these tests pin down
+# what the package computes (against hand-worked values where there are any), not how well it predicts.
+Smalltalk loadPackage: 'Immuno' ==> true
+# peptides and residues
+(Peptide on: 'gil gfv ftl') asString ==> 'GILGFVFTL'
+(Peptide on: 'GILGFVFTL') size ==> 9
+(Peptide on: 'GILGFVFTL') first ==> $G
+(Peptide on: 'GILGFVFTL') last ==> $L
+'ilgfvftl' asPeptide printString ==> 'Peptide(ILGFVFTL)'
+(Peptide on: 'GILGFVFTL') = (Peptide on: 'gilgfvftl') ==> true
+(Peptide on: 'GILGFVFTL') = (Peptide on: 'GILGFVFTI') ==> false
+(Peptide on: 'GILGFVFTL') hash = (Peptide on: 'GILGFVFTL') hash ==> true
+((Peptide on: 'GILGFVFTL') mass * 1000) rounded ==> 965559
+((Peptide on: 'SIINFEKL') mass * 1000) rounded ==> 962544
+((Peptide on: 'GILGFVFTL') hydropathy * 100) rounded ==> 227
+(Peptide on: 'KRDEH') netCharge ==> 0.1
+(Peptide on: 'GILGFVFTL') count: $F ==> 2
+((Peptide on: 'GILGFVFTL') composition at: $G) ==> 2
+((Peptide on: 'GILGFVFTL') kmers: 7) size ==> 3
+((Peptide on: 'GILGFVFTL') kmerStrings: 7) ==> #('GILGFVF' 'ILGFVFT' 'LGFVFTL')
+((Peptide on: 'GILGFVFTL') copyFrom: 2 to: 4) asString ==> 'ILG'
+(Peptide on: 'GIL') reversed asString ==> 'LIG'
+((Peptide on: 'GIL'), (Peptide on: 'FTL')) asString ==> 'GILFTL'
+(Peptide isValid: 'GILGFVFTL') ==> true
+(Peptide isValid: 'GILGFVFTB') ==> false
+(Peptide isValid: '') ==> false
+[Peptide on: 'GILB'] on: ImmunoError do: [:e | e messageText] ==> 'not an amino acid: B'
+[Peptide on: '   '] on: ImmunoError do: [:e | e messageText] ==> 'a peptide needs at least one residue'
+[(Peptide on: 'GILGFVFTL') hammingTo: (Peptide on: 'GIL')] on: ImmunoError do: [:e | e messageText] ==> 'peptides of different lengths'
+((Peptide on: 'GILGFVFTL') hammingTo: (Peptide on: 'GILGFVFTI')) ==> 1
+((Peptide on: 'GILGFVFTL') identityTo: (Peptide on: 'GILGFVFTI')) ==> (8/9)
+((Peptide on: 'GILGFVFTL') similarityTo: (Peptide on: 'GILGFVFTL')) ==> 45
+((Peptide on: 'GILGFVFTL') similarityTo: (Peptide on: 'GILGFVFTI')) ==> 43
+((Peptide on: 'GILGFVFTL') similarityTo: (Peptide on: 'GILGFVFTD')) ==> 37
+(((Peptide on: 'GILGFVFTL') normalizedSimilarityTo: (Peptide on: 'GILGFVFTL')) * 1000) rounded ==> 1000
+AminoAcid order ==> 'ARNDCQEGHILKMFPSTWYV'
+AminoAcid order size ==> 20
+(AminoAcid indexOf: $A) ==> 1
+(AminoAcid indexOf: $B) ==> 0
+(AminoAcid isResidue: $W) ==> true
+(AminoAcid isResidue: $Z) ==> false
+(AminoAcid nameOf: $W) ==> 'tryptophan'
+(AminoAcid massOf: $G) ==> 57.02146
+(AminoAcid hydropathyOf: $I) ==> 4.5
+((AminoAcid background inject: 0 into: [:a :b | a + b]) - 1) abs < 1.0e-12 ==> true
+(AminoAcid isHydrophobic: $L) ==> true
+(AminoAcid isHydrophobic: $K) ==> false
+(AminoAcid isBasic: $R) ==> true
+(AminoAcid isAcidic: $E) ==> true
+(AminoAcid isAromatic: $F) ==> true
+(AminoAcid blosum: $A with: $A) ==> 4
+(AminoAcid blosum: $W with: $W) ==> 11
+(AminoAcid blosum: $I with: $L) ==> 2
+(AminoAcid blosum: $L with: $I) ==> 2
+(AminoAcid blosum: $W with: $G) ==> -2
+(1 to: 20) allSatisfy: [:i | (1 to: 20) allSatisfy: [:j | ((AminoAcid blosum62 at: i) at: j) = ((AminoAcid blosum62 at: j) at: i)]] ==> true
+[AminoAcid massOf: $B] on: ImmunoError do: [:e | e messageText] ==> 'not an amino acid: B'
+# the random number generator
+((ImmunoRandom seed: 1) next = (ImmunoRandom seed: 1) next) ==> true
+((ImmunoRandom seed: 1) next = (ImmunoRandom seed: 2) next) ==> false
+| r | r := ImmunoRandom seed: 5. (1 to: 1000) allSatisfy: [:i | | x | x := r next. x >= 0 and: [x < 1]] ==> true
+| r | r := ImmunoRandom seed: 5. (1 to: 1000) allSatisfy: [:i | (r nextInt: 6) between: 1 and: 6] ==> true
+(Immuno randomPeptides: 3 length: 9 seed: 1) = (Immuno randomPeptides: 3 length: 9 seed: 1) ==> true
+(Immuno randomPeptides: 5 length: 11 seed: 1) allSatisfy: [:p | p size = 11] ==> true
+(Immuno randomPeptides: 3 length: 9 seed: 1) ==> #('AQLYAHRGG' 'TPAKARAEA' 'PRSGNTFAD')
+| s | s := (Peptide on: 'GILGFVFTL') shuffledUsing: (ImmunoRandom seed: 4). s asString asBag = 'GILGFVFTL' asBag ==> true
+# HLA names
+'HLA-A*02:01' asHLA name ==> 'HLA-A*02:01'
+'A*02:01' asHLA name ==> 'HLA-A*02:01'
+'hla-a*02:01' asHLA name ==> 'HLA-A*02:01'
+'HLA-A*02:01:01:01' asHLA name ==> 'HLA-A*02:01:01:01'
+'HLA-A*02:01:01:01' asHLA gene ==> 'A'
+'HLA-A*02:01:01:01' asHLA fieldCount ==> 4
+'HLA-A*02:01:01:01' asHLA fields ==> #('02' '01' '01' '01')
+('HLA-A*02:01:01:01' asHLA field: 2) ==> '01'
+'HLA-A*02:01:01:01' asHLA group ==> 'A*02'
+'HLA-A*02:01:01:01' asHLA protein ==> 'A*02:01'
+('HLA-A*02:01:01:01' asHLA nameAt: 2) ==> 'HLA-A*02:01'
+('HLA-A*02:01:01:01' asHLA nameAt: 3) ==> 'HLA-A*02:01:01'
+('HLA-A*02:01:01:01' asHLA truncatedTo: 2) printString ==> 'HLA-A*02:01'
+'HLA-A*02:01:01:02L' asHLA suffix ==> 'L'
+'HLA-A*02:01:01:02L' asHLA name ==> 'HLA-A*02:01:01:02L'
+('HLA-A*02:01:01:02L' asHLA nameAt: 2) ==> 'HLA-A*02:01'
+'A*02:15N' asHLA isNull ==> true
+'A*02:01' asHLA isNull ==> false
+'HLA-DRB1*15:01' asHLA gene ==> 'DRB1'
+'DRB1*15:01' asHLA isClassII ==> true
+'DRB1*15:01' asHLA isClassI ==> false
+'A*02:01' asHLA isClassI ==> true
+'A*02:01' asHLA isClassII ==> false
+'E*01:01' asHLA isClassI ==> true
+'E*01:01' asHLA isClassIClassical ==> false
+'A*02:01' asHLA isClassIClassical ==> true
+'A*02:01' asHLA mhcClass ==> 1
+'DQB1*06:02' asHLA mhcClass ==> 2
+'ZZ*01:01' asHLA mhcClass ==> nil
+'A*02:01' asHLA locus ==> 'A'
+'A*02:01' asHLA supertype ==> 'A2'
+'A*01:01' asHLA supertype ==> 'A1'
+'A*03:01' asHLA supertype ==> 'A3'
+'A*24:02' asHLA supertype ==> 'A24'
+'B*07:02' asHLA supertype ==> 'B7'
+'B*27:05' asHLA supertype ==> 'B27'
+'B*44:02' asHLA supertype ==> 'B44'
+'B*57:01' asHLA supertype ==> 'B58'
+'B*15:01' asHLA supertype ==> 'B62'
+'B*08:01' asHLA supertype ==> nil
+'DRB1*01:01' asHLA supertype ==> nil
+'A*02:01:01:01' asHLA supertype ==> 'A2'
+HLAAllele supertypeNames size ==> 9
+HLAAllele inSupertype: 'B58' ==> #(HLA-B*57:01 HLA-B*58:01)
+(HLAAllele inSupertype: 'A2') size ==> 8
+HLAAllele inSupertype: 'none' ==> #()
+'A*02:01' asHLA = 'HLA-A*02:01' asHLA ==> true
+'A*02:01' asHLA = 'A*02:02' asHLA ==> false
+'A*02:01' asHLA hash = 'HLA-A*02:01' asHLA hash ==> true
+'A*02:01' asHLA < 'A*02:02' asHLA ==> true
+'A*02:10' asHLA < 'A*02:02' asHLA ==> false
+'A*24:02' asHLA < 'B*07:02' asHLA ==> true
+'A*02:01' asHLA <= 'A*02:01' asHLA ==> true
+(#('B*07:02' 'A*24:02' 'A*02:10' 'A*02:02') collect: [:n | n asHLA]) asSortedCollection asArray ==> #(HLA-A*02:02 HLA-A*02:10 HLA-A*24:02 HLA-B*07:02)
+('A*02:01' asHLA includes: 'A*02:01:01:01' asHLA) ==> true
+('A*02' asHLA includes: 'A*02:01' asHLA) ==> true
+('A*02:01:01' asHLA includes: 'A*02:01' asHLA) ==> false
+('A*02:01' asHLA includes: 'A*02:02' asHLA) ==> false
+('A*02:01' asHLA includes: 'B*02:01' asHLA) ==> false
+('A*02:01:01:01' asHLA matches: 'A*02:01:02' asHLA atResolution: 2) ==> true
+('A*02:01:01:01' asHLA matches: 'A*02:01:02' asHLA atResolution: 3) ==> false
+('A*02:01' asHLA matches: 'A*02:01:02' asHLA atResolution: 3) ==> false
+('A*02:01' asHLA matches: 'B*02:01' asHLA atResolution: 1) ==> false
+(HLAAllele isValid: 'A*02:01') ==> true
+(HLAAllele isValid: 'A02:01') ==> false
+(HLAAllele isValid: 'A*2') ==> false
+(HLAAllele isValid: 'A*02:01:01:01:01') ==> false
+[HLAAllele named: 'foo'] on: ImmunoError do: [:e | e messageText] ==> 'not an HLA allele name: foo'
+[HLAAllele named: 'A*'] on: ImmunoError do: [:e | e messageText] ==> 'not an HLA allele name: A*'
+[HLAAllele named: 'A*zz:01'] on: ImmunoError do: [:e | e messageText] ==> 'not an HLA allele name: A*zz:01'
+(HLAAllele gene: 'A' fields: #('02' '01')) name ==> 'HLA-A*02:01'
+# the models
+AlleleModels alleles size ==> 20
+(AlleleModels alleles first) name ==> 'HLA-A*01:01'
+(AlleleModels alleles last) name ==> 'HLA-DRB1*15:01'
+(AlleleModels alleles select: [:a | a isClassII]) size ==> 5
+AlleleModels hasModelFor: 'A*02:01' ==> true
+AlleleModels hasModelFor: 'HLA-A*02:01:01:01' ==> true
+AlleleModels hasModelFor: 'A*02:99' ==> false
+AlleleModels hasModelFor: 'C*07:01' ==> false
+AlleleModels nameOf: 'A*02:01:01:01' ==> 'HLA-A*02:01'
+[AlleleModels nameOf: 'A*02'] on: ImmunoError do: [:e | e messageText] ==> 'a model needs at least two fields: HLA-A*02'
+[AlleleModels matrixFor: 'A*99:99'] on: ImmunoError do: [:e | e messageText size > 20] ==> true
+(AlleleModels matrixFor: 'A*02:01') name ==> 'HLA-A*02:01'
+(AlleleModels matrixFor: 'A*02:01') source ==> 'a motif'
+(AlleleModels matrixFor: 'A*02:01') mhcClass ==> 1
+(AlleleModels matrixFor: 'DRB1*01:01') mhcClass ==> 2
+(AlleleModels matrixFor: 'A*02:01') isClassI ==> true
+(AlleleModels matrixFor: 'DRB1*01:01') isClassI ==> false
+(AlleleModels matrixFor: 'A*02:01') printString ==> 'BindingMatrix(HLA-A*02:01, a motif)'
+(AlleleModels matrixFor: 'A*02:01') anchors ==> #(9 2)
+(AlleleModels matrixFor: 'B*07:02') anchors ==> #(2 9)
+(AlleleModels matrixFor: 'B*08:01') anchors ==> #(9 5 3)
+(AlleleModels matrixFor: 'A*01:01') anchors ==> #(9 2 3)
+(AlleleModels matrixFor: 'A*24:02') anchors ==> #(2 9)
+(AlleleModels matrixFor: 'B*27:05') anchors ==> #(2 9)
+(AlleleModels matrixFor: 'A*02:01') cellAt: 2 residue: $L ==> 3.0
+(AlleleModels matrixFor: 'A*02:01') cellAt: 2 residue: $K ==> -2.3
+(AlleleModels matrixFor: 'A*02:01') cellAt: 5 residue: $K ==> 0.0
+(AlleleModels matrixFor: 'A*02:01') tenthsAt: 2 residue: $L ==> 30
+(AlleleModels matrixFor: 'A*02:01') rangeAt: 2 ==> 5.3
+(AlleleModels matrixFor: 'A*02:01') rangeAt: 5 ==> 0.0
+(AlleleModels matrixFor: 'A*02:01') topResidues: 3 at: 2 ==> 'LMI'
+(AlleleModels matrixFor: 'A*02:01') topResidues: 5 at: 9 ==> 'VLIAM'
+(AlleleModels matrixFor: 'B*07:02') topResidues: 1 at: 2 ==> 'P'
+(AlleleModels matrixFor: 'B*27:05') topResidues: 1 at: 2 ==> 'R'
+(AlleleModels matrixFor: 'A*01:01') topResidues: 2 at: 3 ==> 'DE'
+(AlleleModels matrixFor: 'A*02:01') maxScore ==> 6.0
+(AlleleModels matrixFor: 'A*02:01') minScore ==> -4.6
+(AlleleModels matrixFor: 'A*02:01') maxTenths ==> 60
+(AlleleModels matrixFor: 'A*02:01') minimumLength ==> 8
+(AlleleModels matrixFor: 'A*02:01') maximumLength ==> 11
+(AlleleModels matrixFor: 'DRB1*01:01') minimumLength ==> 9
+(AlleleModels matrixFor: 'DRB1*01:01') maximumLength ==> 30
+(AlleleModels matrixFor: 'A*02:01') scoreOfNine: 'LLFGYPVYV' ==> 6.0
+(AlleleModels matrixFor: 'A*02:01') tenthsOfNine: 'KLFGYPVYV' ==> 60
+((AlleleModels matrixFor: 'A*02:01') motifString lines size) ==> 10
+((AlleleModels matrixFor: 'A*02:01') motifString lines first) ==> 'HLA-A*02:01  (a motif)'
+((AlleleModels matrixFor: 'A*02:01') motifString lines at: 3) ==> 'P2  LMIVA  range 5.3 bits'
+((AlleleModels matrixFor: 'B*08:01') motifString lines at: 4) ==> 'P3  KR     range 2.3 bits'
+# ranks
+((AlleleModels matrixFor: 'A*02:01') rankOfTenths: (AlleleModels matrixFor: 'A*02:01') minTenths) rounded ==> 100
+((AlleleModels matrixFor: 'A*02:01') rankOfTenths: (AlleleModels matrixFor: 'A*02:01') minTenths - 5) ==> 100.0
+((AlleleModels matrixFor: 'A*02:01') rankOfTenths: (AlleleModels matrixFor: 'A*02:01') maxTenths + 1) ==> 0.0
+(((AlleleModels matrixFor: 'A*02:01') rankOfTenths: (AlleleModels matrixFor: 'A*02:01') maxTenths) * 1000) rounded ==> 665
+(((AlleleModels matrixFor: 'A*02:01') rankOfScore: 4.0) * 100) rounded ==> 805
+| m | m := AlleleModels matrixFor: 'A*02:01'. (-46 to: 60) allSatisfy: [:t | (m rankOfTenths: t) >= (m rankOfTenths: t + 1)] ==> true
+| m | m := AlleleModels matrixFor: 'B*27:05'. (m rankOfTenths: m minTenths) rounded ==> 100
+| m | m := AlleleModels matrixFor: 'DRB1*01:01'. ((m rankOfTenths: 40 windows: 1) - (m rankOfTenths: 40)) abs < 1.0e-9 ==> true
+| m | m := AlleleModels matrixFor: 'DRB1*01:01'. (m rankOfTenths: 40 windows: 5) > (m rankOfTenths: 40) ==> true
+| m | m := AlleleModels matrixFor: 'DRB1*01:01'. (m rankOfTenths: 40 windows: 100) <= 100.0 ==> true
+# predictions
+Immuno predict: 'GILGFVFTL' for: 'HLA-A*02:01' ==> GILGFVFTL / HLA-A*02:01  score 5.1  rank 2.99%  weak
+Immuno predict: 'NLVPMVATV' for: 'A*02:01' ==> NLVPMVATV / HLA-A*02:01  score 6.0  rank 0.67%  strong
+Immuno predict: 'KKKKKKKKK' for: 'A*02:01' ==> KKKKKKKKK / HLA-A*02:01  score -4.6  rank 100.00%  nonbinder
+Immuno predict: 'RPQVPLRPM' for: 'B*07:02' ==> RPQVPLRPM / HLA-B*07:02  score 6.2  rank 0.47%  strong
+Immuno predict: 'PKYVKQNTLKLAT' for: 'DRB1*01:01' ==> PKYVKQNTLKLAT / HLA-DRB1*01:01  score 6.1  rank 1.77%  strong
+(Immuno predict: 'NLVPMVATV' for: 'A*02:01') score ==> 6.0
+(Immuno predict: 'NLVPMVATV' for: 'A*02:01') tenths ==> 60
+(Immuno predict: 'NLVPMVATV' for: 'A*02:01') core ==> 'NLVPMVATV'
+(Immuno predict: 'NLVPMVATV' for: 'A*02:01') allele ==> 'HLA-A*02:01'
+(Immuno predict: 'NLVPMVATV' for: 'A*02:01') peptide ==> Peptide(NLVPMVATV)
+((Immuno predict: 'NLVPMVATV' for: 'A*02:01') rank * 1000) rounded ==> 665
+(Immuno predict: 'NLVPMVATV' for: 'A*02:01') category ==> #strong
+(Immuno predict: 'GILGFVFTL' for: 'A*02:01') category ==> #weak
+(Immuno predict: 'KKKKKKKKK' for: 'A*02:01') category ==> #nonbinder
+(Immuno predict: 'NLVPMVATV' for: 'A*02:01') isStrong ==> true
+(Immuno predict: 'GILGFVFTL' for: 'A*02:01') isStrong ==> false
+(Immuno predict: 'GILGFVFTL' for: 'A*02:01') isBinder ==> true
+(Immuno predict: 'KKKKKKKKK' for: 'A*02:01') isBinder ==> false
+(Immuno predict: 'NLVPMVATV' for: 'A*02:01') strongRank ==> 1.0
+(Immuno predict: 'NLVPMVATV' for: 'A*02:01') weakRank ==> 5.0
+(Immuno predict: 'PKYVKQNTLKLAT' for: 'DRB1*01:01') strongRank ==> 2.0
+(Immuno predict: 'PKYVKQNTLKLAT' for: 'DRB1*01:01') weakRank ==> 10.0
+(Immuno predict: 'PKYVKQNTLKLAT' for: 'DRB1*01:01') core ==> 'YVKQNTLKL'
+(Immuno predict: 'PKYVKQNTLKLAT' for: 'DRB1*01:01') category ==> #strong
+Immuno rank: 'GILGFVFTL' for: 'A*24:02' ==> 11.979640714205958
+(Immuno isBinder: 'GILGFVFTL' to: 'A*02:01') ==> true
+(Immuno isBinder: 'GILGFVFTL' to: 'B*07:02') ==> false
+(Immuno predict: 'GILGFVFTL' forAll: #('A*02:01' 'A*24:02' 'B*07:02' 'B*27:05')) first allele ==> 'HLA-A*02:01'
+(Immuno predict: 'GILGFVFTL' forAll: #('A*02:01' 'A*24:02' 'B*07:02' 'B*27:05')) size ==> 4
+(Immuno predict: 'RPQVPLRPM' forAll: #('A*02:01' 'A*24:02' 'B*07:02' 'B*27:05')) first allele ==> 'HLA-B*07:02'
+Immuno lengthsFor: 'A*02:01' ==> #(8 9 10 11)
+Immuno lengthsFor: 'DRB1*01:01' ==> #(15)
+(Immuno matrixFor: 'A*02:01') == (AlleleModels matrixFor: 'A*02:01') ==> true
+# the same models, each on its textbook epitope
+(Immuno predict: 'VTEHDTLLY' for: 'A*01:01') category ==> #strong
+(Immuno predict: 'ILRGSVAHK' for: 'A*03:01') category ==> #strong
+(Immuno predict: 'QYDPVAALF' for: 'A*24:02') category ==> #strong
+(Immuno predict: 'TPQDLNTML' for: 'B*07:02') category ==> #strong
+(Immuno predict: 'FLRGRAYGL' for: 'B*08:01') category ==> #strong
+(Immuno predict: 'RRIYDLIEL' for: 'B*27:05') category ==> #strong
+(Immuno predict: 'FPVRPQVPL' for: 'B*35:01') category ==> #strong
+(Immuno predict: 'ISPRTLNAW' for: 'B*57:01') category ==> #strong
+(Immuno predict: 'KKKKKKKKK' for: 'B*57:01') category ==> #nonbinder
+(Immuno predict: 'AAAAAAAAA' for: 'B*07:02') category ==> #nonbinder
+# other lengths
+(Immuno predict: 'ILGFVFTL' for: 'A*02:01') core ==> 'ILG-FVFTL'
+(Immuno predict: 'GILGFVFTLT' for: 'A*02:01') core ==> 'GILFVFTLT'
+(Immuno predict: 'GILGFVFTLTV' for: 'A*02:01') core ==> 'GILVFTLTV'
+(Immuno predict: 'ILGFVFTL' for: 'A*02:01') tenths ==> 53
+(Immuno predict: 'GILGFVFTL' for: 'A*02:01') tenths ==> 51
+(Immuno predict: 'GILGFVFTLT' for: 'A*02:01') tenths ==> 24
+(Immuno predict: 'GILGFVFTLTV' for: 'A*02:01') tenths ==> 43
+[Immuno predict: 'GILG' for: 'A*02:01'] on: ImmunoError do: [:e | e messageText] ==> 'HLA-A*02:01 scores peptides of 8 to 11 residues, not 4'
+[Immuno predict: 'GILGFVFTLTVPS' for: 'A*02:01'] on: ImmunoError do: [:e | e messageText] ==> 'HLA-A*02:01 scores peptides of 8 to 11 residues, not 13'
+[Immuno predict: 'GILGFVFT' for: 'DRB1*01:01'] on: ImmunoError do: [:e | e messageText] ==> 'HLA-DRB1*01:01 scores peptides of 9 to 30 residues, not 8'
+(Immuno predict: 'TSTLQEQIGW' for: 'B*57:01') category ==> #strong
+(Immuno predict: 'HPVGEADYFEY' for: 'B*35:01') category ==> #weak
+| m | m := AlleleModels matrixFor: 'A*02:01'. (m deletions: 1 of: 'ABCDEFGHIJ' from: 4 to: 7) ==> OrderedCollection ('ABCEFGHIJ' 'ABCDFGHIJ' 'ABCDEGHIJ' 'ABCDEFHIJ')
+| m | m := AlleleModels matrixFor: 'A*02:01'. (m deletions: 2 of: 'ABCDEFGHIJK' from: 4 to: 8) size ==> 10
+| m | m := AlleleModels matrixFor: 'A*02:01'. (m deletions: 0 of: 'ABC' from: 1 to: 2) ==> #('ABC')
+# scanning
+((Immuno exampleProtein: #influenzaM1) size) ==> 252
+((Immuno exampleProtein: #ubiquitin) size) ==> 76
+((Immuno exampleProtein: #beta2microglobulin) size) ==> 99
+((Immuno exampleProtein: #influenzaM1) indexOfSubCollection: 'GILGFVFTL') ==> 58
+[Immuno exampleProtein: #nothing] on: ImmunoError do: [:e | e messageText] ==> 'no example protein called #nothing'
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. r size ==> 974
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. r binders size ==> 31
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. r strongBinders size ==> 1
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (r atLength: 9) size ==> 244
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (r atLength: 8) size ==> 245
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (r atLength: 12) size ==> 0
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. r alleles ==> #('HLA-A*02:01')
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. r protein size ==> 252
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (r best: 3) collect: [:p | p peptide asString] ==> #('LLTEVETYV' 'DLEVLMEWL' 'SLSYSAGAL')
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (r best: 1) first position ==> 3
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (r best: 1) first endPosition ==> 11
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (r sortedByRank first rank <= r sortedByRank last rank) ==> true
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. r regions ==> #(#(2 31 7) #(38 80 11) #(92 99 1) #(116 142 6) #(164 181 4) #(228 246 2))
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (r coverage * 1000) rounded ==> 575
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (r select: [:p | p position = 58 and: [p peptide size = 9]]) predictions first category ==> #weak
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (r forAllele: 'A*02:01') size = r size ==> true
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (r forAllele: 'B*07:02') size ==> 0
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. r peptides size ==> 974
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (r report lines at: 1) ==> 'scanned 252 residues against 1 allele(s): 974 windows, 31 binders (1 strong)'
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. r printString ==> 'ScanResult(974 windows, 31 binders)'
+| r | r := Immuno scan: 'MSLLTEVETYVLSIIPSGP' for: 'A*02:01'. r size ==> 42
+| r | r := Immuno scan: 'MSLLTEXETYVLSIIPSGP' for: 'A*02:01'. r size ==> 14
+| r | r := Immuno scan: 'MSLLT EVET YVLS 12 IIPSGP' for: 'A*02:01'. r protein ==> 'MSLLTEVETYVLSIIPSGP'
+| r | r := Immuno scan: 'GIL' for: 'A*02:01'. r size ==> 0
+| r | r := Immuno scan: 'GILGFVFTL' for: 'A*02:01'. r coverage ==> 1.0
+| r | r := Immuno scan: 'GILGFVFTL' for: 'B*07:02'. r coverage ==> 0.0
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) forAll: #('A*02:01' 'A*01:01' 'B*07:02' 'A*03:01'). r size ==> 3896
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) forAll: #('A*02:01' 'A*01:01' 'B*07:02' 'A*03:01'). r binders size ==> 135
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) forAll: #('A*02:01' 'A*01:01' 'B*07:02' 'A*03:01'). (r coverage * 1000) rounded ==> 921
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) forAll: #('A*02:01' 'A*01:01' 'B*07:02' 'A*03:01'). r presentation size ==> 132
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) forAll: #('A*02:01' 'A*01:01' 'B*07:02' 'A*03:01'). (r presentation select: [:a | a size > 1]) size ==> 3
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) forAll: #('A*02:01' 'A*01:01' 'B*07:02' 'A*03:01'). (r presentation at: 'DLLENLQAY') ==> #('HLA-A*01:01' 'HLA-A*03:01')
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) forAll: #('A*02:01' 'DRB1*01:01'). r alleles ==> #('HLA-A*02:01' 'HLA-DRB1*01:01')
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) forAll: #('A*02:01' 'DRB1*01:01'). r size ==> 1212
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'DRB1*01:01'. r size ==> 238
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'DRB1*01:01'. r binders size ==> 28
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'DRB1*01:01'. r regions ==> #(#(1 26 11) #(126 158 17))
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'DRB1*01:01'. (r atLength: 15) size = r size ==> true
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'DRB1*01:01'. (r best: 1) first core ==> 'LTEVETYVL'
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'DRB1*01:01'. (r best: 1) first position ==> 1
+| r | r := ScanResult scan: 'ABCDEFGHIK' alleles: #('A*02:01') lengths: #(9). r size ==> 0
+| r | r := ScanResult scan: (Immuno exampleProtein: #ubiquitin) alleles: #('A*03:01') lengths: #(9). r strongBinders size ==> 1
+(ScanResult cleanProtein: 'mq if*') ==> 'MQIF*'
+(ScanResult cleanProtein: (Peptide on: 'GILG')) ==> 'GILG'
+| n | n := OrderedCollection new. ScanResult windowsOf: 'ABXDEF' length: 2 do: [:s :w | n add: s -> w]. n asArray ==> #(4->'DE' 5->'EF')
+| n | n := OrderedCollection new. ScanResult windowsOf: 'AB' length: 3 do: [:s :w | n add: s]. n size ==> 0
+# a person's genotype
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02 C*07:02 C*04:01 DRB1*01:01 DRB1*15:01') printString ==> 'A*02:01/24:02 B*07:02/07:02 C*07:02/04:01 DRB1*01:01/15:01'
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02 C*07:02 C*04:01 DRB1*01:01 DRB1*15:01') loci ==> #('A' 'B' 'C' 'DRB1')
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02 C*07:02 C*04:01 DRB1*01:01 DRB1*15:01') alleles size ==> 8
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02 C*07:02 C*04:01 DRB1*01:01 DRB1*15:01') distinctAlleles size ==> 7
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02 C*07:02 C*04:01 DRB1*01:01 DRB1*15:01') homozygousLoci ==> #('B')
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02') isHomozygousAt: 'B' ==> true
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02') isHomozygousAt: 'A' ==> false
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02') isHomozygousAt: 'B' ==> true
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02') hasLocus: 'C' ==> false
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02') hasLocus: 'B' ==> true
+(Immuno genotype: 'A*02:01,A*24:02;B*07:02') printString ==> 'A*02:01/24:02 B*07:02/07:02'
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02') allelesAt: 'B' ==> #(HLA-B*07:02 HLA-B*07:02)
+[(Immuno genotype: 'A*02:01 A*24:02') allelesAt: 'B'] on: ImmunoError do: [:e | e messageText] ==> 'this genotype has no B typing'
+[Immuno genotype: 'A*02:01 A*24:02 A*01:01'] on: ImmunoError do: [:e | e messageText] ==> 'more than two alleles at locus A'
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02 C*07:02 C*04:01 DRB1*01:01 DRB1*15:01') classI size ==> 5
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02 C*07:02 C*04:01 DRB1*01:01 DRB1*15:01') classII ==> #(HLA-DRB1*01:01 HLA-DRB1*15:01)
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02 C*07:02 C*04:01 DRB1*01:01 DRB1*15:01') modelled ==> #(HLA-A*02:01 HLA-A*24:02 HLA-B*07:02 HLA-DRB1*01:01 HLA-DRB1*15:01)
+(Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02 C*07:02 C*04:01 DRB1*01:01 DRB1*15:01') supertypes ==> #('A2' 'A24' 'B7')
+(Immuno genotype: 'A*02:01:01:01 A*24:02:01 B*07:02') truncatedTo: 2 ==> A*02:01/24:02 B*07:02/07:02
+| g r | g := Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02 DRB1*01:01'. r := Immuno scan: (Immuno exampleProtein: #influenzaM1) genotype: g. r alleles ==> #('HLA-A*02:01' 'HLA-A*24:02' 'HLA-B*07:02' 'HLA-DRB1*01:01')
+| g r | g := Immuno genotype: 'A*02:01 A*24:02 B*07:02 B*07:02 DRB1*01:01'. r := Immuno scan: (Immuno exampleProtein: #influenzaM1) genotype: g. (r coverage * 1000) rounded ==> 841
+# antigen processing
+AntigenProcessing cleavageProfile: 'AALPLKFGD' ==> #(0.3 0.3 -1.5 -1.0 1.5 0.5 1.5 -0.5 1.0)
+AntigenProcessing cleavageProfile: 'LPLP' ==> #(-1.5 -1.0 -1.5 1.0)
+(AntigenProcessing cleavageScoreAfter: 1 in: 'LP') ==> -1.5
+(AntigenProcessing cleavageScoreAfter: 2 in: 'LP') ==> 1.0
+AntigenProcessing cleavageSites: 'AALPLKFGDLL' ==> #(5 7 10)
+AntigenProcessing transportScore: 'GILGFVFTL' ==> 1.2
+AntigenProcessing transportScore: 'GILGFVFTD' ==> -1.5
+((AntigenProcessing transportScore: 'PPLGFVFTL') * 10) rounded ==> 2
+AntigenProcessing transportScore: 'GILGFVFTP' ==> -2.0
+(AntigenProcessing processingScoreOf: 'GILGFVFTL' at: 58 in: (Immuno exampleProtein: #influenzaM1)) rounded ==> 2
+((AntigenProcessing processingScoreOf: 'GILGFVFTL' at: 58 in: (Immuno exampleProtein: #influenzaM1)) * 100) rounded ==> 195
+(((AntigenProcessing processingScoreOf: 'GILGFVFTL' at: 1 in: 'GILGFVFTLAAA') * 100) rounded) ==> 195
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (AntigenProcessing rank: r) size = r size ==> true
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. ((AntigenProcessing rank: r) first at: 2) >= ((AntigenProcessing rank: r) last at: 2) ==> true
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. ((AntigenProcessing rank: r) first at: 1) peptide asString ==> 'SLSYSAGAL'
+| r | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) for: 'A*02:01'. (((AntigenProcessing presentationScoreOf: (r best: 1) first in: r protein)) * 10) rounded ==> 73
+# self and non-self
+| s | s := SelfProteome withProteins: (Array with: (Immuno exampleProtein: #ubiquitin)). s size ==> 332
+| s | s := SelfProteome withProteins: (Array with: (Immuno exampleProtein: #ubiquitin) with: (Immuno exampleProtein: #beta2microglobulin)). s size ==> 779
+| s | s := SelfProteome withProteins: (Array with: (Immuno exampleProtein: #ubiquitin) with: (Immuno exampleProtein: #beta2microglobulin)). s proteinCount ==> 2
+| s | s := SelfProteome withProteins: (Array with: (Immuno exampleProtein: #ubiquitin)). s includes: 'KTLTGKTIT' ==> true
+| s | s := SelfProteome withProteins: (Array with: (Immuno exampleProtein: #ubiquitin)). s includes: (Peptide on: 'KTLTGKTIT') ==> true
+| s | s := SelfProteome withProteins: (Array with: (Immuno exampleProtein: #ubiquitin)). s includes: 'GILGFVFTL' ==> false
+| s | s := SelfProteome withProteins: (Array with: (Immuno exampleProtein: #ubiquitin)). (s nearest: 'KTLAGKTIT') first ==> 'KTLTGKTIT'
+| s | s := SelfProteome withProteins: (Array with: (Immuno exampleProtein: #ubiquitin)). ((s nearest: 'KTLAGKTIT') at: 2) > 0.8 ==> true
+| s | s := SelfProteome withProteins: (Array with: (Immuno exampleProtein: #ubiquitin)). s mismatchesToNearest: 'KTLAGKTIT' ==> 1
+| s | s := SelfProteome withProteins: (Array with: (Immuno exampleProtein: #ubiquitin)). s mismatchesToNearest: 'KTLTGKTIT' ==> 0
+| s | s := SelfProteome withProteins: (Array with: (Immuno exampleProtein: #ubiquitin)). s mismatchesToNearest: 'KTLTGKTITLEVEPSDTIENVKA' ==> nil
+| s | s := SelfProteome withProteins: (Array with: (Immuno exampleProtein: #ubiquitin)). s nearest: 'KTLTGKTITLEVEPSDTIENVKA' ==> nil
+SelfProteome new size ==> 0
+# building models
+| m | m := BindingMatrix fromMotif: #(#(2 'W' 10) #(9 'K' 10)) name: 'HLA-X*01:01' class: 1. (m cellAt: 2 residue: $W) ==> 3.3
+| m | m := BindingMatrix fromMotif: #(#(2 'W' 10) #(9 'K' 10)) name: 'HLA-X*01:01' class: 1. (m cellAt: 2 residue: $A) ==> 0.0
+| m | m := BindingMatrix fromMotif: #(#(2 'W' 10) #(9 'K' 10)) name: 'HLA-X*01:01' class: 1. m maxScore ==> 6.6
+| m | m := BindingMatrix fromMotif: #(#(2 'W' 10) #(9 'K' 10)) name: 'HLA-X*01:01' class: 1. m minScore ==> 0.0
+| m | m := BindingMatrix fromMotif: #(#(2 'W' 10) #(9 'K' 10)) name: 'HLA-X*01:01' class: 1. m anchors ==> #(9 2)
+| m | m := BindingMatrix fromMotif: #(#(2 'W' 10) #(9 'K' 10)) name: 'HLA-X*01:01' class: 1. (m predict: 'AWAAAAAAK') score ==> 6.6
+| m | m := BindingMatrix fromMotif: #(#(2 'W' 10) #(9 'K' 10)) name: 'HLA-X*01:01' class: 1. (m predict: 'AWAAAAAAK') category ==> #strong
+| m | m := BindingMatrix fromMotif: #(#(2 'W' 10) #(9 'K' 10)) name: 'HLA-X*01:01' class: 1. (m predict: 'AAAAAAAAA') score ==> 0.0
+| m | m := BindingMatrix fromMotif: #(#(2 'W' 10) #(9 'K' 10)) name: 'HLA-X*01:01' class: 1. m source ==> 'a motif'
+| m | m := BindingMatrix fromMotif: #(#(2 'W' 10) #(9 'K' 10)) name: 'HLA-X*01:01' class: 1. m printString ==> 'BindingMatrix(HLA-X*01:01, a motif)'
+| m | m := BindingMatrix fromMotif: #(#(2 'W' 10) #(2 'WY' 4)) name: 'x' class: 1. (m cellAt: 2 residue: $W) ==> 2.0
+[BindingMatrix fromMotif: #(#(2 'B' 10)) name: 'x' class: 1] on: ImmunoError do: [:e | e messageText] ==> 'not an amino acid: B'
+| m | m := BindingMatrix trainOn: #('NLVPMVATV' 'GLCTLVAML' 'ILKEPVHGV' 'LLFGYPVYV') name: 'HLA-A*02:01' class: 1. m source ==> 'trained on 4 peptides'
+| m | m := BindingMatrix trainOn: #('NLVPMVATV' 'GLCTLVAML' 'ILKEPVHGV' 'LLFGYPVYV' 'KLVALGINAV') name: 'HLA-A*02:01' class: 1. m source ==> 'trained on 4 peptides'
+| m | m := BindingMatrix trainOn: #('NLVPMVATV' 'GLCTLVAML' 'ILKEPVHGV' 'LLFGYPVYV') name: 'HLA-A*02:01' class: 1. (m predict: 'NLVPMVATV') score > (m predict: 'KKKKKKKKK') score ==> true
+| m | m := BindingMatrix trainOn: (Immuno epitopesFor: 'A*02:01') name: 'HLA-A*02:01' class: 1. m mhcClass ==> 1
+| m | m := BindingMatrix trainOn: (Immuno epitopesFor: 'A*02:01') name: 'HLA-A*02:01' class: 1. (m topResidues: 1 at: 2) ==> 'L'
+| m | m := BindingMatrix trainOn: (Immuno epitopesFor: 'A*02:01') name: 'HLA-A*02:01' class: 1. (m rankOfTenths: m maxTenths) < 0.01 ==> true
+[BindingMatrix trainOn: #('GILG') name: 'x' class: 1] on: ImmunoError do: [:e | e messageText] ==> 'training needs peptides nine residues long'
+(BindingMatrix weightsFor: (Array with: 'AAAAAAAAA' asPeptide with: 'AAAAAAAAA' asPeptide with: 'CDEFGHIKL' asPeptide)) collect: [:w | (w * 1000) rounded] ==> #(750 750 1500)
+(BindingMatrix weightsFor: (Array with: 'AAAAAAAAA' asPeptide with: 'CDEFGHIKL' asPeptide)) collect: [:w | (w * 1000) rounded] ==> #(1000 1000)
+| train test m dec | train := #('NLVPMVATV' 'GLCTLVAML' 'ILKEPVHGV' 'LLFGYPVYV' 'YLQPRTFLL' 'CLGGLLTMV' 'RMFPNAPYL' 'LLWNGPMAV'). test := #('GILGFVFTL' 'SLYNTVATL'). m := BindingMatrix trainOn: train name: 'x' class: 1. dec := Immuno randomPeptides: 100 length: 9 seed: 3. (m aucFor: test against: dec) > 0.9 ==> true
+| train m | m := BindingMatrix trainOn: #('NLVPMVATV' 'GLCTLVAML' 'ILKEPVHGV' 'LLFGYPVYV') name: 'HLA-A*02:01' class: 1. AlleleModels add: m. ((AlleleModels matrixFor: 'A*02:01') source) , ' / ', ((AlleleModels removeAdded; matrixFor: 'A*02:01') source) ==> 'trained on 4 peptides / a motif'
+(Immuno epitopesFor: 'B*07:02') ==> #('RPQVPLRPM' 'TPQDLNTML' 'SPRWYFYYL')
+(Immuno epitopesFor: 'A*02:01') size ==> 14
+(Immuno epitopesFor: 'HLA-A*03:01:01') size ==> 3
+(Immuno epitopesFor: 'C*07:01') ==> #()
+(Immuno epitopesFor: 'DRB1*01:01') ==> #('PKYVKQNTLKLAT')
+Immuno knownEpitopes size ==> 33
+(Immuno knownEpitopes collect: [:row | row first]) asSet size ==> 33
+Immuno knownEpitopes allSatisfy: [:row | Peptide isValid: (row at: 1)] ==> true
+Immuno knownEpitopes allSatisfy: [:row | AlleleModels hasModelFor: (row at: 2)] ==> true
+Immuno knownEpitopes allSatisfy: [:row | HLAAllele isValid: (row at: 2)] ==> true
+# evaluating
+(Immuno evaluate: 'A*02:01') > 0.95 ==> true
+(Immuno evaluate: 'B*07:02') > 0.95 ==> true
+(Immuno evaluate: 'A*24:02') > 0.9 ==> true
+(Immuno evaluate: 'A*02:01') <= 1 ==> true
+[Immuno evaluate: 'A*11:01'] on: ImmunoError do: [:e | e messageText] ==> 'no known epitopes for HLA-A*11:01'
+(Immuno decoysFor: #('GILGFVFTL') seed: 3) first size ==> 9
+(Immuno decoysFor: #('GILGFVFTL' 'NLVPMVATV') seed: 3) size ==> 2
+(Immuno decoysFor: #('GILGFVFTL') seed: 3) = (Immuno decoysFor: #('GILGFVFTL') seed: 3) ==> true
+((Immuno decoysFor: #('GILGFVFTL') seed: 3) first asBag = 'GILGFVFTL' asBag) ==> true
+| m | m := AlleleModels matrixFor: 'A*02:01'. (m aucFor: #('NLVPMVATV') against: #('KKKKKKKKK')) ==> 1.0
+| m | m := AlleleModels matrixFor: 'A*02:01'. (m aucFor: #('KKKKKKKKK') against: #('NLVPMVATV')) ==> 0.0
+| m | m := AlleleModels matrixFor: 'A*02:01'. (m aucFor: #('NLVPMVATV') against: #('NLVPMVATV')) ==> 0.5
+# populations
+AlleleFrequencies example loci ==> #('A' 'B' 'DRB1')
+AlleleFrequencies example alleles size ==> 23
+(AlleleFrequencies example allelesAt: 'DRB1') size ==> 6
+AlleleFrequencies example name ==> 'example population'
+AlleleFrequencies example frequencyOf: 'A*02:01' ==> 0.27
+AlleleFrequencies example frequencyOf: 'HLA-A*02:01:01:01' ==> 0.27
+AlleleFrequencies example frequencyOf: 'A*99:99' ==> 0
+(AlleleFrequencies example totalAt: 'A') < 1 ==> true
+((AlleleFrequencies example totalAt: 'A') * 100) rounded ==> 76
+((AlleleFrequencies example remainderAt: 'A') * 100) rounded ==> 24
+((AlleleFrequencies example carrierFrequency: 'A*02:01') * 10000) rounded ==> 4671
+((AlleleFrequencies example expectedHeterozygosity: 'A') * 10000) rounded ==> 8722
+((AlleleFrequencies example genotypeFrequency: 'A*02:01' with: 'A*01:01') * 10000) rounded ==> 864
+((AlleleFrequencies example genotypeFrequency: 'A*02:01' with: 'A*02:01') * 10000) rounded ==> 729
+((AlleleFrequencies example genotypeFrequency: 'A*02:01' with: 'A*01:01') = (AlleleFrequencies example genotypeFrequency: 'A*01:01' with: 'A*02:01')) ==> true
+((AlleleFrequencies example coverageOf: #('A*02:01')) * 10000) rounded ==> 4671
+((AlleleFrequencies example coverageOf: #('A*02:01' 'A*01:01' 'A*03:01')) * 10000) rounded ==> 8064
+((AlleleFrequencies example coverageOf: #('A*02:01' 'B*07:02')) * 10000) rounded ==> 5966
+((AlleleFrequencies example coverageOf: #('A*02:01' 'A*01:01' 'A*03:01' 'B*07:02' 'B*08:01')) * 10000) rounded ==> 8882
+((AlleleFrequencies example coverageOf: #()) * 10000) rounded ==> 0
+((AlleleFrequencies example coverageOf: #('A*99:99')) * 10000) rounded ==> 0
+((AlleleFrequencies example coverageOf: #('A*02:01' 'A*01:01' 'A*03:01' 'B*07:02' 'B*08:01') atLeast: 2) * 10000) rounded ==> 5329
+((AlleleFrequencies example coverageOf: #('A*02:01' 'A*01:01' 'A*03:01' 'B*07:02' 'B*08:01') atLeast: 0) * 10000) rounded ==> 10000
+((AlleleFrequencies example averageHitsOf: #('A*02:01' 'A*01:01' 'A*03:01' 'B*07:02' 'B*08:01')) * 100) rounded ==> 160
+(AlleleFrequencies example hitDistributionOf: #('A*02:01' 'B*07:02')) size ==> 5
+((AlleleFrequencies example hitDistributionOf: #('A*02:01' 'B*07:02')) inject: 0 into: [:a :b | a + b]) rounded ==> 1
+(((AlleleFrequencies example hitDistributionOf: #('A*02:01' 'B*07:02')) collect: [:x | (x * 10000) rounded])) ==> #(4034 4189 1534 232 12)
+AlleleFrequencies example bestAlleles: 3 from: (AlleleFrequencies example alleles select: [:a | a gene = 'A']) ==> #(HLA-A*02:01 HLA-A*01:01 HLA-A*03:01)
+AlleleFrequencies example bestAlleles: 2 from: #('A*01:01' 'B*07:02' 'A*02:01') ==> #('A*02:01' 'A*01:01')
+AlleleFrequencies example bestAlleles: 10 from: #('A*01:01' 'B*07:02') ==> #('A*01:01' 'B*07:02')
+| f | f := AlleleFrequencies named: 'mine'. f at: 'A*02:01' put: 0.5. f at: 'A*01:01' put: 0.5. Array with: f name with: (f coverageOf: #('A*02:01')) with: (f totalAt: 'A') ==> #('mine' 0.75 1.0)
+| f | f := AlleleFrequencies fromGenotypes: #(#('A*02:01' 'A*02:01') #('A*02:01' 'A*01:01') #('A*01:01' 'A*03:01') #('A*03:01' 'A*03:01')) name: 'sample'. (f alleles collect: [:a | a name -> (f frequencyOf: a)]) ==> #('HLA-A*01:01'->(1/4) 'HLA-A*02:01'->(3/8) 'HLA-A*03:01'->(3/8))
+# Hardy-Weinberg and linkage
+((ImmunoMath chiSquareSurvival: 3.841458820694124 df: 1) * 10000) rounded ==> 500
+((ImmunoMath chiSquareSurvival: 10 df: 3) * 10000) rounded ==> 186
+((ImmunoMath chiSquareSurvival: 0.5 df: 4) * 10000) rounded ==> 9735
+((ImmunoMath chiSquareSurvival: 18.307038 df: 10) * 10000) rounded ==> 500
+(ImmunoMath chiSquareSurvival: 0 df: 2) ==> 1.0
+(ImmunoMath chiSquareSurvival: 100 df: 1) < 1.0e-20 ==> true
+((ImmunoMath lnGamma: 5) - 24 ln) abs < 1.0e-10 ==> true
+((ImmunoMath lnGamma: 0.5) - (Float pi ln / 2)) abs < 1.0e-10 ==> true
+((ImmunoMath upperGamma: 1 at: 2) - (-2.0 exp)) abs < 1.0e-12 ==> true
+| s | s := (Array new: 50 withAll: #('A*02:01' 'A*02:01')), (Array new: 100 withAll: #('A*02:01' 'A*01:01')), (Array new: 50 withAll: #('A*01:01' 'A*01:01')). (AlleleFrequencies hardyWeinbergTest: s) printString ==> 'Hardy-Weinberg at A: chi-square 0.00 on 1 df, p = 1.000'
+| s | s := (Array new: 50 withAll: #('A*02:01' 'A*02:01')), (Array new: 100 withAll: #('A*02:01' 'A*01:01')), (Array new: 50 withAll: #('A*01:01' 'A*01:01')). (AlleleFrequencies hardyWeinbergTest: s) isConsistent ==> true
+| s | s := (Array new: 80 withAll: #('A*02:01' 'A*02:01')), (Array new: 40 withAll: #('A*02:01' 'A*01:01')), (Array new: 80 withAll: #('A*01:01' 'A*01:01')). (AlleleFrequencies hardyWeinbergTest: s) printString ==> 'Hardy-Weinberg at A: chi-square 72.00 on 1 df, p = 0.000'
+| s | s := (Array new: 80 withAll: #('A*02:01' 'A*02:01')), (Array new: 40 withAll: #('A*02:01' 'A*01:01')), (Array new: 80 withAll: #('A*01:01' 'A*01:01')). (AlleleFrequencies hardyWeinbergTest: s) isConsistent ==> false
+| s | s := (Array new: 80 withAll: #('A*02:01' 'A*02:01')), (Array new: 40 withAll: #('A*02:01' 'A*01:01')), (Array new: 80 withAll: #('A*01:01' 'A*01:01')). (AlleleFrequencies hardyWeinbergTest: s) degrees ==> 1
+| s | s := (Array new: 80 withAll: #('A*02:01' 'A*02:01')), (Array new: 40 withAll: #('A*02:01' 'A*01:01')), (Array new: 80 withAll: #('A*01:01' 'A*01:01')). (AlleleFrequencies hardyWeinbergTest: s) chiSquare ==> 72.0
+| s | s := (Array new: 80 withAll: #('A*02:01' 'A*02:01')), (Array new: 40 withAll: #('A*02:01' 'A*01:01')), (Array new: 80 withAll: #('A*01:01' 'A*01:01')). (AlleleFrequencies hardyWeinbergTest: s) n ==> 200
+| s | s := (Array new: 80 withAll: #('A*02:01' 'A*02:01')), (Array new: 40 withAll: #('A*02:01' 'A*01:01')), (Array new: 80 withAll: #('A*01:01' 'A*01:01')). (AlleleFrequencies hardyWeinbergTest: s) locus ==> 'A'
+| s | s := (Array new: 80 withAll: #('A*02:01' 'A*02:01')), (Array new: 40 withAll: #('A*02:01' 'A*01:01')), (Array new: 80 withAll: #('A*01:01' 'A*01:01')). ((AlleleFrequencies hardyWeinbergTest: s) observed at: 'HLA-A*01:01 / HLA-A*02:01') ==> 40
+| s | s := (Array new: 80 withAll: #('A*02:01' 'A*02:01')), (Array new: 40 withAll: #('A*02:01' 'A*01:01')), (Array new: 80 withAll: #('A*01:01' 'A*01:01')). ((AlleleFrequencies hardyWeinbergTest: s) expected at: 'HLA-A*01:01 / HLA-A*02:01') ==> 100
+| s | s := (Array new: 80 withAll: #('A*02:01' 'A*02:01')), (Array new: 40 withAll: #('A*02:01' 'A*01:01')), (Array new: 80 withAll: #('A*01:01' 'A*01:01')). (AlleleFrequencies hardyWeinbergTest: s) pValue < 1.0e-10 ==> true
+[AlleleFrequencies hardyWeinbergTest: #()] on: ImmunoError do: [:e | e messageText] ==> 'no genotypes to test'
+[AlleleFrequencies hardyWeinbergTest: (Array new: 5 withAll: #('A*02:01' 'A*02:01'))] on: ImmunoError do: [:e | e messageText] ==> 'the sample has only one allele, so there is nothing to test'
+| s | s := (Array new: 4 withAll: #('A*02:01' 'A*02:01')), (Array new: 3 withAll: #('A*01:01' 'A*03:01')), (Array new: 3 withAll: #('A*02:01' 'A*03:01')). (AlleleFrequencies hardyWeinbergTest: s) degrees ==> 3
+(LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.15) printString ==> 'LinkageDisequilibrium(D 0.0900, D'' 0.64, r2 0.24)'
+((LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.15) d * 1000) rounded ==> 90
+((LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.15) expected * 1000) rounded ==> 60
+((LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.15) dMax * 1000) rounded ==> 140
+((LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.15) dPrime * 1000) rounded ==> 643
+((LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.15) rSquared * 1000) rounded ==> 241
+((LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.15) chiSquare: 500) rounded ==> 121
+((LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.15) pValue: 500) < 1.0e-20 ==> true
+(LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.06) d abs < 1.0e-12 ==> true
+(LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.06) dPrime abs < 1.0e-12 ==> true
+((LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.2) dPrime * 1000) rounded ==> 1000
+((LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.0) dPrime * 1000) rounded ==> -1000
+((LinkageDisequilibrium pA: 0.5 pB: 0.5 pAB: 0.5) rSquared * 1000) rounded ==> 1000
+(LinkageDisequilibrium pA: 0.0 pB: 0.5 pAB: 0.0) rSquared ==> 0
+(LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.15) pA ==> 0.2
+(LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.15) pB ==> 0.3
+(LinkageDisequilibrium pA: 0.2 pB: 0.3 pAB: 0.15) pAB ==> 0.15
+| h | h := (Array new: 15 withAll: #('A*01:01' 'B*08:01')), (Array new: 5 withAll: #('A*01:01' 'B*07:02')), (Array new: 15 withAll: #('A*02:01' 'B*08:01')), (Array new: 65 withAll: #('A*02:01' 'B*07:02')). (LinkageDisequilibrium fromHaplotypes: h allele: 'A*01:01' and: 'B*08:01') printString ==> 'LinkageDisequilibrium(D 0.0900, D'' 0.64, r2 0.24)'
+| h | h := (Array new: 15 withAll: #('A*01:01' 'B*08:01')), (Array new: 5 withAll: #('A*01:01' 'B*07:02')), (Array new: 15 withAll: #('A*02:01' 'B*08:01')), (Array new: 65 withAll: #('A*02:01' 'B*07:02')). (LinkageDisequilibrium fromHaplotypes: h allele: 'A*01:01' and: 'B*08:01') pAB ==> (3/20)
+# matching
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. b := Immuno genotype: 'A*01:01 A*03:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:02'. (HLAMatch recipient: a donor: b) printString ==> 'HLAMatch(8/10 at 2 fields)'
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. b := Immuno genotype: 'A*01:01 A*03:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:02'. (HLAMatch recipient: a donor: b) grade ==> '8/10'
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. b := Immuno genotype: 'A*01:01 A*03:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:02'. (HLAMatch recipient: a donor: b) matchCount ==> 8
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. b := Immuno genotype: 'A*01:01 A*03:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:02'. (HLAMatch recipient: a donor: b) mismatchCount ==> 2
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. b := Immuno genotype: 'A*01:01 A*03:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:02'. (HLAMatch recipient: a donor: b) isFullMatch ==> false
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. b := Immuno genotype: 'A*01:01 A*03:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:02'. (HLAMatch recipient: a donor: b) hostVersusGraft ==> #(HLA-A*03:01 HLA-DQB1*03:02)
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. b := Immuno genotype: 'A*01:01 A*03:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:02'. (HLAMatch recipient: a donor: b) graftVersusHost ==> #(HLA-A*02:01 HLA-DQB1*03:03)
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. b := Immuno genotype: 'A*01:01 A*03:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:02'. (HLAMatch recipient: a donor: b) matchesAt: 'A' ==> 1
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. b := Immuno genotype: 'A*01:01 A*03:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:02'. (HLAMatch recipient: a donor: b) mismatchesAt: 'B' ==> 0
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. b := Immuno genotype: 'A*01:01 A*03:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:02'. (HLAMatch recipient: a donor: b) loci ==> #('A' 'B' 'C' 'DRB1' 'DQB1')
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. b := Immuno genotype: 'A*01:01 A*03:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:02'. (HLAMatch recipient: a donor: b) report lines size ==> 8
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. (HLAMatch recipient: a donor: a) isFullMatch ==> true
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. (HLAMatch recipient: a donor: a) grade ==> '10/10'
+| a b | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01 C*07:01 C*06:02 DRB1*03:01 DRB1*07:01 DQB1*02:01 DQB1*03:03'. (HLAMatch recipient: a donor: a) hostVersusGraft ==> #()
+| a b | a := Immuno genotype: 'A*02:01 A*02:01'. b := Immuno genotype: 'A*02:01 A*01:01'. (HLAMatch recipient: a donor: b loci: #('A')) grade ==> '1/2'
+| a b | a := Immuno genotype: 'A*02:01 A*02:01'. b := Immuno genotype: 'A*02:01 A*01:01'. (HLAMatch recipient: a donor: b loci: #('A')) hostVersusGraft ==> #(HLA-A*01:01)
+| a b | a := Immuno genotype: 'A*02:01 A*02:01'. b := Immuno genotype: 'A*02:01 A*01:01'. (HLAMatch recipient: a donor: b loci: #('A')) graftVersusHost ==> #()
+| a b | a := Immuno genotype: 'A*02:01 A*01:01'. b := Immuno genotype: 'A*02:01 A*02:01'. (HLAMatch recipient: a donor: b loci: #('A')) hostVersusGraft ==> #()
+| a b | a := Immuno genotype: 'A*02:01 A*01:01'. b := Immuno genotype: 'A*02:01 A*02:01'. (HLAMatch recipient: a donor: b loci: #('A')) graftVersusHost ==> #(HLA-A*01:01)
+| a b | a := Immuno genotype: 'A*02:01 A*03:01'. b := Immuno genotype: 'A*11:01 A*24:02'. (HLAMatch recipient: a donor: b loci: #('A')) grade ==> '0/2'
+| a b | a := Immuno genotype: 'A*02:01 B*07:02'. b := Immuno genotype: 'A*02:05 B*07:02'. (HLAMatch recipient: a donor: b resolution: 1 loci: #('A' 'B')) grade ==> '4/4'
+| a b | a := Immuno genotype: 'A*02:01 B*07:02'. b := Immuno genotype: 'A*02:05 B*07:02'. (HLAMatch recipient: a donor: b resolution: 2 loci: #('A' 'B')) grade ==> '2/4'
+| a b | a := Immuno genotype: 'A*02:01:01:01 B*07:02'. b := Immuno genotype: 'A*02:01:02 B*07:02'. (HLAMatch recipient: a donor: b resolution: 3 loci: #('A' 'B')) grade ==> '2/4'
+| a b | a := Immuno genotype: 'A*02:01:01:01 B*07:02'. b := Immuno genotype: 'A*02:01:02 B*07:02'. (HLAMatch recipient: a donor: b resolution: 2 loci: #('A' 'B')) grade ==> '4/4'
+| a b | a := Immuno genotype: 'A*02:01 B*07:02'. b := Immuno genotype: 'A*02:01 B*07:02'. (HLAMatch recipient: a donor: b resolution: 2 loci: #('A' 'B')) printString ==> 'HLAMatch(4/4 at 2 fields)'
+| a b | a := Immuno genotype: 'A*02:01 B*07:02'. b := Immuno genotype: 'A*02:01 B*07:02'. (HLAMatch recipient: a donor: b resolution: 1 loci: #('A' 'B')) printString ==> 'HLAMatch(4/4 at 1 field)'
+| a b | a := Immuno genotype: 'A*02:01 B*07:02'. b := Immuno genotype: 'A*02:01'. [HLAMatch recipient: a donor: b loci: #('A' 'B')] on: ImmunoError do: [:e | e messageText] ==> 'both people must be typed at B'
+| a | a := Immuno genotype: 'A*01:01 A*02:01 B*08:01 B*57:01'. ((AlleleFrequencies example matchProbability: a loci: #('A' 'B')) * 1.0e6) rounded ==> 570
+| a | a := Immuno genotype: 'A*02:01 A*02:01 B*07:02 B*07:02'. ((AlleleFrequencies example matchProbability: a loci: #('A' 'B')) * 1.0e6) rounded ==> 1232
+# choosing epitopes
+| r f | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) forAll: #('A*02:01' 'A*01:01' 'A*03:01' 'A*24:02' 'B*07:02' 'B*08:01' 'B*44:02'). f := AlleleFrequencies example. (Immuno selectEpitopes: 4 from: r population: f) size ==> 4
+| r f | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) forAll: #('A*02:01' 'A*01:01' 'A*03:01' 'A*24:02' 'B*07:02' 'B*08:01' 'B*44:02'). f := AlleleFrequencies example. (Immuno selectEpitopes: 4 from: r population: f) collect: [:row | row first] ==> #('NMDKAVKL' 'DLLENLQAY' 'DPNNMDKA' 'AEIAQRLEDVF')
+| r f | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) forAll: #('A*02:01' 'A*01:01' 'A*03:01' 'A*24:02' 'B*07:02' 'B*08:01' 'B*44:02'). f := AlleleFrequencies example. (Immuno selectEpitopes: 4 from: r population: f) collect: [:row | (row at: 3) * 1000 // 1] ==> #(675 902 929 943)
+| r f rows | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) forAll: #('A*02:01' 'A*01:01' 'A*03:01' 'A*24:02' 'B*07:02' 'B*08:01' 'B*44:02'). f := AlleleFrequencies example. rows := Immuno selectEpitopes: 4 from: r population: f. (1 to: 3) allSatisfy: [:i | ((rows at: i) at: 3) < ((rows at: i + 1) at: 3)] ==> true
+| r f | r := Immuno scan: (Immuno exampleProtein: #influenzaM1) forAll: #('A*02:01' 'A*01:01' 'A*03:01' 'A*24:02' 'B*07:02' 'B*08:01' 'B*44:02'). f := AlleleFrequencies example. (Immuno selectEpitopes: 1 from: r population: f) first at: 2 ==> #('HLA-A*02:01' 'HLA-A*24:02' 'HLA-B*08:01')
+| r f | r := Immuno scan: 'GILGFVFTL' forAll: #('A*02:01') . f := AlleleFrequencies example. (Immuno selectEpitopes: 5 from: r population: f) size ==> 2
+| r f | r := Immuno scan: 'KKKKKKKKK' forAll: #('A*02:01') . f := AlleleFrequencies example. (Immuno selectEpitopes: 5 from: r population: f) size ==> 0
+# the workspace
+(ImmunoTool evaluate: 'A*02:01', (String with: Character lf), 'GILGFVFTL') lines size ==> 2
+(ImmunoTool evaluate: 'HLA-A*02:01 HLA-B*07:02') lines first ==> 'alleles: #(HLA-A*02:01 HLA-B*07:02)'
+(ImmunoTool evaluate: '') size > 10 ==> true
+ImmunoTool evaluate: '"a comment with A*02:01 in it"' ==> 'nothing to score: give some alleles (A*02:01) and a sequence'
+ImmunoTool stripComments: 'ab"cd"ef' ==> 'abef'
+(ImmunoTool linesOf: 'a', (String with: Character lf), 'b') size ==> 2
+(ImmunoTool evaluate: 'A*99:99', (String with: Character lf), 'GILGFVFTL') lines first ==> 'alleles: #(HLA-A*99:99)'
+(ImmunoTool evaluate: 'GILGFVFTL') lines first ==> 'no alleles yet for GILGFVFTL'
+(ImmunoTool evaluate: 'A*02:01', (String with: Character lf), 'GILGFVFTB') lines last ==> 'not a sequence: GILGFVFTB'
+(ImmunoTool evaluate: ImmunoTool welcomeText) size > 200 ==> true
+Immuno version ==> '1.0'
+Immuno examples size ==> 6
+(Immuno allele: 'A*02:01') name ==> 'HLA-A*02:01'
+Immuno population name ==> 'example population'
+Immuno directory size > 0 ==> true
+# formatting
+ImmunoFormat number: 3.14159 places: 2 ==> '3.14'
+ImmunoFormat number: 0.005 places: 2 ==> '0.01'
+ImmunoFormat number: -2.5 places: 1 ==> '-2.5'
+ImmunoFormat number: -0.04 places: 1 ==> '0.0'
+ImmunoFormat number: 7 places: 0 ==> '7'
+ImmunoFormat percent: 0.4671 ==> '46.7%'
+ImmunoFormat padded: 'ab' to: 5 ==> 'ab   '
+ImmunoFormat right: 'ab' to: 5 ==> '   ab'
+ImmunoFormat padded: 'abcdef' to: 3 ==> 'abcdef'
