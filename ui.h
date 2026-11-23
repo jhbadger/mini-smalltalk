@@ -16,7 +16,9 @@ struct Pane {
     char **items; int nitems; int sel; int top;
     void (*on_select)(Pane *);
     /* text */
-    char *text; int len, cap; int cursor, anchor; int tline; int hoff; int prefcol; bool readonly; bool dirty; bool wrap;
+    char *text; int len, cap; int cursor, anchor; int tline; int hoff; int prefcol; bool readonly; bool dirty;
+    bool wrap;                                /* soft-wrap long lines at the pane width (display only; the text is never changed). On by default; tline is then a display-row index */
+    bool at_end;                              /* scroll to the end once the pane has a size (see text_scroll_to_end) */
     bool (*on_key)(Pane *, Event *);          /* return true if handled */
     void (*line_style)(Pane *, int pos, int *fg, int *bg);   /* optional: colours for the line starting at pos */
     /* button */

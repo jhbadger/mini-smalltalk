@@ -52,7 +52,7 @@ static Pane *pane_new(Window *w, int type) {
     if (w->npanes < 16) w->panes[w->npanes++] = p; if (!w->focus) w->focus = p; return p;
 }
 Pane *win_add_list(Window *w, void (*on_select)(Pane *)) { Pane *p = pane_new(w, PANE_LIST); p->on_select = on_select; return p; }
-Pane *win_add_text(Window *w, bool readonly) { Pane *p = pane_new(w, PANE_TEXT); p->readonly = readonly; p->text = calloc(1, 64); p->cap = 64; return p; }
+Pane *win_add_text(Window *w, bool readonly) { Pane *p = pane_new(w, PANE_TEXT); p->readonly = readonly; p->wrap = true; p->text = calloc(1, 64); p->cap = 64; return p; }
 Pane *win_add_button(Window *w, const char *label, void (*on_click)(Pane *)) { Pane *p = pane_new(w, PANE_BUTTON); snprintf(p->label, sizeof p->label, "%s", label); p->on_click = on_click; return p; }
 void ui_set_desktop_menu(const char **items, int n, void (*on_menu)(int)) { desk_menu = items; ndesk = n; desk_cb = on_menu; }
 
@@ -84,16 +84,59 @@ static int line_start(Pane *p, int pos) { while (pos > 0 && p->text[pos - 1] != 
 static int line_end(Pane *p, int pos) { while (pos < p->len && p->text[pos] != '\n') pos++; return pos; }
 static int line_of(Pane *p, int pos) { int n = 0; for (int i = 0; i < pos && i < p->len; i++) if (p->text[i] == '\n') n++; return n; }
 static int pos_of_line(Pane *p, int line) { int pos = 0; while (line > 0 && pos < p->len) { if (p->text[pos] == '\n') line--; pos++; } return pos; }
-static int nlines(Pane *p) { return line_of(p, p->len) + 1; }
-static int col_of(Pane *p, int pos) { int c = 0; for (int i = line_start(p, pos); i < pos; ) { uint32_t cp; int n = utf8_decode(p->text + i, &cp); if (cp == '\t') c += 4 - c % 4; else c += tui_cell_width(cp); i += n; } return c; }
-static int pos_at_col(Pane *p, int ls, int col) {
-    int c = 0, i = ls;
-    while (i < p->len && p->text[i] != '\n') { uint32_t cp; int n = utf8_decode(p->text + i, &cp); int w = cp == '\t' ? 4 - c % 4 : tui_cell_width(cp); if (c + w > col) break; c += w; i += n; }
+
+/* Display rows. Without wrap a row is a line. With wrap a long line is shown as several rows, broken at the last space that
+   fits (or mid-word if a word is longer than the pane). Nothing is inserted into the text: the breaks exist only on screen.
+   One column is kept spare so the cursor can sit just past the end of a full row. */
+static int wrap_width(Pane *p) { int w = p->r.w - 1; return w < 1 ? 1 : w; }
+static int width_between(Pane *p, int a, int b) {   /* cells from a to b, which are on one row, a being its start */
+    int c = 0; for (int i = a; i < b; ) { uint32_t cp; int n = utf8_decode(p->text + i, &cp); if (cp == '\t') c += 4 - c % 4; else c += tui_cell_width(cp); i += n; } return c;
+}
+static int row_end(Pane *p, int rs) {   /* where the row that starts at rs stops: a soft break, or the end of its line */
+    if (!p->wrap) return line_end(p, rs);
+    int W = wrap_width(p), c = 0, i = rs, brk = -1;
+    while (i < p->len && p->text[i] != '\n') {
+        uint32_t cp; int n = utf8_decode(p->text + i, &cp);
+        int w = cp == '\t' ? 4 - c % 4 : tui_cell_width(cp);
+        if (c + w > W) {
+            if (cp == ' ') return i + n;               /* a space may hang in the spare column rather than start the next row */
+            if (brk > rs) return brk;
+            return i > rs ? i : i + n;                 /* no space to break at: split the word (always take one character, so we move on) */
+        }
+        c += w; i += n; if (cp == ' ' || cp == '\t') brk = i;
+    }
+    return i;
+}
+static bool row_is_hard(Pane *p, int re) { return re >= p->len || p->text[re] == '\n'; }   /* the row ends its line (not a soft break) */
+static int row_next(Pane *p, int re) { return p->text[re] == '\n' ? re + 1 : re; }          /* start of the following row; only if re < len */
+static void row_col(Pane *p, int pos, int *row, int *col) {   /* the display row and column that a text position falls at */
+    if (pos > p->len) pos = p->len;
+    if (!p->wrap) { *row = line_of(p, pos); *col = width_between(p, line_start(p, pos), pos); return; }
+    int r = 0, rs = 0;
+    for (;;) {
+        int re = row_end(p, rs), hard = row_is_hard(p, re);
+        if (pos < re || (pos == re && hard)) { *row = r; *col = width_between(p, rs, pos); return; }
+        rs = row_next(p, re); r++;     /* pos == re on a soft break belongs to the next row */
+    }
+}
+static int pos_of_row(Pane *p, int row) {
+    if (!p->wrap) return pos_of_line(p, row);
+    int rs = 0;
+    while (row > 0) { int re = row_end(p, rs); if (re >= p->len) return p->len; rs = row_next(p, re); row--; }
+    return rs;
+}
+static int nrows(Pane *p) { int r, c; row_col(p, p->len, &r, &c); return r + 1; }
+static int col_of(Pane *p, int pos) { int r, c; row_col(p, pos, &r, &c); return c; }
+static int pos_at_col(Pane *p, int rs, int col) {   /* the position in the row starting at rs that is at (or just before) column col */
+    int re = row_end(p, rs), c = 0, i = rs;
+    while (i < re) { uint32_t cp; int n = utf8_decode(p->text + i, &cp); int w = cp == '\t' ? 4 - c % 4 : tui_cell_width(cp); if (c + w > col) break; c += w; i += n; }
+    if (i == re && i > rs && !row_is_hard(p, re)) { i--; while (i > rs && (p->text[i] & 0xc0) == 0x80) i--; }   /* not the next row's first position */
     return i;
 }
 void text_show_cursor(Pane *p) {
-    int line = line_of(p, p->cursor), col = col_of(p, p->cursor);
-    if (line < p->tline) p->tline = line; if (line >= p->tline + p->r.h) p->tline = line - p->r.h + 1; if (p->tline < 0) p->tline = 0;
+    int row, col; row_col(p, p->cursor, &row, &col);
+    if (row < p->tline) p->tline = row; if (row >= p->tline + p->r.h) p->tline = row - p->r.h + 1; if (p->tline < 0) p->tline = 0;
+    if (p->wrap) { p->hoff = 0; return; }
     if (col < p->hoff) p->hoff = col; if (col >= p->hoff + p->r.w - 1) p->hoff = col - p->r.w + 2; if (p->hoff < 0) p->hoff = 0;
 }
 void text_set(Pane *p, const char *s) { int n = (int)strlen(s); text_reserve(p, n); memcpy(p->text, s, n + 1); p->len = n; p->cursor = 0; p->anchor = -1; p->tline = 0; p->hoff = 0; p->dirty = false; }
@@ -113,7 +156,11 @@ void text_copy(Pane *p) { char *s = text_selection(p); if (s) { free(clipboard);
 void text_cut(Pane *p) { if (p->readonly) return; text_copy(p); if (has_sel(p)) { int a, b; sel_range(p, &a, &b); text_delete_range(p, a, b); text_show_cursor(p); } }
 void text_paste(Pane *p) { if (clipboard && !p->readonly) text_insert(p, clipboard); }
 void text_append(Pane *p, const char *s) { int n = (int)strlen(s); text_insert_at(p, p->len, s, n); p->dirty = false; }
-void text_scroll_to_end(Pane *p) { p->cursor = p->len; p->anchor = -1; int l = nlines(p); p->tline = l > p->r.h ? l - p->r.h : 0; p->hoff = 0; }
+void text_scroll_to_end(Pane *p) {
+    p->cursor = p->len; p->anchor = -1; p->hoff = 0;
+    if (p->r.w <= 0 || p->r.h <= 0) { p->at_end = true; return; }   /* not laid out yet (so the wrap width is unknown): draw_text finishes the job */
+    int l = nrows(p); p->tline = l > p->r.h ? l - p->r.h : 0;
+}
 
 /* ---------- drawing ---------- */
 static void draw_list(Pane *p, bool active) {
@@ -130,15 +177,17 @@ static void draw_list(Pane *p, bool active) {
 }
 static void draw_text(Pane *p, bool active) {
     int a = -1, b = -1; if (has_sel(p)) sel_range(p, &a, &b);
-    int pos = pos_of_line(p, p->tline);
+    if (p->wrap) p->hoff = 0;
+    if (p->at_end) { p->at_end = false; int l = nrows(p); p->tline = l > p->r.h ? l - p->r.h : 0; }
+    { int nr = nrows(p); if (p->tline >= nr) p->tline = nr - 1; if (p->tline < 0) p->tline = 0; }   /* the pane may have got wider since */
+    int pos = pos_of_row(p, p->tline); bool done = false;
     for (int row = 0; row < p->r.h; row++) {
-        bool past = pos > p->len || (pos == p->len && row > 0 && p->tline + row > line_of(p, p->len));
         int lfg = C_WIN_FG, lbg = C_WIN_BG;
-        if (!past && p->line_style) p->line_style(p, pos, &lfg, &lbg);
+        if (!done && p->line_style) p->line_style(p, pos, &lfg, &lbg);
         tui_fill(p->r.x, p->r.y + row, p->r.w, 1, ' ', lfg, lbg, 0);
-        if (past) continue;
-        int col = 0;
-        while (pos < p->len && p->text[pos] != '\n') {
+        if (done) continue;
+        int re = row_end(p, pos), col = 0;
+        while (pos < re) {
             uint32_t cp; int n = utf8_decode(p->text + pos, &cp);
             int w = cp == '\t' ? 4 - col % 4 : tui_cell_width(cp);
             bool insel = pos >= a && pos < b;
@@ -148,13 +197,14 @@ static void draw_text(Pane *p, bool active) {
             }
             col += w; pos += n;
         }
-        if (pos < p->len && pos >= a && pos < b && col - p->hoff >= 0 && col - p->hoff < p->r.w) tui_put(p->r.x + col - p->hoff, p->r.y + row, ' ', C_WIN_FG, C_SEL_BG, 0);
-        pos++;
+        bool hard = row_is_hard(p, re);
+        if (hard && re < p->len && re >= a && re < b && col - p->hoff >= 0 && col - p->hoff < p->r.w) tui_put(p->r.x + col - p->hoff, p->r.y + row, ' ', C_WIN_FG, C_SEL_BG, 0);   /* a selected newline shows as a highlighted blank */
+        if (re >= p->len) done = true; else pos = row_next(p, re);
     }
     if (active && !p->readonly && p->win == win_top()) {
-        int line = line_of(p, p->cursor), col = col_of(p, p->cursor);
-        if (line >= p->tline && line < p->tline + p->r.h && col - p->hoff >= 0 && col - p->hoff < p->r.w) {
-            int cx = p->r.x + col - p->hoff, cy = p->r.y + line - p->tline;
+        int crow, ccol; row_col(p, p->cursor, &crow, &ccol);
+        if (crow >= p->tline && crow < p->tline + p->r.h && ccol - p->hoff >= 0 && ccol - p->hoff < p->r.w) {
+            int cx = p->r.x + ccol - p->hoff, cy = p->r.y + crow - p->tline;
             uint32_t cp = ' ';
             if (p->cursor < p->len && p->text[p->cursor] != '\n' && p->text[p->cursor] != '\t') utf8_decode(p->text + p->cursor, &cp);
             if (cp < 32) cp = ' ';
@@ -198,8 +248,8 @@ static Window *window_at(int x, int y) { for (int i = nwindows - 1; i >= 0; i--)
 static Pane *pane_at(Window *w, int x, int y) { if (w->layout) w->layout(w); for (int i = 0; i < w->npanes; i++) if (in_rect(w->panes[i]->r, x, y)) return w->panes[i]; return NULL; }
 
 static void text_mouse_pos(Pane *p, int x, int y, int *pos) {
-    int line = p->tline + (y - p->r.y); int nl = nlines(p); if (line >= nl) line = nl - 1;
-    int ls = pos_of_line(p, line); *pos = pos_at_col(p, ls, x - p->r.x + p->hoff);
+    int line = p->tline + (y - p->r.y); int nl = nrows(p); if (line >= nl) line = nl - 1; if (line < 0) line = 0;
+    int ls = pos_of_row(p, line); *pos = pos_at_col(p, ls, x - p->r.x + p->hoff);
 }
 static void select_word(Pane *p) {
     int a = p->cursor, b = p->cursor;
@@ -237,7 +287,7 @@ static void pane_mouse(Pane *p, Event *ev) {
 }
 static void pane_wheel(Pane *p, int dir) {
     if (p->type == PANE_LIST) { p->top += dir * 3; int mx = p->nitems - p->r.h; if (p->top > mx) p->top = mx; if (p->top < 0) p->top = 0; }
-    else if (p->type == PANE_TEXT) { p->tline += dir * 3; int mx = nlines(p) - 1; if (p->tline > mx) p->tline = mx; if (p->tline < 0) p->tline = 0; }
+    else if (p->type == PANE_TEXT) { p->tline += dir * 3; int mx = nrows(p) - 1; if (p->tline > mx) p->tline = mx; if (p->tline < 0) p->tline = 0; }
 }
 static void move_cursor(Pane *p, Event *ev, int newpos, bool vertical) {
     if (ev->mods & MOD_SHIFT) { if (p->anchor < 0) p->anchor = p->cursor; } else p->anchor = -1;
@@ -256,9 +306,9 @@ static void text_key(Pane *p, Event *ev) {
     case KEY_LEFT: if (p->cursor > 0) { int c = p->cursor - 1; while (c > 0 && (p->text[c] & 0xc0) == 0x80) c--; move_cursor(p, ev, c, false); } return;
     case KEY_RIGHT: if (p->cursor < p->len) { int c = p->cursor + 1; while (c < p->len && (p->text[c] & 0xc0) == 0x80) c++; move_cursor(p, ev, c, false); } return;
     case KEY_UP: case KEY_DOWN: case KEY_PGUP: case KEY_PGDN: {
-        int line = line_of(p, p->cursor); int d = k == KEY_UP ? -1 : k == KEY_DOWN ? 1 : k == KEY_PGUP ? -p->r.h : p->r.h;
-        line += d; if (line < 0) line = 0; if (line >= nlines(p)) line = nlines(p) - 1;
-        move_cursor(p, ev, pos_at_col(p, pos_of_line(p, line), p->prefcol), true); return; }
+        int line, ccol; row_col(p, p->cursor, &line, &ccol); int d = k == KEY_UP ? -1 : k == KEY_DOWN ? 1 : k == KEY_PGUP ? -p->r.h : p->r.h;
+        line += d; if (line < 0) line = 0; if (line >= nrows(p)) line = nrows(p) - 1;
+        move_cursor(p, ev, pos_at_col(p, pos_of_row(p, line), p->prefcol), true); return; }
     case KEY_HOME: move_cursor(p, ev, line_start(p, p->cursor), false); return;
     case KEY_END: move_cursor(p, ev, line_end(p, p->cursor), false); return;
     }
@@ -375,7 +425,7 @@ static int dialog_result;
 static bool prompt_key(Pane *p, Event *ev) { if (ev->key == 13) { dialog_result = 1; return true; } if (ev->key == 27) { dialog_result = 0; return true; } return false; }
 char *dialog_prompt(const char *title, const char *initial) {
     int w = 50; Window *win = win_new(title, (tui_cols - w) / 2, tui_rows / 2 - 2, w, 4);
-    Pane *t = win_add_text(win, false); t->on_key = prompt_key; text_set(t, initial ? initial : ""); text_select_all(t);
+    Pane *t = win_add_text(win, false); t->wrap = false; t->on_key = prompt_key; text_set(t, initial ? initial : ""); text_select_all(t);
     t->r = (Rect){ win->r.x + 2, win->r.y + 1, w - 4, 1 };
     Pane *b1 = win_add_button(win, "[ OK ]", NULL), *b2 = win_add_button(win, "[ Cancel ]", NULL);
     b1->r = (Rect){ win->r.x + 2, win->r.y + 2, 8, 1 }; b2->r = (Rect){ win->r.x + 12, win->r.y + 2, 12, 1 };
@@ -404,7 +454,7 @@ static void no_click(Pane *p) { dialog_result = 0; }
 bool dialog_confirm(const char *title, const char *msg) {
     int w = (int)strlen(msg) + 6; if (w < 30) w = 30; if (w > tui_cols - 4) w = tui_cols - 4;
     Window *win = win_new(title, (tui_cols - w) / 2, tui_rows / 2 - 2, w, 5); win->on_key = confirm_key;
-    Pane *t = win_add_text(win, true); text_set(t, msg); t->r = (Rect){ win->r.x + 2, win->r.y + 1, w - 4, 1 };
+    Pane *t = win_add_text(win, true); t->wrap = false; text_set(t, msg); t->r = (Rect){ win->r.x + 2, win->r.y + 1, w - 4, 1 };
     Pane *b1 = win_add_button(win, "[ Yes ]", yes_click), *b2 = win_add_button(win, "[ No ]", no_click);
     b1->r = (Rect){ win->r.x + 2, win->r.y + 3, 9, 1 }; b2->r = (Rect){ win->r.x + 13, win->r.y + 3, 8, 1 };
     win->focus = b1;
@@ -435,7 +485,7 @@ int dialog_choose(const char *title, const char *prompt, char **items, int n) {
     Window *win = win_new(title, (tui_cols - w) / 2, (tui_rows - h) / 2, w, h);
     win->on_key = choose_key;
     Pane *lab = NULL;
-    if (prompt) { lab = win_add_text(win, true); text_set(lab, prompt); }
+    if (prompt) { lab = win_add_text(win, true); lab->wrap = false; text_set(lab, prompt); }
     Pane *lp = win_add_list(win, NULL);
     char **copy = malloc(sizeof(char *) * (n > 0 ? n : 1));
     for (int i = 0; i < n; i++) copy[i] = strdup(items[i]);

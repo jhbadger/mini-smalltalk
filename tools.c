@@ -174,7 +174,7 @@ static void nb_line_style(Pane *p, int pos, int *fg, int *bg) {
     int n; Cell *cs = nb_cells(p->text, p->len, pos, &n);
     int i = nb_cell_at(cs, n, pos, p->len);
     if (i >= 0) {
-        Cell c = cs[i]; bool fence = pos == c.open || (c.closed && pos >= c.body_end);
+        Cell c = cs[i]; bool fence = pos < c.body || (c.closed && pos >= c.body_end);
         if (c.kind == NB_RESULT) *fg = fence ? NB_FENCE_FG : NB_RESULT_FG;
         else { *bg = NB_CODE_BG; if (fence) *fg = NB_FENCE_FG; }
     }

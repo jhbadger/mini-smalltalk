@@ -35,7 +35,9 @@ changes. `-k dir` overrides where the kernel sources are looked for (and means: 
   (the Smalltalk-80 "yellow button"); right click on the desktop opens the
   **System menu** (browser, workspace, notebook, transcript, file in, quit). Drag a
   window by its title bar, resize with the `╯` corner, close with `[x]`.
-  The mouse wheel scrolls lists and text.
+  The mouse wheel scrolls lists and text. Long lines in text windows (notebooks, tutorials, workspaces, the browser's
+  code pane and so on) are word-wrapped to the window width, so nothing is cut off when a window is narrow; the wrap is
+  only how the text is shown, and no line breaks are ever added to it. Resizing a window re-wraps it.
 * **Keyboard**: `ctrl-D` do it, `ctrl-P` print it, `ctrl-T` inspect it,
   `ctrl-S` accept (browser), `ctrl-L` cancel, `ctrl-A/C/X/V` select-all/copy/cut/paste,
   `Esc` system menu, `Tab` cycles panes (in a text pane it inserts a tab; Shift-Tab cycles),
