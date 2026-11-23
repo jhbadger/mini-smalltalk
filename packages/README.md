@@ -3,14 +3,14 @@
 This folder holds systems that are **not** part of the standard image. Load one when you want it:
 
 ```smalltalk
-Smalltalk availablePackages            "#('Bio' 'Debugger' 'Greek' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
+Smalltalk availablePackages            "#('Bio' 'Debugger' 'Forth' 'Greek' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'        "files it in (once)"
 Smalltalk isPackageLoaded: 'Prolog'
 Smalltalk packageDescription: 'Prolog' "the first comment of its file"
 ```
 
 From the UI use **System menu → load package...**; from the shell start with `st -l Prolog`
-(`-l` may be repeated). A package can add items to the System menu (the Prolog package adds *prolog workspace*).
+(`-l` may be repeated). A package can add items to the System menu (the Prolog package adds *prolog workspace*, Forth adds *forth workspace*).
 
 What loading does:
 
@@ -64,6 +64,9 @@ Keep tests with the package: both packages have a `tests/tests.txt` of `expressi
   marked, variables by name, and evaluation in a frame. Loading it is enough; unhandled errors open it by themselves.
 * **[Regex](Regex/README.md)** — regular expressions: the usual pattern language matched by backtracking, with
   searching, replacing and splitting, and String messages such as `matchesRegex:` and `copyWithRegex:replacedWith:`.
+* **[Forth](Forth/README.md)** — a Forth system: an outer interpreter and compiler, the ANS core words and many more,
+  `create ... does>`, double-length numbers, a floating-point stack, `catch` and `throw`, a bridge in both directions between
+  the Forth stack and Smalltalk objects, a workspace, and a tutorial of 19 lessons.
 * **[Bio](Bio/README.md)** — bioinformatics: FASTA, FASTQ and GenBank files, sequence and feature objects, translation with
   the NCBI genetic codes, ORFs, composition and assembly statistics, IUPAC pattern search, k-mers, restriction enzymes,
   Needleman-Wunsch and Smith-Waterman alignment, a sequence browser, and (with Prolog loaded) features as Prolog facts.

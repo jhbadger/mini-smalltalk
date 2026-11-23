@@ -399,6 +399,9 @@ int main(int argc, char **argv) {
         check("Smalltalk loadPackage: 'Regex'", "true");
         n = run_lib_tests("packages/Regex/tests/tests.txt");
         printf("ok    Regex package tests%s: %d run\n", pass ? " under GC stress" : "", n);
+        check("Smalltalk loadPackage: 'Forth'", "true");
+        n = run_lib_tests("packages/Forth/tests/tests.txt");
+        printf("ok    Forth package tests%s: %d run\n", pass ? " under GC stress" : "", n);
         check("Smalltalk loadPackage: 'Phylo'", "true");
         n = run_lib_tests("packages/Phylo/tests/tests.txt");
         printf("ok    Phylo package tests%s: %d run\n", pass ? " under GC stress" : "", n);

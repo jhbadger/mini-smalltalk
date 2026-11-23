@@ -42,6 +42,11 @@ Smalltalk loadPackage: 'Regex'. (Smalltalk tutorialNamed: 'Regex') == RegexTutor
 | t ls | t := RegexTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(16 16 true)
 | c | c := RegexTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 40)) ==> #(0 true)
 RegexTutorial tutorialName ==> 'Regex'
+# Forth
+Smalltalk loadPackage: 'Forth'. (Smalltalk tutorialNamed: 'Forth') == ForthTutorial ==> true
+| t ls | t := ForthTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(19 19 true)
+| c | c := ForthTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 100)) ==> #(0 true)
+ForthTutorial tutorialName ==> 'Forth'
 # Bio
 Smalltalk loadPackage: 'Bio'. (Smalltalk tutorialNamed: 'Bio') == BioTutorial ==> true
 | t ls | t := BioTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(17 17 true)

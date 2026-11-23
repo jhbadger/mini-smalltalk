@@ -154,7 +154,7 @@ case-insensitive, and an image does not hold processes or windows.
 The `packages/` folder holds optional systems that are not in the standard image. Load one on demand:
 
 ```smalltalk
-Smalltalk availablePackages          "#('Bio' 'Debugger' 'Greek' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
+Smalltalk availablePackages          "#('Bio' 'Debugger' 'Forth' 'Greek' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'      "also: System menu -> load package..., or  st -l Prolog"
 ```
 
@@ -168,6 +168,9 @@ that image. These come with the system:
   variables by name. Load it and unhandled errors open it instead of the walkback.
 * [**Regex**](packages/Regex/README.md) — regular expressions: matching, searching, replacing and splitting, with
   String messages such as `matchesRegex:`, `allRegexMatches:` and `copyWithRegex:replacedWith:`.
+* [**Forth**](packages/Forth/README.md) — a Forth system: the ANS core words and many more, definitions with `create ... does>`,
+  double-length numbers, a floating-point stack, `catch` and `throw`, a bridge to Smalltalk objects, a workspace, and a
+  19-lesson tutorial: `Forth eval: ': square dup * ;  7 square .'`.
 * [**Bio**](packages/Bio/README.md) — bioinformatics: FASTA, FASTQ and GenBank files, sequences and features, the NCBI genetic
   codes, ORFs, assembly statistics, IUPAC pattern search, k-mers, restriction enzymes, pairwise alignment, a sequence browser,
   and sequence features as Prolog facts.
