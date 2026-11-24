@@ -411,6 +411,18 @@ int main(int argc, char **argv) {
         check("Smalltalk loadPackage: 'Immuno'", "true");
         n = run_lib_tests("packages/Immuno/tests/tests.txt");
         printf("ok    Immuno package tests%s: %d run\n", pass ? " under GC stress" : "", n);
+        check("Smalltalk loadPackage: 'Scheme'", "true");
+        n = run_lib_tests("packages/Scheme/tests/tests.txt");
+        printf("ok    Scheme package tests%s: %d run\n", pass ? " under GC stress" : "", n);
+        check("Smalltalk loadPackage: 'APL'", "true");
+        n = run_lib_tests("packages/APL/tests/tests.txt");
+        printf("ok    APL package tests%s: %d run\n", pass ? " under GC stress" : "", n);
+        check("Smalltalk loadPackage: 'Matrix'", "true");
+        n = run_lib_tests("packages/Matrix/tests/tests.txt");
+        printf("ok    Matrix package tests%s: %d run\n", pass ? " under GC stress" : "", n);
+        check("Smalltalk loadPackage: 'Algebra'", "true");
+        n = run_lib_tests("packages/Algebra/tests/tests.txt");
+        printf("ok    Algebra package tests%s: %d run\n", pass ? " under GC stress" : "", n);
         /* Greek: a few conjugations and declensions here, the rest in its tests.txt */
         check("Smalltalk loadPackage: 'Greek'", "true");
         check("'γράφω' asGreekVerb conjugate: #present", "#('γράφω' 'γράφεις' 'γράφει' 'γράφουμε' 'γράφετε' 'γράφουν')");

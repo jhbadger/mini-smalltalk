@@ -1,0 +1,649 @@
+# Tests for the APL package, run by test_vm after loading it: one  expression ==> expected printString  per line.
+# Each test that evaluates APL text uses a new session (APL new eval: ... or lines: ..., which answers the lines of the display as an Array of Strings);
+# an error test shows the message, and the Smalltalk interface is tested last.
+Smalltalk loadPackage: 'APL' ==> true
+# arithmetic and agreement
+APL new eval: '1 2 3 + 4 5 6' ==> '5 7 9'
+APL new eval: '1 2 3 + 10' ==> '11 12 13'
+APL new eval: '10 + 1 2 3' ==> '11 12 13'
+APL new lines: '10 20 + 2 3 $ i. 6' ==> #('10 11 12' '23 24 25')
+APL new lines: '100 + 2 3 $ i. 6' ==> #('100 101 102' '103 104 105')
+APL new eval: '7 - 2' ==> '5'
+APL new eval: '_3 * 4' ==> '_12'
+APL new eval: '6 % 3' ==> '2'
+APL new eval: '7 % 2' ==> '3.5'
+APL new eval: '1 % 4' ==> '0.25'
+APL new eval: '1 2 3 % 2' ==> '0.5 1 1.5'
+APL new eval: '2 ^ 10' ==> '1024'
+APL new eval: '2 ^ 100' ==> '1267650600228229401496703205376'
+APL new eval: '2 ^ _2' ==> '0.25'
+APL new eval: '4 ^ 0.5' ==> '2'
+APL new eval: '10 | 23' ==> '3'
+APL new eval: '3 | _7' ==> '2'
+APL new eval: '0 | 5' ==> '5'
+APL new eval: '5 | 0 1 2 3 4 5 6' ==> '0 1 2 3 4 0 1'
+APL new eval: '- 3 _4' ==> '_3 4'
+APL new eval: '* _5 0 5' ==> '_1 0 1'
+APL new eval: '% 1 2 4' ==> '1 0.5 0.25'
+APL new eval: '*: 1 2 3 4' ==> '1 4 9 16'
+APL new eval: '%: 0 1 4 9 16' ==> '0 1 2 3 4'
+APL new eval: '%: 2' ==> '1.41421'
+APL new eval: '! 0 1 2 3 4 5' ==> '1 1 2 6 24 120'
+APL new eval: '2 ! 5' ==> '10'
+APL new eval: '3 >. 1 5 2' ==> '3 5 3'
+APL new eval: '3 <. 1 5 2' ==> '1 3 2'
+APL new eval: '<. 2.5 _2.5 3' ==> '2 _3 3'
+APL new eval: '>. 2.5 _2.5 3' ==> '3 _2 3'
+APL new eval: '>: 1 2 3' ==> '2 3 4'
+APL new eval: '<: 1 2 3' ==> '0 1 2'
+APL new eval: '1 2 3 < 2' ==> '1 0 0'
+APL new eval: '1 2 3 = 1 5 3' ==> '1 0 1'
+APL new eval: '1 2 3 >: 2' ==> '0 1 1'
+APL new eval: '1 0 1 *. 1 1 0' ==> '1 0 0'
+APL new eval: '1 0 1 +. 1 1 0' ==> '1 1 1'
+APL new eval: '12 +. 18' ==> '6'
+APL new eval: '4 *. 6' ==> '12'
+APL new eval: '0.1 + 0.2' ==> '0.3'
+APL new eval: '1 + 1.5' ==> '2.5'
+APL new eval: '1 2 3 + 0.5' ==> '1.5 2.5 3.5'
+APL new eval: '5 % 0' ==> '_'
+APL new eval: '_5 % 0' ==> '__'
+APL new eval: '0 % 0' ==> '0'
+APL new eval: '3r4 + 1r4' ==> '1'
+APL new eval: '1r2 * 1r3' ==> '1r6'
+APL new eval: '3r4 + 0.25' ==> '1'
+APL new eval: '2 * 3r4' ==> '3r2'
+APL new eval: '% 3r4' ==> '4r3'
+[APL new eval: '1 2 3 + 4 5'] on: APLError do: [:e | e messageText] ==> 'length error'
+[APL new eval: '1 + ''a'''] on: APLError do: [:e | e messageText] ==> 'domain error'
+[APL new eval: '1 2 3 + 4 5 6 7'] on: APLError do: [:e | e messageText] ==> 'length error'
+[APL new eval: '(2 3 $ i. 6) + 1 2 3'] on: APLError do: [:e | e messageText] ==> 'length error'
+# right to left
+APL new eval: '2 * 3 + 4' ==> '14'
+APL new eval: '10 - 4 - 3' ==> '9'
+APL new eval: '(10 - 4) - 3' ==> '3'
+APL new eval: '2 ^ 3 ^ 2' ==> '512'
+APL new eval: '10 - 2 * 3' ==> '4'
+APL new eval: '- - 5' ==> '5'
+APL new eval: '- 1 + 2' ==> '_3'
+APL new eval: '1 + - 2' ==> '_1'
+APL new eval: '3 * - 4' ==> '_12'
+APL new eval: '2 ^ - 2' ==> '0.25'
+# shape and structure
+APL new eval: '$ 5' ==> ''
+APL new eval: '$ 1 2 3' ==> '3'
+APL new eval: '$ 2 3 $ i. 6' ==> '2 3'
+APL new eval: '$ ''''' ==> '0'
+APL new eval: '$ ''abc''' ==> '3'
+APL new eval: '# 1 2 3' ==> '3'
+APL new eval: '# 2 3 $ i. 6' ==> '2'
+APL new eval: '# 5' ==> '1'
+APL new eval: '# ''''' ==> '0'
+APL new eval: ', 5' ==> '5'
+APL new eval: '$ , 5' ==> '1'
+APL new eval: ', 2 3 $ i. 6' ==> '0 1 2 3 4 5'
+APL new eval: '3 $ 7' ==> '7 7 7'
+APL new eval: '5 $ 1 2' ==> '1 2 1 2 1'
+APL new lines: '2 3 $ 1 2' ==> #('1 2 1' '2 1 2')
+APL new eval: '0 $ 1' ==> ''
+APL new eval: '$ 0 3 $ 1' ==> '0 3'
+APL new lines: '2 3 $ ''abcdef''' ==> #('abc' 'def')
+APL new lines: 'i. 2 3' ==> #('0 1 2' '3 4 5')
+APL new lines: '|: 2 3 $ i. 6' ==> #('0 3' '1 4' '2 5')
+APL new eval: '$ |: i. 2 3 4' ==> '4 3 2'
+APL new eval: 'i. 5' ==> '0 1 2 3 4'
+APL new eval: 'i. 0' ==> ''
+APL new eval: 'i. _3' ==> '2 1 0'
+APL new eval: '$ i. 0' ==> '0'
+APL new lines: 'i. 2 2 2' ==> #('0 1' '2 3' '' '4 5' '6 7')
+APL new eval: '1 2 , 3' ==> '1 2 3'
+APL new eval: '1 , 2 3' ==> '1 2 3'
+APL new eval: '1 2 , 3 4 5' ==> '1 2 3 4 5'
+APL new eval: '''ab'' , ''cd''' ==> 'abcd'
+APL new eval: '''a'' , ''b''' ==> 'ab'
+APL new lines: '(i. 2 2) , 5' ==> #('0 1' '2 3' '5 5')
+APL new lines: '1 2 3 ,. 4 5 6' ==> #('1 4' '2 5' '3 6')
+APL new lines: '(i. 2 2) , i. 2 2' ==> #('0 1' '2 3' '0 1' '2 3')
+APL new lines: '(i. 2 2) ,. i. 2 2' ==> #('0 1 0 1' '2 3 2 3')
+APL new lines: '1 2 ,: 3 4' ==> #('1 2' '3 4')
+APL new eval: '$ ,: 1 2 3' ==> '1 3'
+APL new eval: '$ ,. i. 3' ==> '3 1'
+APL new lines: ',. 1 2 3' ==> #('1' '2' '3')
+# selection
+APL new eval: '2 { ''hello''' ==> 'l'
+APL new eval: '_1 { ''hello''' ==> 'o'
+APL new eval: '1 3 { ''hello''' ==> 'el'
+APL new eval: '0 0 2 { 1 2 3' ==> '1 1 3'
+APL new eval: '(<1;2) { 3 3 $ i. 9' ==> '5'
+APL new eval: '(<1;0 1) { 3 3 $ i. 9' ==> '3 4'
+APL new lines: '(<'''';1) { 3 3 $ i. 9' ==> #('1 4 7')
+APL new lines: '1 { 3 3 $ i. 9' ==> #('3 4 5')
+APL new eval: '3 {. i. 10' ==> '0 1 2'
+APL new eval: '_3 {. i. 10' ==> '7 8 9'
+APL new eval: '3 }. i. 10' ==> '3 4 5 6 7 8 9'
+APL new eval: '_3 }. i. 10' ==> '0 1 2 3 4 5 6'
+APL new eval: '7 {. 1 2 3' ==> '1 2 3 0 0 0 0'
+APL new eval: '2 {. ''hello''' ==> 'he'
+APL new lines: '4 {. ''ab''' ==> #('ab  ')
+APL new eval: '{. ''hello''' ==> 'h'
+APL new eval: '{: ''hello''' ==> 'o'
+APL new eval: '}. ''hello''' ==> 'ello'
+APL new eval: '}: ''hello''' ==> 'hell'
+APL new eval: '{. 3 4 5' ==> '3'
+APL new lines: '{. 2 3 $ i. 6' ==> #('0 1 2')
+APL new lines: '{: 2 3 $ i. 6' ==> #('3 4 5')
+APL new lines: '1 {. 2 3 $ i. 6' ==> #('0 1 2')
+APL new lines: '1 1 {. 2 3 $ i. 6' ==> #('0')
+APL new lines: '1 2 {. 2 3 $ i. 6' ==> #('0 1')
+APL new eval: '|. i. 5' ==> '4 3 2 1 0'
+APL new eval: '2 |. i. 5' ==> '2 3 4 0 1'
+APL new eval: '_1 |. i. 5' ==> '4 0 1 2 3'
+APL new lines: '|. 2 3 $ i. 6' ==> #('3 4 5' '0 1 2')
+APL new lines: '1 |. 2 3 $ i. 6' ==> #('3 4 5' '0 1 2')
+APL new lines: '0 1 |. 2 3 $ i. 6' ==> #('1 2 0' '4 5 3')
+APL new eval: '3 1 4 1 5 {~ 0 2 4' ==> '3 4 5'
+APL new eval: 'I. 3 1 4 1 5 > 2' ==> '0 2 4'
+APL new eval: '(3 1 4 1 5 > 2) # 3 1 4 1 5' ==> '3 4 5'
+APL new eval: '2 3 # ''ab''' ==> 'aabbb'
+APL new eval: '3 # ''x''' ==> 'xxx'
+APL new eval: '1 0 2 # 1 2 3' ==> '1 3 3'
+APL new eval: '9 (1}) i. 5' ==> '0 9 2 3 4'
+APL new eval: '7 8 (0 2}) i. 4' ==> '7 1 8 3'
+APL new lines: '7 ((<1;1)}) 2 2 $ 5' ==> #('5 5' '5 7')
+APL new eval: '(i. 5) -. 1 3' ==> '0 2 4'
+APL new eval: '1 2 3 4 5 -. 2 4' ==> '1 3 5'
+# reduce, scan, table
+APL new eval: '+/ i. 11' ==> '55'
+APL new eval: '*/ 1 + i. 5' ==> '120'
+APL new eval: '>./ 3 1 4 1 5' ==> '5'
+APL new eval: '<./ 3 1 4 1 5' ==> '1'
+APL new eval: '-/ 1 2 3' ==> '2'
+APL new eval: '%/ 1 2 4' ==> '2'
+APL new eval: '+/ ''''' ==> '0'
+APL new eval: '*/ ''''' ==> '1'
+APL new eval: '>./ 1 2 3 + 0.5' ==> '3.5'
+APL new eval: '+/ 5' ==> '5'
+APL new lines: ',/ ''ab'' ; ''cd''' ==> #('┌──┬──┐' '│ab│cd│' '└──┴──┘')
+APL new lines: '+/ 2 3 $ i. 6' ==> #('3 5 7')
+APL new lines: '+/"1 (2 3 $ i. 6)' ==> #('3 12')
+APL new lines: '*/ 2 3 $ 1 2 3 4 5 6' ==> #('4 10 18')
+APL new eval: '+/ , 2 3 $ i. 6' ==> '15'
+APL new eval: '+/ +/ 2 3 $ i. 6' ==> '15'
+APL new eval: '+/ 1 2 3 > 1' ==> '2'
+APL new eval: '+/\ 1 2 3 4' ==> '1 3 6 10'
+APL new eval: '*/\ 1 + i. 5' ==> '1 2 6 24 120'
+APL new eval: '>./\ 3 1 4 1 5' ==> '3 3 4 4 5'
+APL new eval: '-/\ 1 2 3 4' ==> '1 _1 2 _2'
+APL new lines: '+\ 1 2 3' ==> #('1 0 0' '1 2 0' '1 2 3')
+APL new lines: '1 2 3 */ 4 5' ==> #(' 4  5' ' 8 10' '12 15')
+APL new lines: '(i. 3) +/ i. 4' ==> #('0 1 2 3' '1 2 3 4' '2 3 4 5')
+APL new lines: '=/~ i. 3' ==> #('1 0 0' '0 1 0' '0 0 1')
+APL new lines: '</~ i. 3' ==> #('0 1 1' '0 0 1' '0 0 0')
+APL new eval: '3 +/\ i. 6' ==> '3 6 9 12'
+APL new lines: '_2 <\ i. 5' ==> #('┌───┬───┬─┐' '│0 1│2 3│4│' '└───┴───┴─┘')
+APL new lines: '2 <\ i. 5' ==> #('┌───┬───┬───┬───┐' '│0 1│1 2│2 3│3 4│' '└───┴───┴───┴───┘')
+APL new eval: '+/\. 1 2 3' ==> '6 5 3'
+APL new lines: '<\. 1 2 3' ==> #('┌─────┬───┬─┐' '│1 2 3│2 3│3│' '└─────┴───┴─┘')
+APL new eval: '2 +/\. 1 2 3 4 5' ==> '12 10 8 6'
+# rank
+APL new eval: '$ +/"1 i. 2 3 4' ==> '2 3'
+APL new eval: '$ +/"2 i. 2 3 4' ==> '2 4'
+APL new eval: '$ +/"_1 i. 2 3 4' ==> '2 4'
+APL new lines: '+/"1 i. 2 3 4' ==> #(' 6 22 38' '54 70 86')
+APL new lines: '+/ i. 2 3 4' ==> #('12 14 16 18' '20 22 24 26' '28 30 32 34')
+APL new lines: '|."1 i. 2 3' ==> #('2 1 0' '5 4 3')
+APL new lines: '<"1 i. 2 3' ==> #('┌─────┬─────┐' '│0 1 2│3 4 5│' '└─────┴─────┘')
+APL new eval: '$ <"0 i. 2 3' ==> '2 3'
+APL new lines: '10 20 +"0 1 (2 3 $ i. 6)' ==> #('10 11 12' '23 24 25')
+APL new lines: '10 20 30 +"1 1 (2 3 $ i. 6)' ==> #('10 21 32' '13 24 35')
+APL new lines: '1 2 3 (+"0 _) 4 5' ==> #('5 6' '6 7' '7 8')
+APL new lines: '(i. 2 3) ,"1 (7 8)' ==> #('0 1 2 7 8' '3 4 5 7 8')
+APL new lines: '(i. 2 3) ,"1 (7 8 9)' ==> #('0 1 2 7 8 9' '3 4 5 7 8 9')
+APL new eval: '$ ,"2 i. 2 3 4' ==> '2 12'
+# characters and boxes
+APL new eval: '''hello'' , '' '' , ''world''' ==> 'hello world'
+APL new eval: '|. ''hello''' ==> 'olleh'
+APL new eval: '''it''''s''' ==> 'it''s'
+APL new eval: '$ ''it''''s''' ==> '4'
+APL new eval: '/:~ ''banana''' ==> 'aaabnn'
+APL new eval: '\:~ ''banana''' ==> 'nnbaaa'
+APL new eval: '''banana'' i. ''n''' ==> '2'
+APL new eval: '''banana'' i. ''nx''' ==> '2 6'
+APL new eval: '~. ''banana''' ==> 'ban'
+APL new eval: '''aeiou'' e. ''education''' ==> '1 1 1 1 1'
+APL new eval: '''abc'' = ''abd''' ==> '1 1 0'
+APL new eval: '''abc'' -: ''abc''' ==> '1'
+APL new eval: '''abc'' -: ''ab''' ==> '0'
+APL new eval: 'a. i. ''A''' ==> '65'
+APL new eval: '97 { a.' ==> 'a'
+APL new eval: '$ a.' ==> '256'
+APL new lines: '<''abc''' ==> #('┌───┐' '│abc│' '└───┘')
+APL new lines: '''ab'' ; ''cde'' ; 1 2' ==> #('┌──┬───┬───┐' '│ab│cde│1 2│' '└──┴───┴───┘')
+APL new lines: '> ''ab'' ; ''cde''' ==> #('ab ' 'cde')
+APL new lines: ';: ''the quick brown fox''' ==> #('┌───┬─────┬─────┬───┐' '│the│quick│brown│fox│' '└───┴─────┴─────┴───┘')
+APL new eval: '# &> ;: ''the quick brown fox''' ==> '3 5 5 3'
+APL new eval: '# ;: ''the quick brown fox''' ==> '4'
+APL new eval: '; ''ab'' ; ''cd'' ; ''ef''' ==> 'abcdef'
+APL new lines: '(i. 3) ; ''x'' ; 2 2 $ 1 2 3 4' ==> #('┌─────┬─┬───┐' '│0 1 2│x│1 2│' '│     │ │3 4│' '└─────┴─┴───┘')
+APL new lines: '<;._1 '' a b c''' ==> #('┌─┬─┬─┐' '│a│b│c│' '└─┴─┴─┘')
+APL new lines: '<;._1 '',red,green,blue''' ==> #('┌───┬─────┬────┐' '│red│green│blue│' '└───┴─────┴────┘')
+APL new lines: '<;.1 '' a b''' ==> #('┌──┬──┐' '│ a│ b│' '└──┴──┘')
+APL new lines: '<;._2 ''ab,cd,''' ==> #('┌──┬──┐' '│ab│cd│' '└──┴──┘')
+APL new lines: '*: each 1 2 3' ==> #('┌─┬─┬─┐' '│1│4│9│' '└─┴─┴─┘')
+APL new lines: '# each (i. 3) ; (i. 5)' ==> #('┌─┬─┐' '│3│5│' '└─┴─┘')
+APL new lines: '|. each ''ab'' ; ''cde''' ==> #('┌──┬───┐' '│ba│edc│' '└──┴───┘')
+APL new lines: '(<''a'') , (<''bc'')' ==> #('┌─┬──┐' '│a│bc│' '└─┴──┘')
+APL new lines: '<"0 ''abc''' ==> #('┌─┬─┬─┐' '│a│b│c│' '└─┴─┴─┘')
+APL new lines: '> 1 ; 2 3' ==> #('1 0' '2 3')
+APL new eval: '$ > ''a'' ; ''bcd'' ; ''ef''' ==> '3 3'
+APL new eval: '> <''abc''' ==> 'abc'
+APL new eval: '$ <''abc''' ==> ''
+APL new eval: '$ < i. 3' ==> ''
+# definitions
+APL new eval: 'sq =: 3 : ''y * y'' ⋄ sq 1 2 3' ==> '1 4 9'
+APL new eval: 'plus =: 3 : ''x + y'' ⋄ 3 plus 4 5' ==> '7 8'
+APL new eval: 'hyp =: 3 : ''%: +/ *: y'' ⋄ hyp 3 4' ==> '5'
+APL new eval: 'f =: 3 : ''a =. y + 1 ⋄ a * 2'' ⋄ f 4' ==> '10'
+APL new eval: 'g =: 3 : ''a =. y + 1 ⋄ a * 2'' ⋄ a =: 100 ⋄ g 4' ==> '10'
+APL new eval: 'h =: 3 : ''a =: y + 1'' ⋄ h 4 ⋄ a' ==> '5'
+APL new eval: 'both =: ''y * y'' : ''x * y'' ⋄ (both 5) , 3 both 5' ==> '25 15'
+APL new eval: 'sq =: 3 : ''y * y'' ⋄ sq' ==> '3 : ''y * y'''
+APL new eval: 'mean =: +/ % # ⋄ mean' ==> '(+/ % #)'
+APL new eval: 'mean =: +/ % # ⋄ mean 3 1 4 1 5 9' ==> '3.83333'
+APL new eval: 'mean =: +/ % # ⋄ mean 1 2 3 4' ==> '2.5'
+APL new eval: '(+/ % #) 2 4 6 8' ==> '5'
+APL new eval: '(+/ , */) 1 2 3 4' ==> '10 24'
+APL new eval: '(] , |.) ''abc''' ==> 'abccba'
+APL new eval: '(- +) 5' ==> '0'
+APL new eval: '3 (- +) 5' ==> '_2'
+APL new eval: '(+ - *) 5' ==> '4'
+APL new eval: '3 (+ - *) 5' ==> '_7'
+APL new eval: '([: +/ *:) 1 2 3' ==> '14'
+APL new eval: '(- ~) 3' ==> '0'
+APL new eval: '2 3 (+ , *) 4' ==> '6 7 8 12'
+APL new eval: 'mean =: +/ % # ⋄ var =: (+/ @: *: @: (- mean)) % # ⋄ var 1 2 3 4' ==> '1.25'
+APL new eval: 'mean =: +/ % # ⋄ var =: (+/ @: *: @: (- mean)) % # ⋄ sd =: %: @ var ⋄ sd 2 4 4 4 5 5 7 9' ==> '2'
+APL new eval: '+/ @: *: 1 2 3' ==> '14'
+APL new eval: '+/ @ *: 1 2 3' ==> '1 4 9'
+APL new eval: '(3 & *) 1 2 3' ==> '3 6 9'
+APL new eval: '(+ & 1) 1 2 3' ==> '2 3 4'
+APL new eval: '(1 & +) 1 2 3' ==> '2 3 4'
+APL new eval: '(- & 1) 5' ==> '4'
+APL new eval: '(1 & -) 5' ==> '_4'
+APL new eval: '(*: & >:) 3' ==> '16'
+APL new eval: '2 (*: & >:) 3' ==> '0'
+APL new eval: '(*: ^: 3) 2' ==> '256'
+APL new eval: '>: ^: (i. 5) 0' ==> '0 1 2 3 4'
+APL new eval: '(2 & *) ^: (i. 6) 1' ==> '1 2 4 8 16 32'
+APL new eval: '%: ^: _ (1000)' ==> '1'
+APL new eval: '(*: ^: _1) 16' ==> '4'
+APL new eval: '(+ & 3) ^: _1 (10)' ==> '7'
+APL new eval: '(*&2) ^: _1 (8)' ==> '4'
+APL new eval: '(-&1) ^: _1 (5)' ==> '6'
+APL new eval: '(1&-) ^: _1 (5)' ==> '_4'
+APL new eval: 'twice =: 1 : ''u u y'' ⋄ *: twice 3' ==> '81'
+APL new eval: 'twice =: 1 : ''u u y'' ⋄ (>: twice) 5' ==> '7'
+APL new eval: 'ap =: 2 : ''u v y'' ⋄ (*: ap >:) 4' ==> '25'
+APL new eval: 'rep =: 2 : ''u ^: n y'' ⋄ (*: rep 3) 2' ==> '256'
+APL new eval: '(3 : ''y + 1'') 5' ==> '6'
+APL new eval: '10 (4 : ''x - y'') 3' ==> '7'
+APL new eval: 'a =: 5 ⋄ a =: a + 1 ⋄ a' ==> '6'
+APL new eval: 'a =: b =: 4 ⋄ a + b' ==> '8'
+APL new eval: '(a =: 5) + 1' ==> '6'
+APL new eval: '1 + a =: 2' ==> '3'
+APL new eval: 'q =: 1 2 3 ⋄ q * 2' ==> '2 4 6'
+APL new eval: 'NB. a comment' ==> ''
+APL new eval: '1 + 1 NB. a comment' ==> '2'
+APL new lines: '1 + 1 ⋄ 2 * 3' ==> #('2' '6')
+# control structures
+APL new eval: 'abs2 =: 3 : ''if. y < 0 do. - y else. y end.'' ⋄ abs2 _7' ==> '7'
+APL new eval: 'abs2 =: 3 : ''if. y < 0 do. - y else. y end.'' ⋄ abs2 7' ==> '7'
+APL new eval: 'sgn =: 3 : ''if. y < 0 do. _1 elseif. y > 0 do. 1 else. 0 end.'' ⋄ (sgn _3) , (sgn 0) , sgn 5' ==> '_1 0 1'
+APL new eval: 'fact =: 3 : ''if. y < 2 do. 1 else. y * fact y - 1 end.'' ⋄ fact 10' ==> '3628800'
+APL new eval: 'fact =: 3 : ''if. y < 2 do. 1 else. y * fact y - 1 end.'' ⋄ fact 25' ==> '15511210043330985984000000'
+APL new eval: 'fib =: 3 : ''if. y < 2 do. y return. end. (($: y - 1) + $: y - 2)'' ⋄ fib 15' ==> '610'
+APL new eval: 'sumsq =: 3 : ''s =. 0 ⋄ for_k. i. y do. s =. s + *: k end. s'' ⋄ sumsq 10' ==> '285'
+APL new eval: 'cnt =: 3 : ''r =. 0 $ 0 ⋄ for_i. i. y do. r =. r , i * i end. r'' ⋄ cnt 5' ==> '0 1 4 9 16'
+APL new eval: 'idx =: 3 : ''r =. 0 $ 0 ⋄ for_c. y do. r =. r , c_index end. r'' ⋄ idx ''abc''' ==> '0 1 2'
+APL new eval: 'w =: 3 : ''n =. 0 ⋄ while. n < y do. n =. n + 3 end. n'' ⋄ w 10' ==> '12'
+APL new eval: 'w =: 3 : ''n =. 0 ⋄ whilst. n < y do. n =. n + 3 end. n'' ⋄ w 0' ==> '3'
+APL new eval: 'collatz =: 3 : ''n =. 0 ⋄ while. y > 1 do. y =. (0 = 2 | y) { (1 + 3 * y), y % 2 ⋄ n =. n + 1 end. n'' ⋄ collatz 27' ==> '111'
+APL new eval: 'brk =: 3 : ''n =. 0 ⋄ while. 1 do. n =. n + 1 ⋄ if. n > 4 do. break. end. end. n'' ⋄ brk 0' ==> '5'
+APL new eval: 'cont =: 3 : ''s =. 0 ⋄ for_i. i. y do. if. 2 | i do. continue. end. s =. s + i end. s'' ⋄ cont 10' ==> '20'
+APL new eval: 'sel =: 3 : ''select. y case. 1 do. ''''one'''' case. 2 do. ''''two'''' else. ''''many'''' end.'' ⋄ sel 1' ==> 'one'
+APL new eval: 'sel =: 3 : ''select. y case. 1 do. ''''one'''' case. 2 do. ''''two'''' else. ''''many'''' end.'' ⋄ sel 2' ==> 'two'
+APL new eval: 'sel =: 3 : ''select. y case. 1 do. ''''one'''' case. 2 do. ''''two'''' else. ''''many'''' end.'' ⋄ sel 9' ==> 'many'
+APL new eval: 'safe =: 3 : ''try. %: y catch. ''''negative'''' end.'' ⋄ safe 16' ==> '4'
+APL new eval: 'safe =: 3 : ''try. %: y catch. ''''negative'''' end.'' ⋄ safe _16' ==> 'negative'
+[APL new eval: 'c =: 3 : ''assert. y > 0 ⋄ y'' ⋄ c _1'] on: APLError do: [:e | e messageText] ==> 'assertion failure'
+APL new eval: 'c =: 3 : ''assert. y > 0 ⋄ y'' ⋄ c 3' ==> '3'
+APL new eval: 'early =: 3 : ''if. y > 0 do. ''''pos'''' return. end. ''''nonpos'''''' ⋄ early 1' ==> 'pos'
+APL new eval: 'early =: 3 : ''if. y > 0 do. ''''pos'''' return. end. ''''nonpos'''''' ⋄ early _1' ==> 'nonpos'
+APL new eval: ('big =: verb define' , (String with: Character lf) , 'a =. y + 1' , (String with: Character lf) , 'b =. a * 2' , (String with: Character lf) , 'b' , (String with: Character lf) , ')' , (String with: Character lf) , 'big 4') ==> '10'
+APL new eval: ('t =: 0 : 0' , (String with: Character lf) , 'hello' , (String with: Character lf) , 'world' , (String with: Character lf) , ')' , (String with: Character lf) , '$ t') ==> '11'
+# sorting and searching
+APL new eval: '/: 3 1 4 1 5' ==> '1 3 0 2 4'
+APL new eval: '\: 3 1 4 1 5' ==> '4 2 0 1 3'
+APL new eval: '/:~ 3 1 4 1 5' ==> '1 1 3 4 5'
+APL new eval: '\:~ 3 1 4 1 5' ==> '5 4 3 1 1'
+APL new eval: '3 1 2 /: ''abc''' ==> 'bca'
+APL new eval: '3 1 2 \: ''abc''' ==> 'acb'
+APL new lines: '/:~ ;: ''the quick brown fox''' ==> #('┌─────┬───┬─────┬───┐' '│brown│fox│quick│the│' '└─────┴───┴─────┴───┘')
+APL new lines: '/: 2 2 $ 3 1 2 4' ==> #('1 0')
+APL new lines: '/:~ 2 3 $ 3 1 2 1 1 5' ==> #('1 1 5' '3 1 2')
+APL new eval: '/:~ _2 5 0 _7' ==> '_7 _2 0 5'
+APL new eval: '/:~ 2.5 1 3' ==> '1 2.5 3'
+APL new eval: '/:~ ''Banana''' ==> 'Baaann'
+APL new eval: '''hello'' i. ''l''' ==> '2'
+APL new eval: '''hello'' i. ''lz''' ==> '2 5'
+APL new eval: '1 2 3 i. 3' ==> '2'
+APL new eval: '2 e. 1 2 3' ==> '1'
+APL new eval: '5 e. 1 2 3' ==> '0'
+APL new eval: '1 2 3 e. 2 3' ==> '0 1 1'
+APL new eval: '~. 3 1 4 1 5 9 2 6 5 3 5' ==> '3 1 4 5 9 2 6'
+APL new eval: '~: 3 1 4 1 5' ==> '1 1 1 0 1'
+APL new eval: '~. ''mississippi''' ==> 'misp'
+APL new eval: '#/.~ ''mississippi''' ==> '1 4 4 2'
+APL new lines: '(~. ''mississippi'') ,. ": ,. #/.~ ''mississippi''' ==> #('m1' 'i4' 's4' 'p2')
+APL new eval: '~. ''''' ==> ''
+APL new eval: '0 10 20 30 I. 5 15 25 35 45' ==> '1 2 3 4 4'
+APL new eval: '0 10 20 30 I. 10' ==> '2'
+APL new eval: 'I. 0 1 1 0 1' ==> '1 2 4'
+APL new eval: 'I. 1 0 2' ==> '0 2 2'
+APL new eval: '1 1 2 -. 1' ==> '2'
+APL new lines: '~. 2 2 $ 1 2 1 2' ==> #('1 2')
+APL new lines: '~. 3 2 $ 1 2 3 4 1 2' ==> #('1 2' '3 4')
+APL new eval: '1 2 1 i. 1' ==> '0'
+APL new lines: '(2 2 $ 1 2 3 4) i. 3 4' ==> #('1')
+APL new eval: '(2 2 $ 1 2 3 4) i. 3 4' ==> '1'
+APL new eval: '3 1 2 -: 3 1 2' ==> '1'
+APL new eval: '1 1 2 +//. 10 20 30' ==> '30 30'
+APL new eval: '1 1 2 >.//. 10 20 30' ==> '20 30'
+APL new lines: '1 1 2 +/. 10 20 30' ==> #('10 20' '30  0')
+APL new lines: '+//. 3 3 $ i. 9' ==> #('0 4 12 12 8')
+# matrices
+APL new lines: '(2 2 $ 1 2 3 4) +/ . * 2 2 $ 5 6 7 8' ==> #('19 22' '43 50')
+APL new eval: '1 2 3 +/ . * 4 5 6' ==> '32'
+APL new eval: '2 +/ . * 3' ==> '6'
+APL new lines: '(2 3 $ 1 2 3 4 5 6) +/ . * 3 2 $ 1 0 0 1 1 1' ==> #(' 4  5' '10 11')
+APL new eval: '(2 2 $ 1 2 3 4) +/ . * 5 6' ==> '17 39'
+APL new eval: '5 6 +/ . * 2 2 $ 1 2 3 4' ==> '23 34'
+APL new eval: '-/ . * 2 2 $ 1 2 3 4' ==> '_2'
+APL new eval: '-/ . * 3 3 $ 2 0 1 1 3 2 1 1 4' ==> '18'
+APL new eval: '-/ . * 1 1 $ 7' ==> '7'
+APL new eval: '+/ . * 2 2 $ 1 2 3 4' ==> '10'
+APL new eval: '>./ . + 2 2 $ 1 2 3 4' ==> '5'
+APL new lines: '%. 2 2 $ 2 1 1 1' ==> #(' 1 _1' '_1  2')
+APL new lines: '%. 2 2 $ 1 2 3 4' ==> #(' _2    1' '3r2 _1r2')
+APL new lines: '(2 2 $ 2 1 1 1) +/ . * %. 2 2 $ 2 1 1 1' ==> #('1 0' '0 1')
+APL new eval: '5 6 %. 2 2 $ 1 2 3 4' ==> '_4 9r2'
+APL new lines: '%. 3 3 $ 2 0 0 0 4 0 0 0 5' ==> #('1r2   0   0' '  0 1r4   0' '  0   0 1r5')
+[APL new eval: '%. 2 2 $ 1 2 2 4'] on: APLError do: [:e | e messageText] ==> 'domain error'
+[APL new eval: '%. 2 3 $ 1'] on: APLError do: [:e | e messageText] ==> 'length error'
+APL new lines: '=/~ i. 3' ==> #('1 0 0' '0 1 0' '0 0 1')
+APL new lines: '|: 1 0 2 |: i. 2 3 4' ==> #(' 0  4  8' '12 16 20' '' ' 1  5  9' '13 17 21' '' ' 2  6 10' '14 18 22' '' ' 3  7 11' '15 19 23')
+APL new eval: '$ 1 0 2 |: i. 2 3 4' ==> '3 2 4'
+APL new eval: '$ 2 0 1 |: i. 2 3 4' ==> '3 4 2'
+# numbers and formatting
+APL new eval: '! 30' ==> '265252859812191058636308480000000'
+APL new eval: 'x: 0.5' ==> '1r2'
+APL new eval: 'x: 0.75' ==> '3r4'
+APL new eval: 'x: 1 % 3' ==> '1r3'
+APL new eval: 'x: 0.1' ==> '1r10'
+APL new eval: '(x: 1 % 3) + 1r6' ==> '1r2'
+APL new eval: 'x: 3' ==> '3'
+APL new eval: '3x' ==> '3'
+APL new eval: '123456789012x * 1000000000000' ==> '123456789012000000000000'
+APL new eval: '1e3' ==> '1000'
+APL new eval: '1.5e2' ==> '150'
+APL new eval: '2.5e_3' ==> '0.0025'
+APL new eval: '12345678.9' ==> '1.23457e7'
+APL new eval: '123456.789' ==> '123457'
+APL new eval: '0.000123456' ==> '0.000123456'
+APL new eval: '0.00001234' ==> '1.234e_5'
+APL new eval: '1e20 * 1.5' ==> '1.5e20'
+APL new eval: '100000 * 1.5' ==> '150000'
+APL new eval: '1 % 3' ==> '0.333333'
+APL new eval: '2 % 3' ==> '0.666667'
+APL new eval: '22 % 7' ==> '3.14286'
+APL new eval: '_1 % 3' ==> '_0.333333'
+APL new eval: '1e10 + 0.5' ==> '1e10'
+APL new eval: '^ 1' ==> '2.71828'
+APL new eval: '^. 1' ==> '0'
+APL new eval: '10 ^. 1000' ==> '3'
+APL new eval: '_ + 1' ==> '_'
+APL new eval: '__ + 1' ==> '__'
+APL new eval: '#. 1 0 1 0' ==> '10'
+APL new eval: '2 #. 1 1 0' ==> '6'
+APL new eval: '10 #. 1 2 3' ==> '123'
+APL new eval: '24 60 60 #. 1 1 1' ==> '3661'
+APL new eval: '#: 10' ==> '1 0 1 0'
+APL new lines: '#: 5 6 7' ==> #('1 0 1' '1 1 0' '1 1 1')
+APL new eval: '2 #: 10' ==> '1 0 1 0'
+APL new eval: '2 2 2 #: 5' ==> '1 0 1'
+APL new lines: '2 2 2 #: 5 6 7' ==> #('1 1 1' '0 1 1' '1 0 1')
+APL new eval: '24 60 60 #: 3661' ==> '1 1 1'
+APL new eval: '10 #: 123' ==> '1 2 3'
+APL new eval: '10 #: 2 ^ 20' ==> '1 0 4 8 5 7 6'
+APL new eval: '": 3.14159' ==> '3.14159'
+APL new eval: '": 1 2 3' ==> '1 2 3'
+APL new eval: '": _5' ==> '_5'
+APL new eval: '$ ": 12345' ==> '5'
+APL new eval: '8.2 ": 3.14159' ==> '    3.14'
+APL new eval: '8.2 ": 3 4.5 _1.25' ==> '    3.00    4.50   _1.25'
+APL new eval: '5 ": 1 2 3' ==> '    1    2    3'
+APL new eval: '8.3 ": 1r3' ==> '   0.333'
+APL new eval: '0.2 ": 2.5' ==> '2.50'
+APL new eval: '''pi is '' , 8.3 ": 3.14159265' ==> 'pi is    3.142'
+APL new eval: '3 ": 12345' ==> '***'
+APL new eval: '_6 ": 12' ==> '12    '
+APL new eval: '6 ": 12' ==> '    12'
+APL new lines: '6 ": 2 3 $ 1 2 3 4 5 6' ==> #('     1     2     3' '     4     5     6')
+APL new eval: '9!:10 ''''' ==> '6'
+APL new lines: '9!:11 (10) ⋄ % 3' ==> #('6' '0.3333333333')
+APL new lines: '9!:11 (3) ⋄ % 3' ==> #('6' '0.333')
+APL new lines: '9!:11 (6) ⋄ 22 % 7' ==> #('6' '3.14286')
+APL new eval: '". ''1 2 3''' ==> '1 2 3'
+APL new eval: '". ''2 + 3''' ==> '5'
+APL new eval: '". ''+/ 1 2 3''' ==> '6'
+APL new eval: '3 + ". ''4''' ==> '7'
+APL new eval: 'p: i. 10' ==> '2 3 5 7 11 13 17 19 23 29'
+APL new eval: '1 p: 7 8 9 10 11' ==> '1 0 0 0 1'
+APL new eval: 'q: 360' ==> '2 2 2 3 3 5'
+APL new lines: 'q: 12 7 9' ==> #('2 2 3' '7 0 0' '3 3 0')
+APL new eval: '*/ q: 360' ==> '360'
+APL new eval: 'p: 100' ==> '547'
+APL new eval: '$ ? 10 $ 5' ==> '10'
+APL new eval: '*./ (? 10 $ 5) < 5' ==> '1'
+APL new eval: '$ 3 ? 10' ==> '3'
+APL new eval: '/:~ 5 ? 5' ==> '0 1 2 3 4'
+APL new eval: '$ ~. 5 ? 20' ==> '5'
+APL new eval: '1 o. 0' ==> '0'
+APL new eval: '2 o. 0' ==> '1'
+APL new eval: '$ o. 1 2' ==> '2'
+# the rest of the adverbs and conjunctions
+APL new eval: '+: &. - 3' ==> '6'
+APL new lines: '|. &. > ''ab'' ; ''cd''' ==> #('┌──┬──┐' '│ba│dc│' '└──┴──┘')
+APL new lines: '- &. > 1 ; 2' ==> #('┌──┬──┐' '│_1│_2│' '└──┴──┘')
+APL new eval: '<: &. (^&2) 9' ==> '8.94427'
+APL new eval: '(3 : ''y + 1'') ^: 3 (0)' ==> '3'
+APL new lines: '(+/ % #) &> 1 2 3 ; 4 5 ; 6' ==> #('2 4.5 6')
+APL new lines: '(+/ % #) each 1 2 3 ; 4 5 ; 6' ==> #('┌─┬───┬─┐' '│2│4.5│6│' '└─┴───┴─┘')
+APL new eval: '#@:~. 1 1 2 3' ==> '3'
+APL new eval: '#@~. 1 1 2 3' ==> '3'
+APL new eval: '+/@:(*:) 1 2 3' ==> '14'
+APL new eval: '+/ @: (>: @: *:) 1 2 3' ==> '17'
+APL new eval: '(i.@#) ''abc''' ==> '0 1 2'
+APL new eval: '(|.@i.) 4' ==> '3 2 1 0'
+APL new eval: '2 (+&*:) 3' ==> '13'
+APL new eval: '2 (+ &: *:) 3' ==> '13'
+APL new eval: '(3&{.)@i. 10' ==> '0 1 2'
+APL new eval: '(3 {. ]) i. 10' ==> '0 1 2'
+# programs
+APL new eval: 'life =: 3 : ''r =. _1 0 1 ⋄ n =. |: +/ r |."0 _ |: +/ r |."0 _ y ⋄ (3 = n) +. y *. 4 = n'' ⋄ g =: 5 5 $ 0 1 0 0 0 0 0 1 0 0 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 ⋄ +/ , life life life life g' ==> '5'
+APL new lines: 'life =: 3 : ''r =. _1 0 1 ⋄ n =. |: +/ r |."0 _ |: +/ r |."0 _ y ⋄ (3 = n) +. y *. 4 = n'' ⋄ g =: 5 5 $ 0 1 0 0 0 0 0 1 0 0 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 ⋄ life g' ==> #('0 0 0 0 0' '1 0 1 0 0' '0 1 1 0 0' '0 1 0 0 0' '0 0 0 0 0')
+APL new lines: 'life =: 3 : ''r =. _1 0 1 ⋄ n =. |: +/ r |."0 _ |: +/ r |."0 _ y ⋄ (3 = n) +. y *. 4 = n'' ⋄ b =: 5 5 $ 0 0 0 0 0 0 1 1 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 ⋄ life b' ==> #('0 0 1 0 0' '0 0 1 0 0' '0 0 1 0 0' '0 0 0 0 0' '0 0 0 0 0')
+APL new eval: 'primes =: 3 : ''1 + I. 2 = +/ 0 = (>: i. y) |/ >: i. y'' ⋄ primes 30' ==> '2 3 5 7 11 13 17 19 23 29'
+APL new eval: '(#~ 1 p: ]) i. 50' ==> '2 3 5 7 11 13 17 19 23 29 31 37 41 43 47'
+APL new eval: '(2 }. i. 30) -. , (2 }. i. 6) */ 2 }. i. 15' ==> '2 3 5 7 11 13 17 19 23 29'
+APL new eval: '(, +/ @ (_2 & {.)) ^: 8 (0 1)' ==> '0 1 1 2 3 5 8 13 21 34'
+APL new eval: '(2 2 $ 1 1 1 0) +/ . * ^: 10 (1 0)' ==> '89 55'
+APL new eval: '+/\ >: i. 10' ==> '1 3 6 10 15 21 28 36 45 55'
+APL new eval: '*/\ >: i. 8' ==> '1 2 6 24 120 720 5040 40320'
+APL new lines: '!/~ i. 5' ==> #('1 1 1 1 1' '0 1 2 3 4' '0 0 1 3 6' '0 0 0 1 4' '0 0 0 0 1')
+APL new eval: '+/ 10 #: 2 ^ 100' ==> '115'
+APL new eval: 'pal =: 3 : ''y -: |. y'' ⋄ (pal ''racecar'') , pal ''racecars''' ==> '1 0'
+APL new lines: 'w =: ;: ''the cat and the dog and the bird'' ⋄ (~. w) ,. <"0 #/.~ w' ==> #('┌────┬─┐' '│the │3│' '├────┼─┤' '│cat │1│' '├────┼─┤' '│and │2│' '├────┼─┤' '│dog │1│' '├────┼─┤' '│bird│1│' '└────┴─┘')
+APL new eval: '+/ ''aeiou'' e.~ ''the quick brown fox jumps over the lazy dog''' ==> '11'
+APL new eval: 'mean =: +/ % # ⋄ data =: 4 8 15 16 23 42 ⋄ mean data' ==> '18'
+APL new eval: 'mean =: +/ % # ⋄ data =: 4 8 15 16 23 42 ⋄ var =: (+/ @: *: @: (- mean)) % # ⋄ var data' ==> '151.667'
+APL new eval: 'mean =: +/ % # ⋄ data =: 4 8 15 16 23 42 ⋄ var =: (+/ @: *: @: (- mean)) % # ⋄ (%: var data) < 12.4' ==> '1'
+APL new eval: 'median =: 3 : ''m =. <. -: # y ⋄ s =. /:~ y ⋄ if. 2 | # y do. m { s else. -: +/ (m - 1 0) { s end.'' ⋄ median 3 1 4 1 5' ==> '3'
+APL new eval: 'median =: 3 : ''m =. <. -: # y ⋄ s =. /:~ y ⋄ if. 2 | # y do. m { s else. -: +/ (m - 1 0) { s end.'' ⋄ median 4 8 15 16 23 42' ==> '15.5'
+APL new eval: 'mean =: +/ % # ⋄ cor =: 4 : ''(+/ (x - mean x) * (y - mean y)) % %: (+/ *: x - mean x) * +/ *: y - mean y'' ⋄ 1 2 3 4 5 cor 2 4 6 8 10' ==> '1'
+APL new eval: 'mean =: +/ % # ⋄ cor =: 4 : ''(+/ (x - mean x) * (y - mean y)) % %: (+/ *: x - mean x) * +/ *: y - mean y'' ⋄ 1 2 3 4 5 cor 5 4 3 2 1' ==> '_1'
+APL new eval: 'collatz =: 3 : ''n =. 0 ⋄ while. y > 1 do. y =. (0 = 2 | y) { (1 + 3 * y), y % 2 ⋄ n =. n + 1 end. n'' ⋄ collatz"0 i. 1 + 10' ==> '0 0 1 7 2 5 8 16 3 19 6'
+APL new eval: 'gcd =: 3 : ''if. 0 = y do. x else. y gcd x | y end.'' ⋄ 12 gcd 18' ==> '6'
+APL new eval: 'hanoi =: 3 : ''if. y = 0 do. 0 else. 1 + 2 * hanoi y - 1 end.'' ⋄ hanoi 10' ==> '1023'
+APL new eval: '0 = 3 | 1 + i. 9' ==> '0 0 1 0 0 1 0 0 1'
+APL new eval: '+/ 0 = 3 | 1 + i. 99' ==> '33'
+APL new eval: 'digits =: 10 & #: ⋄ +/ digits 2 ^ 15' ==> '26'
+APL new eval: 'bin =: 2 & #. ⋄ bin 1 0 1 1' ==> '11'
+APL new eval: 'rev =: |. ⋄ rev ''stressed''' ==> 'desserts'
+APL new eval: 'inv =: 3 : ''n =. # y ⋄ m =. y ,. =/~ i. n ⋄ for_i. i. n do. r =. (i { m) % (<i;i) { m ⋄ m =. r i} m ⋄ for_j. (i. n) -. i do. m =. ((j { m) - ((<j;i) { m) * i { m) j} m end. end. n }."1 m'' ⋄ *./ , 1e_9 > | (inv 2 2 $ 2 1 1 1) - %. 2 2 $ 2 1 1 1' ==> '1'
+APL new eval: 'inv =: 3 : ''n =. # y ⋄ m =. y ,. =/~ i. n ⋄ for_i. i. n do. r =. (i { m) % (<i;i) { m ⋄ m =. r i} m ⋄ for_j. (i. n) -. i do. m =. ((j { m) - ((<j;i) { m) * i { m) j} m end. end. n }."1 m'' ⋄ a =: 3 3 $ 2 1 0 1 3 1 0 1 4 ⋄ *./ , 1e_9 > | (inv a) - %. a' ==> '1'
+APL new eval: 'inv =: 3 : ''n =. # y ⋄ m =. y ,. =/~ i. n ⋄ for_i. i. n do. r =. (i { m) % (<i;i) { m ⋄ m =. r i} m ⋄ for_j. (i. n) -. i do. m =. ((j { m) - ((<j;i) { m) * i { m) j} m end. end. n }."1 m'' ⋄ a =: 3 3 $ 2 1 0 1 3 1 0 1 4 ⋄ *./ , 1e_9 > | (a +/ . * inv a) - =/~ i. 3' ==> '1'
+APL new lines: 'inv =: 3 : ''n =. # y ⋄ m =. y ,. =/~ i. n ⋄ for_i. i. n do. r =. (i { m) % (<i;i) { m ⋄ m =. r i} m ⋄ for_j. (i. n) -. i do. m =. ((j { m) - ((<j;i) { m) * i { m) j} m end. end. n }."1 m'' ⋄ 9!:11 (4) ⋄ inv 2 2 $ 2 1 1 1' ==> #('6' ' 1 _1' '_1  2')
+# glyphs
+APL new eval: '⍳ 5' ==> '0 1 2 3 4'
+APL new eval: '⍴ 2 3 ⍴ ⍳ 6' ==> '2 3'
+APL new eval: '+/ ⍳ 10' ==> '45'
+APL new eval: 'x ← 3 4 ⋄ x × 2' ==> '6 8'
+APL new eval: '⌽ ⍳ 4' ==> '3 2 1 0'
+APL new lines: '⍉ 2 3 ⍴ ⍳ 6' ==> #('0 3' '1 4' '2 5')
+APL new eval: '⍋ 3 1 2' ==> '1 2 0'
+APL new eval: '⍒ 3 1 2' ==> '0 2 1'
+APL new eval: '¯5 + 3' ==> '_2'
+APL new eval: '(⌈/ ⍳ 4) ÷ 2' ==> '1.5'
+APL new eval: '3 ⌊ 5' ==> '3'
+APL new eval: '3 ⌈ 5' ==> '5'
+APL new eval: '1 2 3 ≤ 2' ==> '1 1 0'
+APL new eval: '1 2 3 ≠ 2' ==> '1 0 1'
+APL new eval: '2 ↑ ''hello''' ==> 'he'
+APL new eval: '2 ↓ ''hello''' ==> 'llo'
+APL new eval: '⍴ ⍬' ==> '0'
+APL new lines: '1 ⋄ 2' ==> #('1' '2')
+APL new eval: '1 + 1 ⍝ comment' ==> '2'
+APL new eval: '(⍳ 3) ∊ 1 2' ==> '0 1 1'
+APL new eval: '+⌿ 2 3 ⍴ ⍳ 6' ==> '3 5 7'
+APL new eval: '$ ''a¯b''' ==> '4'
+# the Smalltalk interface
+(APL evalValue: '1 2 3') shape ==> #(3)
+(APL evalValue: '2 3 $ i. 6') asSmalltalk ==> #(#(0 1 2) #(3 4 5))
+(APL new evalValue: '''abc''') asSmalltalk ==> 'abc'
+(APL new evalValue: '5') asSmalltalk ==> 5
+(APL new evalValue: '1 2 3 + 4') data ==> #(5 6 7)
+(APLArray fromSmalltalk: #(1 2 3)) shape ==> #(3)
+(APLArray fromSmalltalk: #(#(1 2) #(3 4))) shape ==> #(2 2)
+(APLArray fromSmalltalk: #(#(1 2) #(3 4))) data ==> #(1 2 3 4)
+(APLArray fromSmalltalk: 'hi') shape ==> #(2)
+(APLArray fromSmalltalk: 'hi') asSmalltalk ==> 'hi'
+(APLArray fromSmalltalk: 7) asSmalltalk ==> 7
+(APLArray fromSmalltalk: $a) asSmalltalk ==> $a
+(APLArray fromSmalltalk: #('ab' 'cde')) asSmalltalk ==> #('ab' 'cde')
+(APLArray fromSmalltalk: #('ab' 'cde')) shape ==> #(2)
+(APLArray fromSmalltalk: #(1 'a')) asSmalltalk ==> #(1 'a')
+(APLArray fromSmalltalk: #(1 2 3.5)) asSmalltalk ==> #(1 2 3.5)
+(APLArray fromSmalltalk: (1/2)) asSmalltalk ==> (1/2)
+(APLArray fromSmalltalk: true) asSmalltalk ==> 1
+(APLArray fromSmalltalk: nil) shape ==> #(0)
+(APLArray fromSmalltalk: (OrderedCollection with: 1 with: 2)) asSmalltalk ==> #(1 2)
+#(1 2 3) asAPL shape ==> #(3)
+'abc' asAPL data size ==> 3
+(APLArray fromSmalltalk: #(#(1 2 3) #(4 5 6))) asSmalltalk ==> #(#(1 2 3) #(4 5 6))
+(APL new evalValue: '2 3 $ ''abcdef''') asSmalltalk ==> #('abc' 'def')
+(APL new evalValue: '<''abc''') asSmalltalk ==> 'abc'
+(APL new evalValue: '1 ; 2 3') asSmalltalk ==> #(1 #(2 3))
+| s | s := APL new. s eval: 'a =: 5'. s eval: 'a + 1' ==> '6'
+| s | s := APL new. s eval: 'a =: 5'. s includesName: 'a' ==> true
+| s | s := APL new. s eval: 'a =: 5'. APL new includesName: 'a' ==> false
+| s | s := APL new. s at: 'v' put: #(3 1 4 1 5). s eval: '+/ v' ==> '14'
+| s | s := APL new. s at: 'v' put: #(3 1 4 1 5). (s at: 'v') shape ==> #(5)
+| s | s := APL new. s at: 'w' put: 'hello'. s eval: '|. w' ==> 'olleh'
+| s | s := APL new. s define: 'sq' as: '3 : ''y * y'''. s eval: 'sq 4' ==> '16'
+| s | s := APL new. s eval: 'sq =: 3 : ''y * y'''. s call: 'sq' on: 7 ==> 49
+| s | s := APL new. s eval: 'sq =: 3 : ''y * y'''. s call: 'sq' on: #(1 2 3) ==> #(1 4 9)
+APL call: '+/' on: #(1 2 3) ==> 6
+APL call: '%' on: 1 and: 4 ==> 0.25
+APL call: '|.' on: 'abc' ==> 'cba'
+APL call: '{.' on: #(5 6 7) ==> 5
+APL call: '3 & {.' on: #(5 6 7 8) ==> #(5 6 7)
+APL call: ',' on: #(1 2) and: #(3) ==> #(1 2 3)
+APL call: '+/ . *' on: #(1 2 3) and: #(4 5 6) ==> 32
+APL call: '/:~' on: #(3 1 2) ==> #(1 2 3)
+APL call: '$' on: #(#(1 2) #(3 4)) ==> #(2 2)
+| s | s := APL new. s defineVerb: 'dbl' monad: [:y | y collect: [:e | e * 2]] dyad: nil. s eval: 'dbl 1 2 3' ==> '2 4 6'
+| s | s := APL new. s defineVerb: 'add' monad: nil dyad: [:x :y | x + y]. s eval: '3 add 4' ==> '7'
+| s | s := APL new. s defineVerb: 'up' monad: [:y | y asUppercase] dyad: nil. s eval: 'up ''abc''' ==> 'ABC'
+APL new lines: '2 3 $ i. 6' ==> #('0 1 2' '3 4 5')
+APL new smalltalkValue: '+/ i. 5' ==> 10
+APL new smalltalkValue: '2 2 $ 1 2 3 4' ==> #(#(1 2) #(3 4))
+[APL new eval: '1 + ''a'''] on: APLError do: [:e | e class name] ==> #APLError
+[APL new eval: '1 + ''a'''] on: Error do: [:e | e messageText] ==> 'domain error'
+[APL new eval: 'nonesuch'] on: APLError do: [:e | e messageText] ==> 'value error: nonesuch'
+[APL new eval: '1 2 + 1 2 3'] on: APLError do: [:e | e messageText] ==> 'length error'
+[APL new eval: '(1 + 2'] on: APLError do: [:e | e messageText] ==> 'syntax error'
+[APL new eval: '1 + 2)'] on: APLError do: [:e | e messageText] ==> 'syntax error'
+[APL new eval: '''abc'] on: APLError do: [:e | e messageText] ==> 'open quote'
+[APL new eval: '5 6 7 { 3'] on: APLError do: [:e | e messageText] ==> 'rank error'
+[APL new eval: '9 { 1 2 3'] on: APLError do: [:e | e messageText] ==> 'index error'
+[APL new eval: '+/ ''ab'''] on: APLError do: [:e | e messageText] ==> 'domain error'
+[APL new eval: '1 + + +'] on: APLError do: [:e | e messageText] ==> 'syntax error'
+[APL new eval: 'if. 1 do. 2 end.'] on: APLError do: [:e | e messageText] ==> 'syntax error'
+[APL new eval: '3 : ''if. 1 do. 2'''] on: APLError do: [:e | e messageText] ==> 'syntax error'
+[APL new eval: '1 2 3 +/ . * 4 5'] on: APLError do: [:e | e messageText] ==> 'length error'
+[APL new eval: 'f =: 3 : ''x + y'' ⋄ f 3'] on: APLError do: [:e | e messageText] ==> 'value error: x'
+[APL new eval: '%: _4'] on: APLError do: [:e | e messageText] ==> 'domain error'
+APL reset class == APL ==> true
+(APL eval: 'zz =: 12') size ==> 0
+APL eval: 'zz + 1' ==> '13'
+APL new precision ==> 6
+| s | s := APL new. s precision: 3. s eval: '% 3' ==> '0.333'
+APLArray empty shape ==> #(0)
+(APLArray integers: 4) data ==> #(0 1 2 3)
+(APLArray text: 'abc') isText ==> true
+(APLArray scalar: 3) isAtom ==> true
+(APLArray vector: #(1 2)) rank ==> 1
+(APLArray vector: #(1 2)) tally ==> 2
+(APLArray shape: #(2 2) data: #(1 2 3 4)) itemSize ==> 2
+((APLArray shape: #(2 2) data: #(1 2 3 4)) itemAt: 2) data ==> #(3 4)
+(APLArray shape: #(2 2) data: #(1 2 3 4)) match: (APLArray fromSmalltalk: #(#(1 2) #(3 4))) ==> true
+(APLLexer tokens: '1 2 3') size ==> 1
+((APLLexer tokens: '+/ i. 3') collect: [:t | t first]) asArray ==> #(#prim #prim #prim #num)
+APLLexer parseNumber: '3r4' ==> (3/4)
+APLLexer parseNumber: '_5' ==> -5
+APLLexer parseNumber: '1e3' ==> 1000
+APLLexer parseNumber: '2.5' ==> 2.5
+APLLexer parseNumber: 'abc' ==> nil
+APLLexer translateGlyphs: '⍳ 5' ==> ' i.  5'
+APL glyphs size > 20 ==> true
+APLFormat float: 3.14159 precision: 6 ==> '3.14159'
+APLFormat float: 123456789.123 precision: 6 ==> '1.23457e8'
+APLFormat float: 0.000012345 precision: 4 ==> '1.235e_5'
+APLFormat integer: -5 ==> '_5'
+APLFormat fraction: (3/4) ==> '3r4'
+APLFormat width: 'abc' ==> 3
+(APLPrims lookup: '+') display ==> '+'
+APLPrims isSpelling: 'i.' ==> true
+APLPrims isSpelling: 'zz' ==> false
+APLPrims exactOf: 0.5 ==> (1/2)
+APLPrims exactOf: 0.125 ==> (1/8)
+APLTutorial lessonCount ==> 20
+APLTool reset class == APL ==> true
+APLTool evaluate: '2 + 3' ==> '5'
+APLTool evaluate: '1 + ''a''' ==> '|domain error'
+APLTool evaluate: 'a =: 5 ⋄ a * 2' ==> '10'
+APLTool evaluate: 'a' ==> '5'
+APLTool evaluate: 'FORGET-ALL' ==> 'a fresh APL session'
+APLTool evaluate: 'a' ==> '|value error: a'
+(APLTool evaluate: '1 + 1 ⋄ 2 +') size ==> 15

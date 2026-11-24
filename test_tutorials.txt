@@ -86,3 +86,23 @@ Smalltalk tutorials size >= 8 ==> true
 (Smalltalk tutorials allSatisfy: [:each | (each exampleCheck at: 2) = 0]) ==> true
 (Smalltalk tutorials allSatisfy: [:each | each lessonCount >= 10 or: [each category = 'T']]) ==> true
 (Smalltalk tutorials collect: [:each | each tutorialName]) asArray = Smalltalk tutorialNames ==> true
+# Scheme
+Smalltalk loadPackage: 'Scheme'. (Smalltalk tutorialNamed: 'Scheme') == SchemeTutorial ==> true
+| t ls | t := SchemeTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(21 21 true)
+| c | c := SchemeTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 100)) ==> #(0 true)
+SchemeTutorial tutorialName ==> 'Scheme'
+# APL
+Smalltalk loadPackage: 'APL'. (Smalltalk tutorialNamed: 'APL') == APLTutorial ==> true
+| t ls | t := APLTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(20 20 true)
+| c | c := APLTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 100)) ==> #(0 true)
+APLTutorial tutorialName ==> 'APL'
+# Matrix
+Smalltalk loadPackage: 'Matrix'. (Smalltalk tutorialNamed: 'Matrix') == MatrixTutorial ==> true
+| t ls | t := MatrixTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(18 18 true)
+| c | c := MatrixTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 100)) ==> #(0 true)
+MatrixTutorial tutorialName ==> 'Matrix'
+# Algebra
+Smalltalk loadPackage: 'Algebra'. (Smalltalk tutorialNamed: 'Algebra') == AlgebraTutorial ==> true
+| t ls | t := AlgebraTutorial. ls := t lessons. (Array with: ls size with: ((ls collect: [:each | each title]) asSet size) with: (ls allSatisfy: [:each | each text size > 200])) ==> #(19 19 true)
+| c | c := AlgebraTutorial exampleCheck. (Array with: (c at: 2) with: ((c at: 1) > 100)) ==> #(0 true)
+AlgebraTutorial tutorialName ==> 'Algebra'

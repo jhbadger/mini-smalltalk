@@ -156,7 +156,7 @@ case-insensitive, and an image does not hold processes or windows.
 The `packages/` folder holds optional systems that are not in the standard image. Load one on demand:
 
 ```smalltalk
-Smalltalk availablePackages          "#('Bio' 'Debugger' 'Forth' 'Greek' 'Immuno' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
+Smalltalk availablePackages          "#('Algebra' 'APL' 'Bio' 'Debugger' 'Forth' 'Greek' 'Immuno' 'Matrix' 'Phylo' 'Prolog' 'Regex' 'Scheme' 'Stats' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'      "also: System menu -> load package..., or  st -l Prolog"
 ```
 
@@ -190,6 +190,18 @@ that image. These come with the system:
   B2, the irregular verbs, deponents), nouns in all their inflection classes with the accent shifts, articles, adjectives that
   agree with their nouns, the strong and weak pronouns, a lexicon, and a 23-lesson tutorial on the grammar:
   `'γράφω' asGreekVerb conjugate: #aorist`, `GreekNoun plural: 'άνθρωπος'`.
+
+* [**Scheme**](packages/Scheme/README.md) — a Scheme system: R5RS and much of R7RS-small, proper tail calls, re-entrant `call/cc`,
+  `syntax-rules` macros, records, hash tables, string ports, a bridge to Smalltalk objects, a workspace, and a 21-lesson
+  tutorial: `Scheme eval: '(map (lambda (x) (* x x)) (iota 5))'`.
+* [**APL**](packages/APL/README.md) — an array language in the APL and J family: rank-polymorphic arrays, verbs, adverbs and
+  conjunctions, tacit trains, boxes, the classic APL glyphs as alternate spellings, a workspace, and a 20-lesson tutorial:
+  `APL eval: '+/ i. 10'`.
+* [**Matrix**](packages/Matrix/README.md) — linear algebra on exact (rational) or floating point matrices: elimination,
+  determinants, inverses, LU, QR, Cholesky, eigenvalues, the SVD, least squares, and an 18-lesson tutorial:
+  `(Matrix rows: #(#(2 1) #(1 3))) inverse`.
+* [**Algebra**](packages/Algebra/README.md) — a computer algebra system: expand, factor, simplify, partial fractions, derivatives,
+  integrals, limits, series, equations, a workspace, and a 19-lesson tutorial: `Algebra factor: 'x^4 - 1'`.
 
 See [packages/README.md](packages/README.md) for how packages work and how to write one.
 

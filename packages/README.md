@@ -3,14 +3,14 @@
 This folder holds systems that are **not** part of the standard image. Load one when you want it:
 
 ```smalltalk
-Smalltalk availablePackages            "#('Bio' 'Debugger' 'Forth' 'Greek' 'Immuno' 'Phylo' 'Prolog' 'Regex' 'Stats' 'SUnit')"
+Smalltalk availablePackages            "#('Algebra' 'APL' 'Bio' 'Debugger' 'Forth' 'Greek' 'Immuno' 'Matrix' 'Phylo' 'Prolog' 'Regex' 'Scheme' 'Stats' 'SUnit')"
 Smalltalk loadPackage: 'Prolog'        "files it in (once)"
 Smalltalk isPackageLoaded: 'Prolog'
 Smalltalk packageDescription: 'Prolog' "the first comment of its file"
 ```
 
 From the UI use **System menu → load package...**; from the shell start with `st -l Prolog`
-(`-l` may be repeated). A package can add items to the System menu (the Prolog package adds *prolog workspace*, Forth adds *forth workspace*, Immuno adds *immuno workspace*).
+(`-l` may be repeated). A package can add items to the System menu (the Prolog package adds *prolog workspace*, Forth adds *forth workspace*, Immuno adds *immuno workspace*; Scheme, APL and Algebra add theirs too).
 
 What loading does:
 
@@ -83,3 +83,15 @@ Keep tests with the package: both packages have a `tests/tests.txt` of `expressi
   binding models for twenty class I and class II alleles (teaching models, with exact percentile ranks), protein scanning,
   models you train yourself and test by AUC, antigen processing, self and non-self, genotypes, population coverage,
   Hardy-Weinberg and linkage, donor matching, epitope selection for a vaccine, a workspace, and an 18-lesson tutorial.
+* **[Scheme](Scheme/README.md)** — a Scheme system: R5RS and much of R7RS-small, evaluated by a register machine with heap
+  continuations so tail calls are proper and `call/cc` is full and re-entrant; `dynamic-wind`, `syntax-rules` macros, records,
+  hash tables, string ports, `guard`, a bridge in both directions with Smalltalk, a workspace, and a 21-lesson tutorial.
+* **[APL](APL/README.md)** — an array language in the APL and J family: J-style ASCII words read right to left, multi-axis
+  arrays, rank and agreement, adverbs and conjunctions, explicit and tacit definitions, boxes, exact integers and rationals,
+  classic APL glyphs as alternate spellings, a workspace, and a 20-lesson tutorial.
+* **[Matrix](Matrix/README.md)** — linear algebra with entries that are exact Integers and Fractions or Floats: elimination
+  (with a step-by-step text trace), determinant, inverse, rank, null space, LU, Cholesky, QR, eigenvalues (including complex
+  pairs), the SVD, pseudoinverse, least squares, matrix functions, and an 18-lesson tutorial.
+* **[Algebra](Algebra/README.md)** — a computer algebra system with canonical-form expressions: an infix reader, printing and
+  LaTeX, expand, factor over the rationals, partial fractions, polynomial GCD, derivatives, integrals, limits, series, solving
+  equations and linear systems, summation, a command workspace, and a 19-lesson tutorial.

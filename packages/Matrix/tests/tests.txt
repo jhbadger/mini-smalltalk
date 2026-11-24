@@ -1,0 +1,528 @@
+# Tests for the Matrix package, run by test_vm after loading it: one  expression ==> expected printString  per line.
+# Exact (Integer and Fraction) matrices give exact answers; Float results are rounded so that the last bits cannot matter.
+Smalltalk loadPackage: 'Matrix' ==> true
+# construction and shape
+Matrix rows: #(#(1 2) #(3 4)) ==> Matrix(1 2; 3 4)
+(Matrix rows: #(#(1 2) #(3 4))) dimensions ==> #(2 2)
+(Matrix rows: #(#(1 2 3) #(4 5 6))) rowCount ==> 2
+(Matrix rows: #(#(1 2 3) #(4 5 6))) columnCount ==> 3
+(Matrix rows: #(#(1 2 3) #(4 5 6))) size ==> 6
+(Matrix rows: #(#(1 2) #(3 4))) isSquare ==> true
+(Matrix rows: #(#(1 2 3) #(4 5 6))) isSquare ==> false
+Matrix columns: #(#(1 2 3) #(4 5 6)) ==> Matrix(1 4; 2 5; 3 6)
+Matrix row: #(1 2 3) ==> Matrix(1 2 3)
+Matrix column: #(1 2 3) ==> Matrix(1; 2; 3)
+(Matrix row: #(1 2 3)) isVector ==> true
+(Matrix column: #(1 2 3)) isColumnVector ==> true
+(Matrix rows: #(#(1 2) #(3 4))) isVector ==> false
+Matrix identity: 3 ==> Matrix(1 0 0; 0 1 0; 0 0 1)
+Matrix zeros: 2 ==> Matrix(0 0; 0 0)
+Matrix ones: 2 ==> Matrix(1 1; 1 1)
+Matrix zerosRows: 2 columns: 3 ==> Matrix(0 0 0; 0 0 0)
+Matrix onesRows: 3 columns: 2 ==> Matrix(1 1; 1 1; 1 1)
+Matrix rows: 2 columns: 2 fill: 5 ==> Matrix(5 5; 5 5)
+Matrix diagonal: #(1 2 3) ==> Matrix(1 0 0; 0 2 0; 0 0 3)
+Matrix rows: 2 columns: 3 collect: [:i :j | i + j] ==> Matrix(2 3 4; 3 4 5)
+Matrix fromString: '1 2; 3 4' ==> Matrix(1 2; 3 4)
+Matrix fromString: '1, 2, 3; 4, 5, 6' ==> Matrix(1 2 3; 4 5 6)
+Matrix fromString: '1/2 3/4; -1 2.5' ==> Matrix(1/2 3/4; -1 2.5)
+Matrix fromString: '1 2 3' ==> Matrix(1 2 3)
+(Matrix fromString: '1 2' , (String with: Character lf) , '3 4') dimensions ==> #(2 2)
+Matrix hilbert: 3 ==> Matrix(1 1/2 1/3; 1/2 1/3 1/4; 1/3 1/4 1/5)
+Matrix vandermonde: #(1 2 3) ==> Matrix(1 1 1; 1 2 4; 1 3 9)
+Matrix vandermonde: #(1 2 3) degree: 1 ==> Matrix(1 1; 1 2; 1 3)
+Matrix toeplitz: #(1 2 3) ==> Matrix(1 2 3; 2 1 2; 3 2 1)
+Matrix companion: #(2 3) ==> Matrix(0 -2; 1 -3)
+Matrix pascal: 3 ==> Matrix(1 1 1; 1 2 3; 1 3 6)
+Matrix permutation: #(2 3 1) ==> Matrix(0 1 0; 0 0 1; 1 0 0)
+(Matrix rotation: 0) isIdentity ==> true
+(Matrix rotation: Float pi / 2) roundedTo: 6 ==> Matrix(0.0 -1.0; 1.0 0.0)
+(Matrix rotationZ: Float pi) roundedTo: 6 ==> Matrix(-1.0 0.0 0.0; 0.0 -1.0 0.0; 0.0 0.0 1.0)
+(Matrix rotationX: Float pi / 2) roundedTo: 6 ==> Matrix(1.0 0.0 0.0; 0.0 0.0 -1.0; 0.0 1.0 0.0)
+(Matrix rotationY: Float pi / 2) roundedTo: 6 ==> Matrix(0.0 0.0 1.0; 0.0 1.0 0.0; -1.0 0.0 0.0)
+[Matrix rows: #(#(1 2) #(3))] on: MatrixError do: [:e | e messageText] ==> 'the rows are not all the same length'
+[Matrix rows: #()] on: MatrixError do: [:e | e messageText] ==> 'a matrix needs at least one row'
+[Matrix rows: #(#(1 $a))] on: MatrixError do: [:e | e messageText] ==> 'a matrix holds numbers, not $a'
+[Matrix fromString: '1 x'] on: MatrixError do: [:e | e messageText] ==> 'not a number: x'
+[Matrix fromString: '1/0'] on: MatrixError do: [:e | e messageText] ==> 'a zero denominator in 1/0'
+# accessing
+(Matrix rows: #(#(1 2) #(3 4))) at: 2 at: 1 ==> 3
+(Matrix rows: #(#(1 2) #(3 4))) at: 1 at: 2 ==> 2
+[(Matrix rows: #(#(1 2) #(3 4))) at: 3 at: 1] on: MatrixError do: [:e | e messageText] ==> 'there is no entry (3, 1) in a 2 x 2 matrix'
+[(Matrix rows: #(#(1 2) #(3 4))) at: 0 at: 1] on: MatrixError do: [:e | e class] ==> MatrixError
+| m | m := (Matrix rows: #(#(1 2) #(3 4))) copy. m at: 1 at: 1 put: 9. m ==> Matrix(9 2; 3 4)
+| m c | m := Matrix rows: #(#(1 2) #(3 4)). c := m copy. c at: 1 at: 1 put: 9. m ==> Matrix(1 2; 3 4)
+(Matrix column: #(5 6 7)) at: 2 ==> 6
+[(Matrix fromString: '1 2; 3 4') at: 1] on: MatrixError do: [:e | e messageText] ==> 'at: needs a vector; use at:at:'
+(Matrix fromString: '1 2 3; 4 5 6') rowArray: 2 ==> #(4 5 6)
+(Matrix fromString: '1 2 3; 4 5 6') columnArray: 3 ==> #(3 6)
+(Matrix fromString: '1 2 3; 4 5 6') row: 1 ==> Matrix(1 2 3)
+(Matrix fromString: '1 2 3; 4 5 6') column: 2 ==> Matrix(2; 5)
+[(Matrix fromString: '1 2 3; 4 5 6') row: 3] on: MatrixError do: [:e | e messageText] ==> 'there is no row 3'
+(Matrix fromString: '1 2 3; 4 5 6') diagonal ==> #(1 5)
+(Matrix fromString: '1 2 3; 4 5 6') asArray ==> #(1 2 3 4 5 6)
+(Matrix fromString: '1 2 3; 4 5 6') asArrays ==> #(#(1 2 3) #(4 5 6))
+(Matrix fromString: '1 2 3; 4 5 6') asColumnArrays ==> #(#(1 4) #(2 5) #(3 6))
+(Matrix fromString: '1 2 3; 4 5 6') sum ==> 21
+(Matrix fromString: '1 2 3; 4 5 6') max ==> 6
+(Matrix fromString: '1 2 3; 4 5 6') min ==> 1
+(Matrix fromString: '1 2 3; 4 5 6') transposed ==> Matrix(1 4; 2 5; 3 6)
+(Matrix fromString: '1 2 3; 4 5 6') transposed transposed = (Matrix fromString: '1 2 3; 4 5 6') ==> true
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') submatrixRows: 2 to: 3 columns: 1 to: 2 ==> Matrix(4 5; 7 8)
+[(Matrix fromString: '1 2; 3 4') submatrixRows: 1 to: 3 columns: 1 to: 1] on: MatrixError do: [:e | e messageText] ==> 'that block is outside the matrix'
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') withoutRow: 1 column: 3 ==> Matrix(4 5; 7 8)
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') rowsAt: #(3 1) ==> Matrix(7 8 9; 1 2 3)
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') columnsAt: #(2 3) ==> Matrix(2 3; 5 6; 8 9)
+(Matrix fromString: '1 2; 3 4') augment: (Matrix column: #(5 6)) ==> Matrix(1 2 5; 3 4 6)
+(Matrix fromString: '1 2; 3 4') stack: (Matrix row: #(5 6)) ==> Matrix(1 2; 3 4; 5 6)
+[(Matrix fromString: '1 2; 3 4') augment: (Matrix column: #(5 6 7))] on: MatrixError do: [:e | e messageText] ==> 'augment: needs the same number of rows'
+(Matrix fromString: '1 2 3 4; 5 6 7 8') reshapedRows: 4 columns: 2 ==> Matrix(1 2; 3 4; 5 6; 7 8)
+(Matrix fromString: '1 2; 3 4') collect: [:x | x * x] ==> Matrix(1 4; 9 16)
+(Matrix fromString: '1 2; 3 4') collectWithIndexes: [:x :i :j | x * 10 + i + j] ==> Matrix(12 23; 33 44)
+(Matrix fromString: '1 2; 3 4') swapRows: 1 with: 2 ==> Matrix(3 4; 1 2)
+(Matrix fromString: '1 2; 3 4') scaleRow: 2 by: 1/2 ==> Matrix(1 2; 3/2 2)
+(Matrix fromString: '1 2; 3 4') addRow: 1 times: -3 to: 2 ==> Matrix(1 2; 0 -2)
+# comparing
+(Matrix fromString: '1 2; 3 4') = (Matrix fromString: '1 2; 3 4') ==> true
+(Matrix fromString: '1 2; 3 4') = (Matrix fromString: '1 2; 3 5') ==> false
+(Matrix fromString: '1 2; 3 4') = 3 ==> false
+(Matrix fromString: '1 2; 3 4') hash = (Matrix fromString: '1 2; 3 4') hash ==> true
+(Matrix fromString: '1.0 2') isCloseTo: (Matrix fromString: '1.0000000000001 2') ==> true
+(Matrix fromString: '1.0 2') isCloseTo: (Matrix fromString: '1.1 2') ==> false
+(Matrix fromString: '1 2') isCloseTo: (Matrix fromString: '1; 2') ==> false
+# printing
+(Matrix fromString: '1/2 -3; 0.5 7') printString ==> 'Matrix(1/2 -3; 0.5 7)'
+(Matrix fromString: '1 2; 3 4') displayString size ==> 17
+((Matrix fromString: '0.1 0.25; 1.5 100.125') displayString: 2) includesSubstring: '[ 1.5  100.13 ]' ==> true
+((Matrix fromString: '0.1 0.25; 1.5 100.125') displayString: 2) includesSubstring: '[ 0.1    0.25 ]' ==> true
+(Matrix fromString: '1/3 2/7') asFloats printString ==> 'Matrix(0.333333 0.285714)'
+(Matrix fromString: '0.30000000000000004 1') printString ==> 'Matrix(0.3 1)'
+MatrixFormat number: 3.14159 digits: 2 ==> '3.14'
+MatrixFormat number: -0.00001 digits: 3 ==> '0.0'
+MatrixFormat number: (3/4) digits: 2 ==> '3/4'
+MatrixFormat number: 7 digits: 2 ==> '7'
+# arithmetic
+(Matrix fromString: '1 2; 3 4') + (Matrix fromString: '10 20; 30 40') ==> Matrix(11 22; 33 44)
+(Matrix fromString: '1 2; 3 4') - (Matrix fromString: '10 20; 30 40') ==> Matrix(-9 -18; -27 -36)
+(Matrix fromString: '1 2; 3 4') + 1 ==> Matrix(2 3; 4 5)
+(Matrix fromString: '1 2; 3 4') * 3 ==> Matrix(3 6; 9 12)
+(Matrix fromString: '1 2; 3 4') * (1/2) ==> Matrix(1/2 1; 3/2 2)
+(Matrix fromString: '2 4; 6 8') / 2 ==> Matrix(1 2; 3 4)
+(Matrix fromString: '1 2; 3 4') negated ==> Matrix(-1 -2; -3 -4)
+(Matrix fromString: '1 2; 3 4') * (Matrix fromString: '5 6; 7 8') ==> Matrix(19 22; 43 50)
+(Matrix fromString: '1 2 3; 4 5 6') * (Matrix fromString: '1 0; 0 1; 1 1') ==> Matrix(4 5; 10 11)
+(Matrix fromString: '1 2 3; 4 5 6') * (Matrix column: #(1 0 2)) ==> Matrix(7; 16)
+(Matrix fromString: '1 2; 3 4') * (Matrix identity: 2) ==> Matrix(1 2; 3 4)
+(Matrix fromString: '1 2; 3 4') * (Matrix zeros: 2) ==> Matrix(0 0; 0 0)
+[(Matrix fromString: '1 2; 3 4') * (Matrix fromString: '1 2 3')] on: MatrixError do: [:e | e messageText] ==> 'cannot multiply a 2 x 2 matrix by a 1 x 3 one'
+[(Matrix fromString: '1 2; 3 4') + (Matrix fromString: '1 2 3')] on: MatrixError do: [:e | e messageText] ==> 'elementwise operation needs matrices of the same shape, not 2 x 2 and 1 x 3'
+[(Matrix fromString: '1 2; 3 4') / (Matrix identity: 2)] on: MatrixError do: [:e | e messageText] ==> 'a matrix can be divided only by a number; for A inverse * B write A solve: B'
+[(Matrix fromString: '1 2; 3 4') / 0] on: MatrixError do: [:e | e messageText] ==> 'division by zero'
+| a b | a := Matrix fromString: '1 2; 3 4'. b := Matrix fromString: '0 1; 1 0'. (a * b) = (b * a) ==> false
+| a b c | a := Matrix fromString: '1 2; 3 4'. b := Matrix fromString: '0 1; 1 0'. c := Matrix fromString: '2 -1; 5 3'. ((a * b) * c) = (a * (b * c)) ==> true
+| a b c | a := Matrix fromString: '1 2; 3 4'. b := Matrix fromString: '0 1; 1 0'. c := Matrix fromString: '2 -1; 5 3'. (a * (b + c)) = ((a * b) + (a * c)) ==> true
+| a b | a := Matrix fromString: '1 2 3; 4 5 6'. b := Matrix fromString: '1 0; 2 1; 0 3'. (a * b) transposed = (b transposed * a transposed) ==> true
+(Matrix fromString: '1 2; 3 4') hadamard: (Matrix fromString: '5 6; 7 8') ==> Matrix(5 12; 21 32)
+(Matrix fromString: '1 2; 3 4') dividedElementwiseBy: (Matrix fromString: '1 2; 3 4') ==> Matrix(1 1; 1 1)
+(Matrix fromString: '1 2; 3 4') kronecker: (Matrix fromString: '0 1; 1 0') ==> Matrix(0 1 0 2; 1 0 2 0; 0 3 0 4; 3 0 4 0)
+(Matrix fromString: '1 2') kronecker: (Matrix column: #(3 4)) ==> Matrix(3 6; 4 8)
+(Matrix fromString: '1 1; 0 1') raisedTo: 5 ==> Matrix(1 5; 0 1)
+(Matrix fromString: '1 1; 0 1') raisedTo: 0 ==> Matrix(1 0; 0 1)
+(Matrix fromString: '2 0; 0 3') raisedTo: -2 ==> Matrix(1/4 0; 0 1/9)
+(Matrix fromString: '1 2; 3 4') squared ==> Matrix(7 10; 15 22)
+[(Matrix fromString: '1 2; 3 4') raisedTo: 1/2] on: MatrixError do: [:e | e messageText] ==> 'a matrix can be raised only to an integer power'
+[(Matrix fromString: '1 2 3') raisedTo: 2] on: MatrixError do: [:e | e messageText] ==> 'a power needs a square matrix, and this one is 1 x 3'
+(Matrix fromString: '1 2; 3 4') trace ==> 5
+(Matrix fromString: '1 2; 3 4') scaledBy: 10 ==> Matrix(10 20; 30 40)
+(Matrix fromString: '1 -2; 3 4') norm1 ==> 6
+(Matrix fromString: '1 -2; 3 4') normInf ==> 7
+(Matrix fromString: '3 0; 0 4') frobeniusNorm ==> 5.0
+(Matrix fromString: '1 2; 3 4') normSquared ==> 30
+((Matrix fromString: '3 0; 0 4') norm2 * 1000) rounded ==> 4000
+# vectors
+(Matrix column: #(3 4)) norm ==> 5.0
+(Matrix column: #(3 4)) normSquared ==> 25
+(Matrix column: #(1 2 3)) dot: #(4 5 6) ==> 32
+(Matrix row: #(1 2 3)) dot: (Matrix column: #(4 5 6)) ==> 32
+[(Matrix column: #(1 2)) dot: #(1 2 3)] on: MatrixError do: [:e | e messageText] ==> 'dot: needs vectors of the same length'
+[(Matrix fromString: '1 2; 3 4') dot: #(1 2)] on: MatrixError do: [:e | e messageText] ==> 'dot: needs a vector (a matrix with one row or one column)'
+(Matrix column: #(1 0 0)) cross: #(0 1 0) ==> Matrix(0; 0; 1)
+(Matrix column: #(1 2 3)) cross: #(4 5 6) ==> Matrix(-3; 6; -3)
+(Matrix column: #(1 2 3)) cross: #(1 2 3) ==> Matrix(0; 0; 0)
+[(Matrix column: #(1 2)) cross: #(1 2)] on: MatrixError do: [:e | e messageText] ==> 'cross: needs two vectors of length 3'
+(Matrix column: #(1 2 3)) outer: #(1 10) ==> Matrix(1 10; 2 20; 3 30)
+(Matrix column: #(3 4)) normalized ==> Matrix(0.6; 0.8)
+[(Matrix column: #(0 0)) normalized] on: MatrixError do: [:e | e messageText] ==> 'the zero vector cannot be normalized'
+(Matrix column: #(3 4)) projectOnto: #(1 0) ==> Matrix(3; 0)
+(Matrix column: #(2 2)) projectOnto: #(1 3) ==> Matrix(4/5; 12/5)
+[(Matrix column: #(1 2)) projectOnto: #(0 0)] on: MatrixError do: [:e | e messageText] ==> 'cannot project onto the zero vector'
+(((Matrix column: #(1 0)) angleWith: #(0 1)) * 1000) rounded ==> 1571
+(((Matrix column: #(1 0)) angleWith: #(1 1)) * 1000) rounded ==> 785
+(Matrix column: #(1 0)) angleWith: #(1 0) ==> 0.0
+(Matrix column: #(1 0)) isOrthogonalTo: #(0 7) ==> true
+(Matrix column: #(1 1)) isOrthogonalTo: #(0 7) ==> false
+# elimination, rank, null space
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 10') rref ==> Matrix(1 0 0; 0 1 0; 0 0 1)
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') rref ==> Matrix(1 0 -1; 0 1 2; 0 0 0)
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') reducedRowEchelon = (Matrix fromString: '1 2 3; 4 5 6; 7 8 9') rref ==> true
+(Matrix fromString: '0 2; 1 1') rref ==> Matrix(1 0; 0 1)
+(Matrix fromString: '2 4 6; 1 2 3') rref ==> Matrix(1 2 3; 0 0 0)
+(Matrix fromString: '0 0; 0 0') rref ==> Matrix(0 0; 0 0)
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') pivotColumns ==> #(1 2)
+(Matrix fromString: '0 1 2; 0 0 3') pivotColumns ==> #(2 3)
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') rank ==> 2
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 10') rank ==> 3
+(Matrix fromString: '1 2 3 4; 2 4 6 8') rank ==> 1
+(Matrix zeros: 3) rank ==> 0
+(Matrix fromString: '1 2 3; 4 5 6') rank ==> 2
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') nullity ==> 1
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') nullspaceBasis ==> #(Matrix(1; -2; 1))
+(Matrix fromString: '1 2 3 4; 2 4 6 8') nullspaceBasis ==> #(Matrix(-2; 1; 0; 0) Matrix(-3; 0; 1; 0) Matrix(-4; 0; 0; 1))
+(Matrix fromString: '1 0; 0 1') nullspaceBasis ==> #()
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') leftNullspaceBasis ==> #(Matrix(1; -2; 1))
+| a | a := Matrix fromString: '1 2 3 4; 2 4 6 8; 1 0 1 0'. a nullspaceBasis collect: [:v | a * v] ==> #(Matrix(0; 0; 0) Matrix(0; 0; 0))
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') columnSpaceBasis ==> #(Matrix(1; 4; 7) Matrix(2; 5; 8))
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') rowSpaceBasis ==> #(Matrix(1 0 -1) Matrix(0 1 2))
+| a | a := Matrix fromString: '1 2 3 4; 2 4 6 8; 1 0 1 0'. a rank + a nullity = a columnCount ==> true
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') rrefSteps size > 200 ==> true
+(Matrix fromString: '1 2; 3 4') rrefSteps includesSubstring: 'row 2 minus 3 times row 1' ==> true
+((Matrix fromString: '1 2; 3 4') rrefSteps copyFrom: 1 to: 6) ==> 'start:'
+(Matrix fromString: '1 2; 3 4') isInvertible ==> true
+(Matrix fromString: '1 2; 2 4') isInvertible ==> false
+(Matrix fromString: '1 2 3; 4 5 6') isInvertible ==> false
+(Matrix fromString: '1 2; 2 4') isSingular ==> true
+# float elimination
+(Matrix fromString: '1.0 2 3; 4 5 6; 7 8 9') rank ==> 2
+(Matrix fromString: '1.5 2 3; 4 5 6; 7 8 9') rank ==> 3
+(Matrix fromString: '1.0 2; 3 4') rref ==> Matrix(1.0 0.0; 0.0 1.0)
+(Matrix fromString: '0.1 0.2; 0.3 0.6') rank ==> 1
+((Matrix fromString: '1.0 2 3; 4 5 6; 7 8 9') nullspaceBasis at: 1) roundedTo: 6 ==> Matrix(1.0; -2.0; 1.0)
+# determinant, inverse, solve
+(Matrix fromString: '5') determinant ==> 5
+(Matrix fromString: '1 2; 3 4') determinant ==> -2
+(Matrix fromString: '2 0 1; 1 3 2; 1 1 4') determinant ==> 18
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') determinant ==> 0
+(Matrix fromString: '0 1; 1 0') determinant ==> -1
+(Matrix identity: 5) determinant ==> 1
+(Matrix diagonal: #(2 3 4)) determinant ==> 24
+(Matrix hilbert: 3) determinant ==> (1/2160)
+(Matrix hilbert: 4) determinant ==> (1/6048000)
+(Matrix vandermonde: #(1 2 3 4)) determinant ==> 12
+(Matrix fromString: '1/2 1/3; 1/4 1/5') determinant ==> (1/60)
+((Matrix fromString: '1.5 2; 3 5') determinant * 1000) rounded ==> 1500
+(Matrix fromString: '2 1 0 0; 1 2 1 0; 0 1 2 1; 0 0 1 2') determinant ==> 5
+((Matrix fromString: '1.0 2 3; 0 4 5; 1 0 6') determinant * 1000) rounded ==> 22000
+[(Matrix fromString: '1 2 3') determinant] on: MatrixError do: [:e | e messageText] ==> 'the determinant needs a square matrix, and this one is 1 x 3'
+| a b | a := Matrix fromString: '1 2 3; 0 4 5; 1 0 6'. b := Matrix fromString: '2 1 0; 1 3 1; 0 1 4'. (a * b) determinant = (a determinant * b determinant) ==> true
+| a | a := Matrix fromString: '1 2 3; 0 4 5; 1 0 6'. a determinant = a transposed determinant ==> true
+| a | a := Matrix fromString: '1 2 3; 0 4 5; 1 0 6'. (a swapRows: 1 with: 3) determinant = a determinant negated ==> true
+| a | a := Matrix fromString: '1 2 3; 0 4 5; 1 0 6'. (a * 2) determinant = (a determinant * 8) ==> true
+(Matrix fromString: '1 2; 3 4') cofactorMatrix ==> Matrix(4 -3; -2 1)
+(Matrix fromString: '1 2; 3 4') adjugate ==> Matrix(4 -2; -3 1)
+| a | a := Matrix fromString: '2 0 1; 1 3 2; 1 1 4'. (a * a adjugate) = ((Matrix identity: 3) * a determinant) ==> true
+| a | a := Matrix fromString: '2 0 1; 1 3 2; 1 1 4'. a inverse = (a adjugate / a determinant) ==> true
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 10') minorAt: 1 at: 1 ==> 2
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 10') cofactorAt: 1 at: 2 ==> 2
+(Matrix fromString: '1 2; 3 4') inverse ==> Matrix(-2 1; 3/2 -1/2)
+(Matrix fromString: '2 1; 1 3') inverse ==> Matrix(3/5 -1/5; -1/5 2/5)
+(Matrix hilbert: 3) inverse ==> Matrix(9 -36 30; -36 192 -180; 30 -180 180)
+(Matrix hilbert: 4) inverse * (Matrix hilbert: 4) ==> Matrix(1 0 0 0; 0 1 0 0; 0 0 1 0; 0 0 0 1)
+(Matrix fromString: '0 1; 1 0') inverse ==> Matrix(0 1; 1 0)
+(Matrix fromString: '4') inverse ==> Matrix(1/4)
+(Matrix fromString: '1 2 3; 0 1 4; 5 6 0') inverse ==> Matrix(-24 18 5; 20 -15 -4; -5 4 1)
+| a | a := Matrix fromString: '1 2 3; 0 1 4; 5 6 0'. (a * a inverse) = (Matrix identity: 3) ==> true
+| a | a := Matrix fromString: '1 2 3; 0 1 4; 5 6 0'. (a inverse * a) = (Matrix identity: 3) ==> true
+| a | a := Matrix fromString: '1 2 3; 0 1 4; 5 6 0'. a inverse inverse = a ==> true
+| a | a := Matrix fromString: '1.5 2 3; 0 1 4; 5 6 0'. ((a * a inverse) roundedTo: 9) = (Matrix identity: 3) asFloats ==> true
+[(Matrix fromString: '1 2; 2 4') inverse] on: MatrixError do: [:e | e messageText] ==> 'the matrix is singular'
+[(Matrix fromString: '1 2 3; 4 5 6') inverse] on: MatrixError do: [:e | e messageText] ==> 'the inverse needs a square matrix, and this one is 2 x 3'
+[(Matrix fromString: '1.0 2 3; 4 5 6; 7 8 9') inverse] on: MatrixError do: [:e | e messageText] ==> 'the matrix is singular'
+(Matrix fromString: '2 1; 1 3') solve: #(3 5) ==> Matrix(4/5; 7/5)
+(Matrix fromString: '1 2 3; 2 5 3; 1 0 8') solve: #(14 18 17) ==> Matrix(-119; 41; 17)
+(Matrix fromString: '2 1 -1; -3 -1 2; -2 1 2') solve: #(8 -11 -3) ==> Matrix(2; 3; -1)
+(Matrix fromString: '2 1; 1 3') solve: (Matrix identity: 2) ==> Matrix(3/5 -1/5; -1/5 2/5)
+(Matrix fromString: '2 1; 1 3') solve: (Matrix fromString: '3 1; 5 0') ==> Matrix(4/5 3/5; 7/5 -1/5)
+(Matrix fromString: '0 1; 1 0') solve: #(7 9) ==> Matrix(9; 7)
+(Matrix fromString: '2.0 1; 1 3') solve: #(3 5) ==> Matrix(0.8; 1.4)
+[(Matrix fromString: '1 2; 2 4') solve: #(1 2)] on: MatrixError do: [:e | e messageText] ==> 'the matrix is singular'
+[(Matrix fromString: '1 2; 3 4') solve: #(1 2 3)] on: MatrixError do: [:e | e messageText] ==> 'the right hand side has 3 rows, the matrix has 2'
+[(Matrix fromString: '1 2 3; 4 5 6') solve: #(1 2)] on: MatrixError do: [:e | e messageText] ==> 'solve: needs a square matrix, and this one is 2 x 3'
+(Matrix fromString: '2 1; 1 3') cramer: #(3 5) ==> Matrix(4/5; 7/5)
+(Matrix fromString: '1 2 3; 2 5 3; 1 0 8') cramer: #(14 18 17) ==> Matrix(-119; 41; 17)
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') solveGeneral: #(1 2 3) ==> #(Matrix(-1/3; 2/3; 0) #(Matrix(1; -2; 1)))
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') solveGeneral: #(1 2 4) ==> nil
+(Matrix fromString: '1 1; 1 2; 1 3') solveGeneral: #(1 2 3) ==> #(Matrix(0; 1) #())
+(Matrix fromString: '1 1; 1 2; 1 3') solveGeneral: #(1 2 4) ==> nil
+(Matrix fromString: '1 1 1') solveGeneral: #(6) ==> #(Matrix(6; 0; 0) #(Matrix(-1; 1; 0) Matrix(-1; 0; 1)))
+(Matrix fromString: '1 2; 3 4') isConsistent: #(1 1) ==> true
+(Matrix fromString: '1 2; 2 4') isConsistent: #(1 1) ==> false
+| a x | a := Matrix fromString: '1 1 1; 1 2 3'. x := (a solveGeneral: #(6 14)) at: 1. a * x ==> Matrix(6; 14)
+# LU
+(Matrix fromString: '2 1 1; 4 3 3; 8 7 9') lu lower ==> Matrix(1 0 0; 2 1 0; 4 3 1)
+(Matrix fromString: '2 1 1; 4 3 3; 8 7 9') lu upper ==> Matrix(2 1 1; 0 1 1; 0 0 2)
+(Matrix fromString: '2 1 1; 4 3 3; 8 7 9') lu permutation ==> #(1 2 3)
+(Matrix fromString: '0 1; 1 1') lu permutation ==> #(2 1)
+(Matrix fromString: '0 1; 1 1') lu sign ==> -1
+(Matrix fromString: '0 1; 1 1') lu permutationMatrix ==> Matrix(0 1; 1 0)
+(Matrix fromString: '0 1; 1 1') lu lower ==> Matrix(1 0; 0 1)
+(Matrix fromString: '0 1; 1 1') lu upper ==> Matrix(1 1; 0 1)
+| a | a := Matrix fromString: '1 2 3; 4 5 6; 7 8 10'. a lu reconstruct = a ==> true
+| a lu | a := Matrix fromString: '1 2 3; 4 5 6; 7 8 10'. lu := a lu. (lu permutationMatrix * a) = (lu lower * lu upper) ==> true
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 10') lu determinant ==> -3
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') lu isSingular ==> true
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') lu determinant ==> 0
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 10') lu isSingular ==> false
+(Matrix fromString: '2 1 1; 4 3 3; 8 7 9') lu solve: (Matrix column: #(1 2 3)) ==> Matrix(1/2; 1/2; -1/2)
+| a | a := Matrix fromString: '1.5 2 3; 4 5 6; 7 8 10'. (a lu reconstruct isCloseTo: a) ==> true
+| a | a := Matrix fromString: '1.5 2 3; 4 5 6; 7 8 10'. (a lu lower isLowerTriangular and: [a lu upper isUpperTriangular]) ==> true
+(Matrix fromString: '1 2; 3 4') lu printString ==> 'an LU decomposition of a 2 x 2 matrix'
+# QR, Gram-Schmidt, orthogonality
+| a | a := Matrix fromString: '1 2; 3 4; 5 6'. (a qr q * a qr r) isCloseTo: a ==> true
+| a | a := Matrix fromString: '1 2; 3 4; 5 6'. a qr q isOrthogonal ==> true
+| a | a := Matrix fromString: '1 2; 3 4; 5 6'. a qr r isUpperTriangular ==> true
+| a | a := Matrix fromString: '1 2; 3 4; 5 6'. a qr q dimensions ==> #(3 3)
+| a | a := Matrix fromString: '1 2; 3 4; 5 6'. a qr r dimensions ==> #(3 2)
+(Matrix fromString: '1 2; 3 4; 5 6') qr r roundedTo: 4 ==> Matrix(5.9161 7.4374; 0.0 0.8281; 0.0 0.0)
+(Matrix fromString: '3 0; 4 5') qr r roundedTo: 6 ==> Matrix(5.0 4.0; 0.0 3.0)
+| a | a := Matrix fromString: '1 2 3; 4 5 6; 7 8 10'. (a qr q * a qr r) isCloseTo: a ==> true
+| a | a := Matrix fromString: '1 2 3; 4 5 6; 7 8 10'. (1 to: 3) allSatisfy: [:i | (a qr r at: i at: i) >= 0] ==> true
+| a | a := Matrix fromString: '1 2 3 4; 5 6 7 8'. (a qr q * a qr r) isCloseTo: a ==> true
+(Matrix fromString: '1 1 0; 1 0 1; 0 1 1') gramSchmidt isOrthogonal ==> true
+(Matrix fromString: '1 1 0; 1 0 1; 0 1 1') gramSchmidt roundedTo: 4 ==> Matrix(0.7071 0.4082 -0.5774; 0.7071 -0.4082 0.5774; 0.0 0.8165 0.5774)
+(Matrix fromString: '1 1 0; 1 0 1; 0 1 1') gramSchmidtUnnormalized ==> Matrix(1 1/2 -2/3; 1 -1/2 2/3; 0 1 2/3)
+| g | g := Matrix fromString: '1 1 0; 1 0 1; 0 1 1'. (g gramSchmidtUnnormalized transposed * g gramSchmidtUnnormalized) isDiagonal ==> true
+(Matrix fromString: '1 2; 2 4; 3 6') gramSchmidt dimensions ==> #(3 1)
+(Matrix fromString: '1 2 1; 2 4 1; 3 6 1') gramSchmidtUnnormalized columnCount ==> 2
+[(Matrix zeros: 2) gramSchmidt] on: MatrixError do: [:e | e messageText] ==> 'every column is zero'
+(Matrix rotation: 0.7) isOrthogonal ==> true
+(Matrix fromString: '1 2; 3 4') isOrthogonal ==> false
+(Matrix identity: 4) isOrthogonal ==> true
+(Matrix fromString: '1 0; 0 1; 0 0') isOrthonormalColumns ==> true
+(Matrix permutation: #(3 1 2)) isOrthogonal ==> true
+# least squares and fitting
+(Matrix fromString: '1 0; 1 1; 1 2; 1 3') leastSquares: #(1 3 5 7.5) ==> Matrix(0.9; 2.15)
+((Matrix fromString: '1 0; 1 1; 1 2; 1 3') leastSquares: #(1 3 5 7.5)) roundedTo: 6 ==> Matrix(0.9; 2.15)
+(Matrix fromString: '1 0; 1 1; 1 2; 1 3') normalEquations: #(1 3 5 8) ==> Matrix(4/5; 23/10)
+((Matrix fromString: '1 0; 1 1; 1 2; 1 3') leastSquares: #(1 3 5 8)) roundedTo: 6 ==> Matrix(0.8; 2.3)
+((Matrix fromString: '1 1; 1 2; 1 3') leastSquares: #(1 2 3)) roundedTo: 6 ==> Matrix(0.0; 1.0)
+((Matrix fromString: '1 1; 1 2; 1 3') leastSquares: #(1 2 2)) roundedTo: 6 ==> Matrix(0.666667; 0.5)
+(Matrix fromString: '1 1; 1 2; 1 3') normalEquations: #(1 2 2) ==> Matrix(2/3; 1/2)
+| a b x | a := Matrix fromString: '1 0; 1 1; 1 2; 1 3'. b := Matrix column: #(1 3 5 7.5). x := a leastSquares: b. ((a transposed * (b - (a * x))) roundedTo: 8) ==> Matrix(0.0; 0.0)
+[(Matrix fromString: '1 2; 2 4; 3 6') leastSquares: #(1 2 3)] on: MatrixError do: [:e | e messageText] ==> 'the columns are dependent, so there is no single best fit; use minimumNormSolution:'
+[(Matrix fromString: '1 2 3; 4 5 6') leastSquares: #(1 2)] on: MatrixError do: [:e | e messageText] ==> 'least squares needs at least as many rows as columns; use minimumNormSolution:'
+(Matrix fitPolynomialDegree: 1 xs: #(0 1 2 3) ys: #(1 3 5 7)) collect: [:x | (x * 1000) rounded] ==> #(1000 2000)
+(Matrix fitPolynomialDegree: 2 xs: #(0 1 2) ys: #(1 2 5)) collect: [:x | (x * 1000) rounded] ==> #(1000 0 1000)
+(Matrix fitPolynomialDegree: 2 xs: #(-1 0 1 2) ys: #(2 1 2 5)) collect: [:x | (x * 1000) rounded] ==> #(1000 0 1000)
+Matrix fitPolynomialDegree: 1 xs: #(0 1 2 3) ys: #(1 3 5 8) exactly: true ==> #((4/5) (23/10))
+Matrix fitPolynomialDegree: 2 xs: #(0 1 2) ys: #(1 2 5) exactly: true ==> #(1 0 1)
+# pseudoinverse, SVD
+(Matrix fromString: '1 2; 3 4; 5 6') pseudoinverse ==> Matrix(-4/3 -1/3 2/3; 13/12 1/3 -5/12)
+(Matrix fromString: '1 2 3; 4 5 6') pseudoinverse ==> Matrix(-17/18 4/9; -1/9 1/9; 13/18 -2/9)
+(Matrix fromString: '1 2; 2 4') pseudoinverse ==> Matrix(1/25 2/25; 2/25 4/25)
+(Matrix zeros: 2) pseudoinverse ==> Matrix(0 0; 0 0)
+(Matrix fromString: '2 0; 0 4') pseudoinverse ==> Matrix(1/2 0; 0 1/4)
+| a | a := Matrix fromString: '1 2; 3 4; 5 6'. (a * a pseudoinverse * a) = a ==> true
+| a | a := Matrix fromString: '1 2; 3 4; 5 6'. (a pseudoinverse * a) = (Matrix identity: 2) ==> true
+| a | a := Matrix fromString: '1 2; 2 4; 3 6'. (a * a pseudoinverse * a) = a ==> true
+| a | a := Matrix fromString: '1.0 2; 3 4; 5 6'. ((a pseudoinverse - a asExact pseudoinverse) normInf) < 1.0e-9 ==> true
+(Matrix fromString: '1 2; 2 4') minimumNormSolution: #(5 10) ==> Matrix(1; 2)
+(Matrix fromString: '1 1 1') minimumNormSolution: #(3) ==> Matrix(1; 1; 1)
+(Matrix fromString: '3 0; 0 4') singularValues collect: [:x | x rounded] ==> #(4 3)
+(Matrix fromString: '1 2; 3 4') singularValues collect: [:x | (x * 10000) rounded] ==> #(54650 3660)
+((Matrix fromString: '1 2; 3 4') norm2 * 10000) rounded ==> 54650
+((Matrix fromString: '1 2 3; 4 5 6; 7 8 9') singularValues first * 1000) rounded ==> 16848
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') numericalRank ==> 2
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 10') numericalRank ==> 3
+(Matrix fromString: '1 2 3 4; 2 4 6 8') numericalRank ==> 1
+(Matrix identity: 3) conditionNumber ==> 1.0
+(Matrix fromString: '1 0; 0 0') conditionNumber ==> Infinity
+((Matrix fromString: '1 2; 3 4') conditionNumber * 1000) rounded ==> 14933
+| s | s := (Matrix fromString: '1 2; 3 4; 5 6') svd. s reconstruct isCloseTo: s matrix ==> true
+| s | s := (Matrix fromString: '1 2 3; 4 5 6') svd. s reconstruct isCloseTo: s matrix ==> true
+| s | s := (Matrix fromString: '1 2 3; 4 5 6; 7 8 9') svd. s reconstruct isCloseTo: s matrix ==> true
+| s | s := (Matrix fromString: '1 2 3; 4 5 6; 7 8 9') svd. s rank ==> 2
+| s | s := (Matrix fromString: '1 2; 3 4; 5 6') svd. (Array with: s u dimensions with: s v dimensions with: s sigma size) ==> #(#(3 2) #(2 2) 2)
+| s | s := (Matrix fromString: '1 2 3; 4 5 6') svd. (Array with: s u dimensions with: s v dimensions with: s sigma size) ==> #(#(2 2) #(3 2) 2)
+| s | s := (Matrix fromString: '1 2; 3 4; 5 6') svd. (s u isOrthonormalColumns and: [s v isOrthogonal]) ==> true
+| s | s := (Matrix fromString: '1 2 3; 4 5 6') svd. (s u isOrthonormalColumns and: [s v isOrthonormalColumns]) ==> true
+| a | a := Matrix fromString: '3 0; 0 4'. (a svd approximationOfRank: 1) roundedTo: 6 ==> Matrix(0.0 0.0; 0.0 4.0)
+| a | a := Matrix fromString: '1 2 3; 4 5 6; 7 8 10'. (a svd approximationOfRank: 3) isCloseTo: a ==> true
+| a | a := Matrix fromString: '1 2; 2 4'. ((a svd approximationOfRank: 1) isCloseTo: a) ==> true
+(Matrix fromString: '1 2; 3 4') svd sigmaMatrix dimensions ==> #(2 2)
+(Matrix fromString: '1 2; 3 4') svd printString ==> 'an SVD of a 2 x 2 matrix, singular values 5.465 0.366'
+# eigenvalues
+(Matrix fromString: '2 1; 1 2') eigenvalues collect: [:x | (x * 1000) rounded] ==> #(3000 1000)
+(Matrix fromString: '2 1; 1 2') eigenvaluesRoundedTo: 6 ==> #(3.0 1.0)
+(Matrix fromString: '2 0 0; 1 3 0; 4 5 6') eigenvaluesRoundedTo: 6 ==> #(6.0 3.0 2.0)
+(Matrix fromString: '1 2; 3 4') eigenvaluesRoundedTo: 4 ==> #(5.3723 -0.3723)
+(Matrix fromString: '4 1 2; 0 3 1; 1 0 2') eigenvaluesRoundedTo: 4 ==> #(4.8794 2.6527 1.4679)
+(Matrix fromString: '0 -1; 1 0') eigenvaluesRoundedTo: 6 ==> #(1.0i -1.0i)
+(Matrix fromString: '1 2 0; -2 1 0; 0 0 3') eigenvaluesRoundedTo: 6 ==> #(3.0 1.0+2.0i 1.0-2.0i)
+(Matrix fromString: '0 1 0 0; 0 0 1 0; 0 0 0 1; -4 0 -5 0') eigenvaluesRoundedTo: 6 ==> #(2.0i 1.0i -1.0i -2.0i)
+(Matrix fromString: '1 1 0; 0 1 1; 1 0 1') eigenvaluesRoundedTo: 4 ==> #(2.0 0.5+0.866i 0.5-0.866i)
+(Matrix fromString: '5') eigenvalues collect: [:x | x rounded] ==> #(5)
+(Matrix identity: 3) eigenvaluesRoundedTo: 6 ==> #(1.0 1.0 1.0)
+(Matrix diagonal: #(3 1 2)) eigenvaluesRoundedTo: 6 ==> #(3.0 2.0 1.0)
+(Matrix companion: #(-6 11 -6)) eigenvaluesRoundedTo: 6 ==> #(3.0 2.0 1.0)
+(Matrix companion: #(1 0)) eigenvaluesRoundedTo: 6 ==> #(1.0i -1.0i)
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 9') eigenvaluesRoundedTo: 4 ==> #(16.1168 0.0 -1.1168)
+| a e | a := Matrix fromString: '4 1 2; 0 3 1; 1 0 2'. e := a eigenvalues. ((e inject: 0 into: [:s :x | s + x]) - a trace) abs < 1.0e-9 ==> true
+| a e | a := Matrix fromString: '4 1 2; 0 3 1; 1 0 2'. e := a eigenvalues. ((e inject: 1 into: [:s :x | s * x]) - a determinant) abs < 1.0e-9 ==> true
+| a | a := Matrix fromString: '1 2 0; -2 1 0; 0 0 3'. (a eigenvalues at: 2) im > 0 ==> true
+| a | a := Matrix fromString: '1 2 0; -2 1 0; 0 0 3'. (a eigenvalues at: 2) conjugate isCloseTo: (a eigenvalues at: 3) ==> true
+((Matrix fromString: '2 -1 0; -1 2 -1; 0 -1 2') spectralRadius * 1000) rounded ==> 3414
+[(Matrix fromString: '1 2 3') eigenvalues] on: MatrixError do: [:e | e messageText] ==> 'eigenvalues needs a square matrix, and this one is 1 x 3'
+(Matrix fromString: '1 2 3; 4 5 6; 7 8 10') characteristicPolynomial ==> #(3 -12 -16 1)
+(Matrix fromString: '2 1; 1 2') characteristicPolynomial ==> #(3 -4 1)
+(Matrix fromString: '2 1; 1 2') characteristicPolynomialString ==> 'x^2 - 4x + 3'
+(Matrix fromString: '1 2; 3 4') characteristicPolynomialString ==> 'x^2 - 5x - 2'
+(Matrix identity: 3) characteristicPolynomialString ==> 'x^3 - 3x^2 + 3x - 1'
+(Matrix zeros: 2) characteristicPolynomialString ==> 'x^2'
+(Matrix fromString: '1/2 0; 0 1/3') characteristicPolynomial ==> #((1/6) (-5/6) 1)
+(Matrix fromString: '1/2 0; 0 1/3') characteristicPolynomialString ==> 'x^2 - (5/6)x + (1/6)'
+| a | a := Matrix fromString: '1 2; 3 4'. a polynomialValue: a characteristicPolynomial ==> Matrix(0 0; 0 0)
+| a | a := Matrix fromString: '2 0 1; 1 3 2; 1 1 4'. a polynomialValue: a characteristicPolynomial ==> Matrix(0 0 0; 0 0 0; 0 0 0)
+| a | a := Matrix fromString: '1 2; 3 4'. a polynomialValue: #(1 0 1) ==> Matrix(8 10; 15 23)
+(Matrix fromString: '2 1; 1 2') eigenspaceFor: 3 ==> #(Matrix(1; 1))
+(Matrix fromString: '2 1; 1 2') eigenspaceFor: 1 ==> #(Matrix(-1; 1))
+(Matrix fromString: '2 1; 1 2') eigenspaceFor: 5 ==> #()
+(Matrix identity: 3) eigenspaceFor: 1 ==> #(Matrix(1; 0; 0) Matrix(0; 1; 0) Matrix(0; 0; 1))
+(Matrix fromString: '2 1; 0 2') eigenspaceFor: 2 ==> #(Matrix(1; 0))
+(Matrix fromString: '2 1; 1 2') isEigenvalue: 3 ==> true
+(Matrix fromString: '2 1; 1 2') isEigenvalue: 2 ==> false
+((Matrix fromString: '2 1; 1 2') eigenvectorFor: 3) roundedTo: 4 ==> Matrix(0.7071; 0.7071)
+((Matrix fromString: '2 0 0; 1 3 0; 4 5 6') eigenvectorFor: 2) roundedTo: 4 ==> Matrix(0.6963; -0.6963; 0.1741)
+| a v | a := Matrix fromString: '2 0 0; 1 3 0; 4 5 6'. v := a eigenvectorFor: 6. ((a * v) - (v * 6)) frobeniusNorm < 1.0e-8 ==> true
+# eigen decompositions
+(Matrix fromString: '2 1; 1 2') eigen values collect: [:x | (x * 1000) rounded] ==> #(3000 1000)
+(Matrix fromString: '2 1; 1 2') eigen vectors roundedTo: 4 ==> Matrix(0.7071 0.7071; 0.7071 -0.7071)
+(Matrix fromString: '2 1; 1 2') eigen vectors isOrthogonal ==> true
+| a | a := Matrix fromString: '2 -1 0; -1 2 -1; 0 -1 2'. a eigen reconstruct isCloseTo: a ==> true
+| a | a := Matrix fromString: '2 -1 0; -1 2 -1; 0 -1 2'. a eigen residuals allSatisfy: [:r | r < 1.0e-9] ==> true
+| a | a := Matrix fromString: '4 1 2; 0 3 1; 1 0 2'. a eigen reconstruct isCloseTo: a ==> true
+| a | a := Matrix fromString: '4 1 2; 0 3 1; 1 0 2'. a eigen residuals allSatisfy: [:r | r < 1.0e-9] ==> true
+| a | a := Matrix fromString: '4 1 2; 0 3 1; 1 0 2'. a eigen isDiagonalizable ==> true
+| a | a := Matrix fromString: '3 0 0; 0 3 0; 1 0 5'. a eigen reconstruct isCloseTo: a ==> true
+| a | a := Matrix fromString: '3 0 0; 0 3 0; 1 0 5'. a eigen values collect: [:x | x rounded] ==> #(5 3 3)
+(Matrix fromString: '1 1; 0 1') eigen isDiagonalizable ==> false
+(Matrix fromString: '1 1; 0 1') isDiagonalizable ==> false
+(Matrix fromString: '2 1; 0 2') eigen vectors ==> nil
+(Matrix fromString: '0 -1; 1 0') eigen isDiagonalizable ==> false
+(Matrix fromString: '0 -1; 1 0') eigen hasComplexValues ==> true
+(Matrix fromString: '2 1; 1 2') eigen hasComplexValues ==> false
+[(Matrix fromString: '0 -1; 1 0') eigen vectorAt: 1] on: MatrixError do: [:e | e messageText] ==> 'this matrix has no full set of real eigenvectors'
+((Matrix fromString: '2 1; 1 2') eigen vectorAt: 1) roundedTo: 4 ==> Matrix(0.7071; 0.7071)
+(Matrix fromString: '2 1; 1 2') eigen diagonal roundedTo: 4 ==> Matrix(3.0 0.0; 0.0 1.0)
+(Matrix fromString: '2 1; 1 2') diagonalize isDiagonalizable ==> true
+(Matrix fromString: '7') eigen vectors ==> Matrix(1.0)
+(Matrix fromString: '2 1; 1 2') eigen printString ==> 'eigenvalues 3.0 1.0'
+(Matrix fromString: '2 1; 1 2') jacobiEigen values collect: [:x | x rounded] ==> #(3 1)
+(Matrix fromString: '1 2 3; 2 4 5; 3 5 6') jacobiEigen reconstruct isCloseTo: (Matrix fromString: '1 2 3; 2 4 5; 3 5 6') ==> true
+(((Matrix fromString: '2 1; 1 2') powerIteration: 40) first * 1000) rounded ==> 3000
+(((Matrix fromString: '2 1; 1 2') powerIteration: 40) at: 2) roundedTo: 4 ==> Matrix(0.7071; 0.7071)
+| a h | a := Matrix fromString: '4 1 2 3; 1 3 1 2; 2 1 5 1; 3 2 1 6'. h := a hessenbergForm. (1 to: 4) allSatisfy: [:i | (1 to: 4) allSatisfy: [:j | i <= (j + 1) or: [(h at: i at: j) abs < 1.0e-9]]] ==> true
+| a | a := Matrix fromString: '4 1 2 3; 1 3 1 2; 2 1 5 1; 3 2 1 6'. (a hessenbergForm trace - a trace) abs < 1.0e-9 ==> true
+# exponential and functions
+(Matrix zeros: 2) exponential roundedTo: 6 ==> Matrix(1.0 0.0; 0.0 1.0)
+(Matrix identity: 2) exponential roundedTo: 4 ==> Matrix(2.7183 0.0; 0.0 2.7183)
+(Matrix fromString: '0 1; 0 0') exponential roundedTo: 6 ==> Matrix(1.0 1.0; 0.0 1.0)
+(Matrix fromString: '1 2; 3 4') exponential roundedTo: 3 ==> Matrix(51.969 74.737; 112.105 164.074)
+((Matrix rotation: 0.3) * (Matrix rotation: 0.4)) isCloseTo: (Matrix rotation: 0.7) ==> true
+(Matrix fromString: '0 -1; 1 0') exponential roundedTo: 6 ==> Matrix(0.540302 -0.841471; 0.841471 0.540302)
+((Matrix fromString: '0 -1; 1 0') exponential isCloseTo: (Matrix rotation: 1)) ==> true
+# definiteness, Cholesky
+(Matrix fromString: '2 -1 0; -1 2 -1; 0 -1 2') isSymmetric ==> true
+(Matrix fromString: '1 2; 3 4') isSymmetric ==> false
+(Matrix fromString: '1 2 3') isSymmetric ==> false
+(Matrix fromString: '2 -1 0; -1 2 -1; 0 -1 2') isPositiveDefinite ==> true
+(Matrix fromString: '1 2; 2 1') isPositiveDefinite ==> false
+(Matrix fromString: '1 2; 3 4') isPositiveDefinite ==> false
+(Matrix fromString: '2.0 -1 0; -1 2 -1; 0 -1 2') isPositiveDefinite ==> true
+(Matrix fromString: '2 -1 0; -1 2 -1; 0 -1 2') definiteness ==> #positiveDefinite
+(Matrix fromString: '-2 1; 1 -2') definiteness ==> #negativeDefinite
+(Matrix fromString: '1 2; 2 1') definiteness ==> #indefinite
+(Matrix fromString: '1 1; 1 1') definiteness ==> #positiveSemidefinite
+(Matrix fromString: '-1 -1; -1 -1') definiteness ==> #negativeSemidefinite
+(Matrix fromString: '1 2; 3 4') definiteness ==> #notSymmetric
+(Matrix identity: 3) definiteness ==> #positiveDefinite
+(Matrix fromString: '4 2; 2 3') cholesky ==> Matrix(2 0; 1 1.414214)
+(Matrix fromString: '4 2; 2 10') cholesky ==> Matrix(2 0; 1 3)
+(Matrix fromString: '25 15 -5; 15 18 0; -5 0 11') cholesky ==> Matrix(5 0 0; 3 3 0; -1 1 3)
+| a l | a := Matrix fromString: '25 15 -5; 15 18 0; -5 0 11'. l := a cholesky. (l * l transposed) = a ==> true
+| a l | a := Matrix fromString: '4 2; 2 3'. l := a cholesky. (l * l transposed) isCloseTo: a ==> true
+[(Matrix fromString: '1 2; 2 1') cholesky] on: MatrixError do: [:e | e messageText] ==> 'the matrix is not positive definite'
+[(Matrix fromString: '1 2; 3 4') cholesky] on: MatrixError do: [:e | e messageText] ==> 'the Cholesky decomposition needs a symmetric matrix'
+(Matrix fromString: '4 2; 2 3') cholesky isLowerTriangular ==> true
+# structure predicates
+(Matrix identity: 3) isIdentity ==> true
+(Matrix fromString: '1 0; 0 2') isIdentity ==> false
+(Matrix fromString: '1 0; 0 2') isDiagonal ==> true
+(Matrix fromString: '1 1; 0 2') isDiagonal ==> false
+(Matrix fromString: '1 1; 0 2') isUpperTriangular ==> true
+(Matrix fromString: '1 1; 0 2') isLowerTriangular ==> false
+(Matrix fromString: '1 0; 3 2') isLowerTriangular ==> true
+(Matrix zeros: 3) isZeroMatrix ==> true
+(Matrix fromString: '0 0; 0 1') isZeroMatrix ==> false
+# applications
+(Matrix fromString: '9/10 1/10; 1/2 1/2') isRowStochastic ==> true
+(Matrix fromString: '1 1; 1 1') isRowStochastic ==> false
+(Matrix fromString: '9/10 1/10; 1/2 1/2') steadyState ==> Matrix(5/6; 1/6)
+(Matrix fromString: '0.9 0.1; 0.5 0.5') steadyState roundedTo: 6 ==> Matrix(0.833333; 0.166667)
+(Matrix fromString: '1/2 1/2 0; 1/4 1/2 1/4; 0 1/2 1/2') steadyState ==> Matrix(1/4; 1/2; 1/4)
+| p s | p := Matrix fromString: '9/10 1/10; 1/2 1/2'. s := p steadyState. (s transposed * p) = s transposed ==> true
+[(Matrix fromString: '1 0; 0 1') steadyState] on: MatrixError do: [:e | e messageText] ==> 'the steady state is not unique'
+((Matrix fromString: '9/10 1/10; 1/2 1/2') raisedTo: 40) roundedTo: 6 ==> Matrix(0.833333 0.166667; 0.833333 0.166667)
+((Matrix fromString: '1 1; 1 0') raisedTo: 10) at: 1 at: 2 ==> 55
+((Matrix fromString: '1 1; 1 0') raisedTo: 90) at: 1 at: 2 ==> 2880067194370816120
+((Matrix fromString: '1 1; 1 0') raisedTo: 100) at: 1 at: 2 ==> 354224848179261915075
+((Matrix fromString: '0 1 1; 0 0 1; 1 0 0') pageRank: 0.85) roundedTo: 4 ==> Matrix(0.3878; 0.2148; 0.3974)
+(((Matrix fromString: '0 1 1; 0 0 1; 1 0 0') pageRank: 0.85) sum * 1000) rounded ==> 1000
+((Matrix fromString: '0 1; 0 0') pageRank: 0.85) roundedTo: 4 ==> Matrix(0.3509; 0.6491)
+(Matrix fromString: '1 2; 3 4; 5 7') columnMeans ==> Matrix(3 13/3)
+(Matrix fromString: '1 2; 3 4; 5 7') centered ==> Matrix(-2 -7/3; 0 -1/3; 2 8/3)
+(Matrix fromString: '1 2; 3 4; 5 7') covarianceMatrix ==> Matrix(4 5; 5 19/3)
+(Matrix fromString: '2 1; 4 3; 6 5; 8 8') covarianceMatrix ==> Matrix(20/3 23/3; 23/3 107/12)
+(Matrix fromString: '2 1; 4 3; 6 5; 8 8') correlationMatrix roundedTo: 4 ==> Matrix(1.0 0.9944; 0.9944 1.0)
+(Matrix fromString: '2 1; 4 3; 6 5; 8 8') principalComponents values collect: [:x | (x * 100) rounded] ==> #(1554 4)
+(Matrix fromString: '1 2; 3 4; 5 7') covarianceMatrix isSymmetric ==> true
+[(Matrix fromString: '1 2') covarianceMatrix] on: MatrixError do: [:e | e messageText] ==> 'covariance needs at least two observations'
+# complex numbers
+(MatrixComplex re: 1 im: 2) printString ==> '1+2i'
+(MatrixComplex re: 1 im: -2) printString ==> '1-2i'
+(MatrixComplex re: 0 im: 3) printString ==> '3i'
+(MatrixComplex re: 2 im: 0) printString ==> '2'
+((MatrixComplex re: 1 im: 2) + (MatrixComplex re: 3 im: -1)) printString ==> '4+1i'
+((MatrixComplex re: 1 im: 2) * (MatrixComplex re: 3 im: -1)) printString ==> '5+5i'
+((MatrixComplex re: 1 im: 2) * (MatrixComplex re: 1 im: -2)) printString ==> '5'
+((MatrixComplex re: 1 im: 2) / (MatrixComplex re: 3 im: 4)) printString ==> '11/25+2/25i'
+((MatrixComplex re: 1 im: 2) - 1) printString ==> '2i'
+((MatrixComplex re: 0 im: 1) squared) printString ==> '-1'
+((MatrixComplex re: 1 im: 1) raisedTo: 4) printString ==> '-4'
+(MatrixComplex re: 3 im: 4) abs ==> 5.0
+(MatrixComplex re: 1 im: 2) conjugate printString ==> '1-2i'
+(MatrixComplex re: 1 im: 2) isReal ==> false
+(MatrixComplex re: 1 im: 0) isReal ==> true
+(MatrixComplex re: 1 im: 2) = (MatrixComplex re: 1 im: 2) ==> true
+(MatrixComplex re: 1 im: 2) negated printString ==> '-1-2i'
+(MatrixComplex real: 5) printString ==> '5'
+[(MatrixComplex re: 1 im: 2) / (MatrixComplex re: 0 im: 0)] on: MatrixError do: [:e | e messageText] ==> 'division by a complex zero'
+# float structure: results stay Floats
+(Matrix fromString: '1.0 2; 3 4') rref isExact ==> false
+(Matrix fromString: '1.0 2; 3 4') lu lower isExact ==> false
+(Matrix fromString: '1 2; 3 4') lu lower isExact ==> true
+(Matrix fromString: '1.0 2; 3 4') isExact ==> false
+(Matrix fromString: '1 2; 3 4') isExact ==> true
+(Matrix fromString: '1.0 2; 3 4') asExact isExact ==> true
+(Matrix fromString: '1/2 1/4') asFloats isExact ==> false
+(Matrix fromString: '3.14159 2.71828') roundedTo: 2 ==> Matrix(3.14 2.72)
+(Matrix fromString: '1234 5678') roundedTo: -2 ==> Matrix(1200.0 5700.0)
+((Matrix fromString: '1.0 2 3; 4 5 6; 7 8 9') nullspaceBasis at: 1) isExact ==> false
+(Matrix fromString: '1.0 1; 1 1') nullspaceBasis ==> #(Matrix(-1.0; 1.0))
+# the tutorial
+MatrixTutorial lessonCount ==> 18
+MatrixTutorial tutorialName ==> 'Matrix'
+(Smalltalk tutorialNamed: 'Matrix') == MatrixTutorial ==> true
+# tolerance
+Matrix tolerance ==> 1.0e-10
+| t r | t := Matrix tolerance. Matrix tolerance: 1.0e-3. r := (Matrix fromString: '1.0 2; 2.0001 4') rank. Matrix tolerance: t. r ==> 1
+(Matrix fromString: '1.0 2; 2.0001 4') rank ==> 2

@@ -1,0 +1,665 @@
+# Tests for the Algebra package, run by test_vm after loading it: one  expression ==> expected printString  per line.
+# An expression that signals an error shows  ERROR: and the message.  Results were checked by hand and, for the calculus,
+# by differentiating the integrals and comparing with the integrands (the lines that use isEqual: and seemsEqual:).
+Smalltalk loadPackage: 'Algebra' ==> true
+# reading and printing
+Algebra parse: 'x^2 + 3*x - 5' ==> x^2 + 3*x - 5
+Algebra parse: '3x^2 + 2*x - 5' ==> 3*x^2 + 2*x - 5
+Algebra parse: '5 - 3x + x^2' ==> x^2 - 3*x + 5
+Algebra parse: 'x + x' ==> 2*x
+Algebra parse: 'x*x*x' ==> x^3
+Algebra parse: '2x * 3x' ==> 6*x^2
+Algebra parse: 'x - x' ==> 0
+Algebra parse: '(x+1)(x-1)' ==> (x - 1)*(x + 1)
+Algebra parse: '(x+1)^2' ==> (x + 1)^2
+Algebra parse: '2(x+1)' ==> 2*(x + 1)
+Algebra parse: 'x y' ==> x*y
+Algebra parse: 'y*x' ==> x*y
+Algebra parse: 'b + a' ==> a + b
+Algebra parse: 'x^2 + x*y + y^2' ==> x^2 + x*y + y^2
+Algebra parse: 'y^2 + x^2 + x*y' ==> x^2 + x*y + y^2
+Algebra parse: 'a - (b + c)' ==> a - (b + c)
+Algebra parse: '-(x+1)' ==> -(x + 1)
+Algebra parse: '-x^2' ==> -x^2
+Algebra parse: '(-x)^2' ==> x^2
+Algebra parse: '2^3^2' ==> 512
+Algebra parse: '2^-1' ==> 1/2
+Algebra parse: 'x^-2' ==> 1/x^2
+Algebra parse: '1/x' ==> 1/x
+Algebra parse: '3/x' ==> 3/x
+Algebra parse: '1/(2*x)' ==> 1/(2*x)
+Algebra parse: 'x/2' ==> x/2
+Algebra parse: '3x/2' ==> 3*x/2
+Algebra parse: 'x/(x+1)' ==> x/(x + 1)
+Algebra parse: '(x+1)/(x-1)' ==> (x + 1)/(x - 1)
+Algebra parse: 'x/y' ==> x/y
+Algebra parse: 'x/y/z' ==> x/(y*z)
+Algebra parse: '1/x^2' ==> 1/x^2
+Algebra parse: '1/(x+1)^2' ==> 1/(x + 1)^2
+Algebra parse: 'x^(1/3)' ==> x^(1/3)
+Algebra parse: 'sqrt(x)' ==> sqrt(x)
+Algebra parse: '1/sqrt(x)' ==> 1/sqrt(x)
+Algebra parse: 'x^(2/3)' ==> x^(2/3)
+Algebra parse: '2^x' ==> 2^x
+Algebra parse: '2^(-x)' ==> 2^(-x)
+Algebra parse: 'x^y' ==> x^y
+Algebra parse: '(2x)^y' ==> (2*x)^y
+Algebra parse: '0.25 x' ==> x/4
+Algebra parse: '1.5' ==> 3/2
+Algebra parse: '1e3' ==> 1000
+Algebra parse: '2.5e-1' ==> 1/4
+Algebra parse: '.5' ==> 1/2
+Algebra parse: 'pi*r^2' ==> pi*r^2
+Algebra parse: 'e' ==> e
+Algebra parse: 'e^x' ==> exp(x)
+Algebra parse: 'e^2' ==> exp(2)
+Algebra parse: 'sin(x)^2' ==> sin(x)^2
+Algebra parse: 'sin(x)*cos(x)' ==> cos(x)*sin(x)
+Algebra parse: 'sin x' ==> ERROR: cannot read 'sin x': sin needs its argument in brackets, as in sin(x)
+Algebra parse: '2 + ' ==> ERROR: cannot read '2 + ': the text ends too soon
+Algebra parse: '(x' ==> ERROR: cannot read '(x': expected ) but found the end of the text
+Algebra parse: 'x ) 2' ==> ERROR: cannot read 'x ) 2': unexpected ')'
+Algebra parse: '3 $ 4' ==> ERROR: cannot read '3 $ 4': unexpected character $
+Algebra parse: 'cot(x)' ==> 1/tan(x)
+Algebra parse: 'sec(x)' ==> 1/cos(x)
+Algebra parse: 'log(x)' ==> ln(x)
+Algebra parse: 'log(2, 8)' ==> 3
+Algebra parse: 'arcsin(x)' ==> asin(x)
+Algebra parse: 'abs(-3)' ==> 3
+Algebra parse: 'abs(-x)' ==> abs(x)
+Algebra parse: 'abs(2x)' ==> 2*abs(x)
+Algebra parse: 'exp(0)' ==> 1
+Algebra parse: 'ln(1)' ==> 0
+Algebra parse: 'ln(0)' ==> ERROR: ln(0) is not defined
+Algebra parse: '1/0' ==> ERROR: division by zero
+Algebra parse: '0^0' ==> 1
+Algebra parse: '0^-1' ==> ERROR: division by zero
+(Algebra parse: 'x^2 + 1') text ==> 'x^2 + 1'
+(Algebra parse: 'x^2 + 1') printString ==> 'x^2 + 1'
+(Algebra parse: 'x^2 + 1') = (Algebra parse: '1 + x^2') ==> true
+(Algebra parse: 'x^2 + 1') = (Algebra parse: 'x^2 + 2') ==> false
+(Algebra parse: 'x + y') hash = (Algebra parse: 'y + x') hash ==> true
+Algebra size: 'x^2 + 1' ==> 5
+Algebra variables: 'a*x^2 + b*x + c + pi' ==> #('a' 'b' 'c' 'x')
+Algebra variables: '3' ==> #()
+Algebra parse: 3/4 ==> 3/4
+Algebra parse: 2 ==> 2
+(Algebra parse: '2') isNum ==> true
+(Algebra parse: 'x') isSym ==> true
+(Algebra parse: 'x+1') isAdd ==> true
+(Algebra parse: '2x') isMul ==> true
+(Algebra parse: 'x^2') isPow ==> true
+(Algebra parse: 'sin(x)') isFn ==> true
+# numbers and surds
+Algebra parse: '1/2 + 1/3' ==> 5/6
+Algebra parse: '2/4' ==> 1/2
+Algebra parse: '3 * (1/3)' ==> 1
+Algebra parse: '2^100' ==> 1267650600228229401496703205376
+Algebra parse: '(1/2)^3' ==> 1/8
+Algebra parse: '(2/3)^-2' ==> 9/4
+Algebra parse: 'sqrt(4)' ==> 2
+Algebra parse: 'sqrt(8)' ==> 2*sqrt(2)
+Algebra parse: 'sqrt(12)' ==> 2*sqrt(3)
+Algebra parse: 'sqrt(50)' ==> 5*sqrt(2)
+Algebra parse: 'sqrt(1/2)' ==> sqrt(2)/2
+Algebra parse: 'sqrt(2/3)' ==> sqrt(6)/3
+Algebra parse: 'sqrt(2)*sqrt(2)' ==> 2
+Algebra parse: 'sqrt(2)*sqrt(8)' ==> 4
+Algebra parse: 'sqrt(2)*sqrt(3)' ==> sqrt(6)
+Algebra parse: 'sqrt(2)^3' ==> 2*sqrt(2)
+Algebra parse: '8^(1/3)' ==> 2
+Algebra parse: '2^(3/2)' ==> 2*sqrt(2)
+Algebra parse: '4^(3/2)' ==> 8
+Algebra parse: '(1/4)^(1/2)' ==> 1/2
+Algebra parse: '27^(2/3)' ==> 9
+Algebra parse: '(-8)^(1/3)' ==> -2
+Algebra parse: 'sqrt(-4)' ==> 2*i
+Algebra parse: 'sqrt(-1)' ==> i
+Algebra parse: 'i^2' ==> -1
+Algebra parse: 'i^3' ==> -i
+Algebra parse: 'i^5' ==> i
+Algebra parse: 'i*i*i*i' ==> 1
+Algebra parse: '2 + 0.5' ==> 5/2
+(SymExpr num: 2.5) text ==> '2.5'
+(SymExpr num: 2.5) * (SymExpr sym: 'x') ==> 2.5*x
+# constants and functions
+Algebra parse: 'sin(0)' ==> 0
+Algebra parse: 'cos(0)' ==> 1
+Algebra parse: 'sin(pi)' ==> 0
+Algebra parse: 'cos(pi)' ==> -1
+Algebra parse: 'sin(pi/2)' ==> 1
+Algebra parse: 'sin(pi/6)' ==> 1/2
+Algebra parse: 'cos(pi/3)' ==> 1/2
+Algebra parse: 'sin(pi/4)' ==> sqrt(2)/2
+Algebra parse: 'cos(pi/4)' ==> sqrt(2)/2
+Algebra parse: 'sin(pi/3)' ==> sqrt(3)/2
+Algebra parse: 'cos(pi/6)' ==> sqrt(3)/2
+Algebra parse: 'tan(pi/4)' ==> 1
+Algebra parse: 'tan(pi/3)' ==> sqrt(3)
+Algebra parse: 'tan(pi/6)' ==> sqrt(3)/3
+Algebra parse: 'sin(2*pi)' ==> 0
+Algebra parse: 'cos(2*pi)' ==> 1
+Algebra parse: 'sin(7*pi/6)' ==> -1/2
+Algebra parse: 'cos(5*pi/4)' ==> -sqrt(2)/2
+Algebra parse: 'sin(-pi/6)' ==> -1/2
+Algebra parse: 'tan(pi/2)' ==> ERROR: tan is not defined there
+Algebra parse: 'sin(-x)' ==> -sin(x)
+Algebra parse: 'cos(-x)' ==> cos(x)
+Algebra parse: 'tan(-x)' ==> -tan(x)
+Algebra parse: 'atan(1)' ==> pi/4
+Algebra parse: 'asin(1)' ==> pi/2
+Algebra parse: 'acos(0)' ==> pi/2
+Algebra parse: 'acos(-1)' ==> pi
+Algebra parse: 'asin(1/2)' ==> pi/6
+Algebra parse: 'sin(asin(x))' ==> x
+Algebra parse: 'cos(asin(x))' ==> sqrt(-x^2 + 1)
+Algebra parse: 'exp(ln(x))' ==> x
+Algebra parse: 'ln(exp(x))' ==> x
+Algebra parse: 'exp(x)*exp(y)' ==> exp(x + y)
+Algebra parse: 'exp(x)^2' ==> exp(2*x)
+Algebra parse: 'exp(x)*exp(-x)' ==> 1
+Algebra parse: 'ln(e)' ==> 1
+Algebra parse: 'ln(e^3)' ==> 3
+Algebra parse: 'sinh(0)' ==> 0
+Algebra parse: 'cosh(0)' ==> 1
+((Algebra numeric: 'sin(1)') * 1000000) rounded ==> 841471
+((Algebra numeric: 'e') * 1000000) rounded ==> 2718282
+((Algebra numeric: 'pi') * 1000000) rounded ==> 3141593
+((Algebra numeric: 'sqrt(2)') * 1000000) rounded ==> 1414214
+((Algebra numeric: 'exp(2)') * 1000) rounded ==> 7389
+((Algebra numeric: 'atan(1)*4') * 1000000) rounded ==> 3141593
+(Algebra numeric: 'x^2 + 1' with: 'x=3') rounded ==> 10
+Algebra numeric: 'x + 1' ==> ERROR: x has no value
+Algebra numeric: 'i' ==> ERROR: i is not a real number
+# expanding
+Algebra expand: '(x+1)^2' ==> x^2 + 2*x + 1
+Algebra expand: '(x+1)^3' ==> x^3 + 3*x^2 + 3*x + 1
+Algebra expand: '(x-1)^4' ==> x^4 - 4*x^3 + 6*x^2 - 4*x + 1
+Algebra expand: '(x+1)(x-1)' ==> x^2 - 1
+Algebra expand: '(x+y)^2' ==> x^2 + 2*x*y + y^2
+Algebra expand: '(x+y)^2 - (x-y)^2' ==> 4*x*y
+Algebra expand: '(a+b+c)^2' ==> a^2 + 2*a*b + 2*a*c + b^2 + 2*b*c + c^2
+Algebra expand: '(x+1)(x+2)(x+3)' ==> x^3 + 6*x^2 + 11*x + 6
+Algebra expand: '2(x+1) + 3(x-1)' ==> 5*x - 1
+Algebra expand: '(x^2+1)(x^2-1)' ==> x^4 - 1
+Algebra expand: '(x+1)^2 - x^2 - 2x - 1' ==> 0
+Algebra expand: 'x(x+1)' ==> x^2 + x
+Algebra expand: '(x+1)/2' ==> x/2 + 1/2
+Algebra expand: '(2x+4)/2' ==> x + 2
+Algebra expand: '(sqrt(2)+1)^2' ==> 2*sqrt(2) + 3
+Algebra expand: '(sqrt(2)+sqrt(3))^2' ==> 2*sqrt(6) + 5
+Algebra expand: '(sqrt(2)+1)(sqrt(2)-1)' ==> 1
+Algebra expand: '(x+1)^2/x' ==> x + 1/x + 2
+Algebra expand: '2^(x+1)' ==> 2*2^x
+Algebra expand: '(1+i)^2' ==> 2*i
+Algebra expand: '(2+3i)(1-i)' ==> i + 5
+Algebra expand: '(x+1)^10' ==> x^10 + 10*x^9 + 45*x^8 + 120*x^7 + 210*x^6 + 252*x^5 + 210*x^4 + 120*x^3 + 45*x^2 + 10*x + 1
+Algebra binomial: 'a' with: 'b' power: 4 ==> a^4 + 4*a^3*b + 6*a^2*b^2 + 4*a*b^3 + b^4
+Algebra binomial: 'x' with: '1' power: 5 ==> x^5 + 5*x^4 + 10*x^3 + 10*x^2 + 5*x + 1
+Algebra pascalRow: 6 ==> #(1 6 15 20 15 6 1)
+Algebra fibonacci: 12 ==> #(0 1 1 2 3 5 8 13 21 34 55 89)
+# factoring
+Algebra factor: 'x^2 - 1' ==> (x - 1)*(x + 1)
+Algebra factor: 'x^2 + 2x + 1' ==> (x + 1)^2
+Algebra factor: 'x^2 - 5x + 6' ==> (x - 2)*(x - 3)
+Algebra factor: 'x^4 - 1' ==> (x^2 + 1)*(x - 1)*(x + 1)
+Algebra factor: 'x^6 - 1' ==> (x^2 - x + 1)*(x^2 + x + 1)*(x - 1)*(x + 1)
+Algebra factor: 'x^4 + 4' ==> (x^2 - 2*x + 2)*(x^2 + 2*x + 2)
+Algebra factor: 'x^4 + x^2 + 1' ==> (x^2 - x + 1)*(x^2 + x + 1)
+Algebra factor: 'x^3 - 1' ==> (x^2 + x + 1)*(x - 1)
+Algebra factor: 'x^3 + 8' ==> (x^2 - 2*x + 4)*(x + 2)
+Algebra factor: '2x^2 - 8' ==> 2*(x - 2)*(x + 2)
+Algebra factor: '6x^2 + 5x + 1' ==> (2*x + 1)*(3*x + 1)
+Algebra factor: '12x^3 - 8x^2 + 3x - 2' ==> (3*x - 2)*(4*x^2 + 1)
+Algebra factor: 'x^2 + 1' ==> x^2 + 1
+Algebra factor: 'x^2 - 2' ==> x^2 - 2
+Algebra factor: 'x^3 + x + 1' ==> x^3 + x + 1
+Algebra factor: 'x^5 - x' ==> x*(x^2 + 1)*(x - 1)*(x + 1)
+Algebra factor: 'x^8 - 1' ==> (x^2 + 1)*(x^4 + 1)*(x - 1)*(x + 1)
+Algebra factor: 'x^3 - 6x^2 + 11x - 6' ==> (x - 1)*(x - 2)*(x - 3)
+Algebra factor: 'x^4 - 2x^2 + 1' ==> (x - 1)^2*(x + 1)^2
+Algebra factor: '-x^2 + 1' ==> -(x - 1)*(x + 1)
+Algebra factor: '4 - x^2' ==> -(x - 2)*(x + 2)
+Algebra factor: 'x^2 + x' ==> x*(x + 1)
+Algebra factor: '2x + 4' ==> 2*(x + 2)
+Algebra factor: 'x^3 - x*y^2' ==> x*(x - y)*(x + y)
+Algebra factor: 'x^2 + 3 x y + 2 y^2' ==> (x + 2*y)*(x + y)
+Algebra factor: 'a^2 - b^2' ==> (a - b)*(a + b)
+Algebra factor: 'a^3 + b^3' ==> (a^2 - a*b + b^2)*(a + b)
+Algebra factor: 'a^3 - b^3' ==> (a^2 + a*b + b^2)*(a - b)
+Algebra factor: 'a^2 + 2 a b + b^2' ==> (a + b)^2
+Algebra factor: 'a^2 - 2 a b + b^2' ==> (a - b)^2
+Algebra factor: 'x^2*y - y' ==> y*(x - 1)*(x + 1)
+Algebra factor: 'sin(x)^2 - 1' ==> (sin(x) - 1)*(sin(x) + 1)
+Algebra factor: 'exp(2x) - 1' ==> exp(2*x) - 1
+Algebra factor: 'x^2 - 1/4' ==> (2*x - 1)*(2*x + 1)/4
+Algebra factor: 'x^2/4 - 1' ==> (x - 2)*(x + 2)/4
+Algebra factor: '1/x - 1/y' ==> -(x - y)/(x*y)
+Algebra factor: '(x^2-1)/(x^2-2x+1)' ==> (x + 1)/(x - 1)
+Algebra factor: '5' ==> 5
+Algebra factor: 'x' ==> x
+Algebra factor: '(x^2 - 1)(x^2 - 4)' ==> (x - 1)*(x - 2)*(x + 1)*(x + 2)
+Algebra factor: 'x^10 - 1' ==> (x^4 - x^3 + x^2 - x + 1)*(x^4 + x^3 + x^2 + x + 1)*(x - 1)*(x + 1)
+Algebra factor: 'x^4 + 1' ==> x^4 + 1
+Algebra isEqual: (Algebra factor: 'x^6 - 1') to: 'x^6 - 1' ==> true
+Algebra isEqual: (Algebra expand: (Algebra factor: '12x^3 - 8x^2 + 3x - 2')) to: '12x^3 - 8x^2 + 3x - 2' ==> true
+# together, cancel, apart
+Algebra together: '1/x + 1/y' ==> (x + y)/(x*y)
+Algebra together: '1/(x-1) + 1/(x+1)' ==> 2*x/((x - 1)*(x + 1))
+Algebra together: 'x + 1/x' ==> (x^2 + 1)/x
+Algebra together: '1/2 + x/3' ==> (2*x + 3)/6
+Algebra together: '1/x - 1/x' ==> 0
+Algebra together: '1/(x^2-1) + 1/(x-1)' ==> (x^2 + x - 2)/((x^2 - 1)*(x - 1))
+Algebra cancel: '(x^2-1)/(x-1)' ==> x + 1
+Algebra cancel: '(x^2-y^2)/(x-y)' ==> x + y
+Algebra cancel: '(2x+2)/(4x+4)' ==> 1/2
+Algebra cancel: '(x^3-1)/(x^2-1)' ==> (x^2 + x + 1)/(x + 1)
+Algebra cancel: '(x^2+2x+1)/(x+1)^2' ==> 1
+Algebra cancel: 'x/x' ==> 1
+Algebra cancel: '(x^2+x)/x' ==> x + 1
+Algebra cancel: '(x+1)/(x+2)' ==> (x + 1)/(x + 2)
+Algebra cancel: '1/(1/x)' ==> x
+Algebra apart: '1/(x^2-1)' ==> -1/(2*(x + 1)) + 1/(2*(x - 1))
+Algebra apart: '1/(x(x+1))' ==> -1/(x + 1) + 1/x
+Algebra apart: '(x^3+1)/(x^2-1)' ==> x + 1/(x - 1)
+Algebra apart: '1/(x^2*(x+1))' ==> 1/(x + 1) - 1/x + 1/x^2
+Algebra apart: '(3x+5)/((x^2+1)(x-2))' ==> -(11*x + 7)/(5*(x^2 + 1)) + 11/(5*(x - 2))
+Algebra apart: '1/(x^2+1)^2' ==> 1/(x^2 + 1)^2
+Algebra apart: '(2x+1)/(x^2+x+1)' ==> (2*x + 1)/(x^2 + x + 1)
+Algebra apart: 'x^2/(x^2-1)' ==> -1/(2*(x + 1)) + 1/(2*(x - 1)) + 1
+Algebra apart: '1/(x-1)^3' ==> 1/(x - 1)^3
+Algebra apart: '(5x-3)/(x^2-2x-3)' ==> 2/(x + 1) + 3/(x - 3)
+Algebra apart: '(x^4+1)/(x^3-x)' ==> x + 1/(x - 1) + 1/(x + 1) - 1/x
+Algebra apart: '1/(x^2+1)' in: 'x' ==> 1/(x^2 + 1)
+Algebra apart: '1/((x-a)(x-b))' in: 'x' ==> ERROR: apart needs a rational function of x with rational coefficients
+Algebra apart: 'x^2 + 1' ==> x^2 + 1
+Algebra apart: 'sin(x)/x' ==> ERROR: apart needs a rational function of x with rational coefficients
+# simplify
+Algebra simplify: '(x+1)^2 - x^2' ==> 2*x + 1
+Algebra simplify: '(x^2-1)/(x-1)' ==> x + 1
+Algebra simplify: 'x + x + x' ==> 3*x
+Algebra simplify: 'sin(x)^2 + cos(x)^2' ==> 1
+Algebra simplify: 'sin(x)^2 + cos(x)^2 + x' ==> x + 1
+Algebra simplify: '1 - sin(x)^2' ==> cos(x)^2
+Algebra simplify: '1 - cos(x)^2' ==> sin(x)^2
+Algebra simplify: '3 sin(x)^2 + 3 cos(x)^2' ==> 3
+Algebra simplify: '2*sin(x)^2*y + 2*cos(x)^2*y' ==> 2*y
+Algebra simplify: '(x+1)(x-1) - x^2' ==> -1
+Algebra simplify: '1/(x+1) + x/(x+1)' ==> 1
+Algebra simplify: '(x^2 - 4)/(x + 2) + 2' ==> x
+Algebra simplify: 'sqrt(x)^2' ==> x
+Algebra simplify: '(sqrt(2)+1)(sqrt(2)-1)' ==> 1
+Algebra simplify: 'x*(x+1) - x^2 - x' ==> 0
+Algebra simplify: '(a+b)^2 - a^2 - 2*a*b - b^2' ==> 0
+Algebra simplify: 'exp(x)*exp(2x)/exp(3x)' ==> 1
+Algebra simplify: '(x^3-1)/(x-1)' ==> x^2 + x + 1
+Algebra trigSimplify: 'sin(x)^2 + cos(x)^2' ==> 1
+Algebra trigSimplify: 'sin(y)^2*x + cos(y)^2*x' ==> x
+Algebra trigSimplify: 'sin(x)^2 + cos(x)^2 + sin(y)^2 + cos(y)^2' ==> 2
+Algebra trigExpand: 'sin(2x)' ==> 2*cos(x)*sin(x)
+Algebra trigExpand: 'cos(2x)' ==> -sin(x)^2 + cos(x)^2
+Algebra trigExpand: 'sin(x+y)' ==> cos(x)*sin(y) + cos(y)*sin(x)
+Algebra trigExpand: 'cos(x+y)' ==> cos(x)*cos(y) - sin(x)*sin(y)
+Algebra trigExpand: 'sin(3x)' ==> 3*cos(x)^2*sin(x) - sin(x)^3
+Algebra trigExpand: 'cos(x-y)' ==> cos(x)*cos(y) + sin(x)*sin(y)
+Algebra expandLog: 'ln(x*y)' ==> ln(x) + ln(y)
+Algebra expandLog: 'ln(x^3)' ==> 3*ln(x)
+Algebra expandLog: 'ln(2*x^2)' ==> 2*ln(x) + ln(2)
+Algebra expandLog: 'ln(x*y^2*z)' ==> 2*ln(y) + ln(x) + ln(z)
+Algebra collect: 'a x + b x + c' in: 'x' ==> x*(a + b) + c
+Algebra collect: 'x^2 y + x y + x^2 + 3' in: 'x' ==> x^2*(y + 1) + x*y + 3
+Algebra collect: 'x^2 + 2x + 1' in: 'x' ==> x^2 + 2*x + 1
+Algebra collect: 'sin(x) + 1' in: 'x' ==> ERROR: this is not a polynomial in x
+Algebra isEqual: '(x+1)^2' to: 'x^2 + 2x + 1' ==> true
+Algebra isEqual: '(x+1)^2' to: 'x^2 + 1' ==> false
+Algebra isEqual: 'sin(x)^2 + cos(x)^2' to: '1' ==> true
+Algebra isEqual: '(x^2-1)/(x-1)' to: 'x+1' ==> true
+Algebra seemsEqual: 'sin(2x)' to: '2 sin(x) cos(x)' ==> true
+Algebra seemsEqual: 'sin(2x)' to: '2 sin(x)' ==> false
+Algebra seemsEqual: 'ln(x*y)' to: 'ln(x) + ln(y)' ==> false
+# substitution and evaluation
+Algebra substitute: 'x^2 + 1' with: 'x=3' ==> 10
+Algebra substitute: 'x^2 + y' with: 'x=3, y=a' ==> a + 9
+Algebra substitute: 'x + y' with: 'x=y, y=x' ==> x + y
+Algebra substitute: 'x^2' with: 'x=y+1' ==> (y + 1)^2
+Algebra substitute: 'sin(x)' with: 'x=pi/6' ==> 1/2
+Algebra substitute: 'a*x^2 + b*x + c' with: 'x=2' ==> 4*a + 2*b + c
+Algebra substitute: 'x*y' with: ('x' -> 4) ==> 4*y
+Algebra substitute: 'x*y' with: (Array with: 'x' -> 2 with: 'y' -> 'z') ==> 2*z
+Algebra evaluate: '(x^2-1)/(x-1)' with: 'x=3' ==> 4
+Algebra evaluate: 'x^2 + 2x + 1' with: 'x=-1' ==> 0
+Algebra evaluate: '1/x' with: 'x=0' ==> ERROR: division by zero
+Algebra substitute: 'x' with: 'x 2' ==> ERROR: a binding looks like x=2, not 'x 2'
+# derivatives
+Algebra diff: 'x^3' ==> 3*x^2
+Algebra diff: 'x^3 + 2x^2 - 5x + 7' ==> 3*x^2 + 4*x - 5
+Algebra diff: 'sin(x)' ==> cos(x)
+Algebra diff: 'cos(x)' ==> -sin(x)
+Algebra diff: 'tan(x)' ==> 1/cos(x)^2
+Algebra diff: 'exp(x)' ==> exp(x)
+Algebra diff: 'exp(2x)' ==> 2*exp(2*x)
+Algebra diff: 'ln(x)' ==> 1/x
+Algebra diff: 'sqrt(x)' ==> 1/(2*sqrt(x))
+Algebra diff: '1/x' ==> -1/x^2
+Algebra diff: '1/x^2' ==> -2/x^3
+Algebra diff: 'x*sin(x)' ==> x*cos(x) + sin(x)
+Algebra diff: 'x^2*exp(x)' ==> x^2*exp(x) + 2*x*exp(x)
+Algebra diff: 'sin(x^2)' ==> 2*x*cos(x^2)
+Algebra diff: 'exp(x^2)' ==> 2*x*exp(x^2)
+Algebra diff: 'ln(x^2+1)' ==> 2*x/(x^2 + 1)
+Algebra diff: 'sin(cos(x))' ==> -cos(cos(x))*sin(x)
+Algebra diff: 'sqrt(x^2+1)' ==> x/sqrt(x^2 + 1)
+Algebra diff: 'atan(x)' ==> 1/(x^2 + 1)
+Algebra diff: 'asin(x)' ==> 1/sqrt(-x^2 + 1)
+Algebra diff: 'acos(x)' ==> -1/sqrt(-x^2 + 1)
+Algebra diff: 'sinh(x)' ==> cosh(x)
+Algebra diff: 'cosh(x)' ==> sinh(x)
+Algebra diff: 'tanh(x)' ==> 1/cosh(x)^2
+Algebra diff: 'abs(x)' ==> x/abs(x)
+Algebra diff: 'x^x' ==> x^x*(ln(x) + 1)
+Algebra diff: '2^x' ==> 2^x*ln(2)
+Algebra diff: 'x^n' ==> n*x^(n - 1)
+Algebra diff: 'x^2*y' by: 'y' ==> x^2
+Algebra diff: 'x^2*y + y^3' by: 'x' ==> 2*x*y
+Algebra diff: 'a*x^2 + b*x + c' by: 'x' ==> 2*a*x + b
+Algebra diff: '5' ==> 0
+Algebra diff: 'pi*x' ==> pi
+Algebra diff: 'x^5' by: 'x' times: 3 ==> 60*x^2
+Algebra diff: 'sin(x)' by: 'x' times: 4 ==> sin(x)
+Algebra diff: 'exp(3x)' by: 'x' times: 2 ==> 9*exp(3*x)
+Algebra diff: 'x^2*y' by: 'x' times: 0 ==> x^2*y
+Algebra isEqual: (Algebra diff: '(x+1)/(x-1)') to: '-2/(x-1)^2' ==> true
+Algebra seemsEqual: (Algebra diff: 'tan(x)') to: '1 + tan(x)^2' ==> true
+Algebra seemsEqual: (Algebra diff: 'ln(x)/x') to: '(1 - ln(x))/x^2' ==> true
+Algebra seemsEqual: (Algebra diff: 'x^x') to: 'x^x*(ln(x)+1)' ==> true
+# integrals
+Algebra integrate: 'x^2' ==> x^3/3
+Algebra integrate: '3x^2 + 2x + 1' ==> x^3 + x^2 + x
+Algebra integrate: '1' ==> x
+Algebra integrate: '1/x' ==> ln(x)
+Algebra integrate: 'sin(x)' ==> -cos(x)
+Algebra integrate: 'cos(x)' ==> sin(x)
+Algebra integrate: 'exp(x)' ==> exp(x)
+Algebra integrate: 'sin(3x+1)' ==> -cos(3*x + 1)/3
+Algebra integrate: '(2x+1)^3' ==> (2*x + 1)^4/8
+Algebra integrate: 'exp(2x)' ==> exp(2*x)/2
+Algebra integrate: '2^x' ==> 2^x/ln(2)
+Algebra integrate: '1/(2x+3)' ==> ln(2*x + 3)/2
+Algebra integrate: 'sqrt(x)' ==> 2*x^(3/2)/3
+Algebra integrate: 'x^n' ==> x^(n + 1)/(n + 1)
+Algebra integrate: 'x*exp(x)' ==> x*exp(x) - exp(x)
+Algebra integrate: 'x*sin(x)' ==> -x*cos(x) + sin(x)
+Algebra integrate: 'ln(x)' ==> x*ln(x) - x
+Algebra integrate: 'x*ln(x)' ==> x^2*ln(x)/2 - x^2/4
+Algebra integrate: 'atan(x)' ==> x*atan(x) - ln(x^2 + 1)/2
+Algebra integrate: 'x^2*exp(x)' ==> x^2*exp(x) - 2*(x*exp(x) - exp(x))
+Algebra integrate: '2x*cos(x^2)' ==> sin(x^2)
+Algebra integrate: 'x/(x^2+1)' ==> ln(x^2 + 1)/2
+Algebra integrate: 'sin(x)*cos(x)' ==> -cos(2*x)/4
+Algebra integrate: 'sin(x)^2' ==> x/2 - cos(x)*sin(x)/2
+Algebra integrate: 'cos(x)^3' ==> cos(x)^2*sin(x)/3 + 2*sin(x)/3
+Algebra integrate: 'sin(2x)*cos(3x)' ==> -cos(5*x)/10 + cos(x)/2
+Algebra integrate: 'exp(x)*sin(x)' ==> exp(x)*(-cos(x) + sin(x))/2
+Algebra integrate: '1/(x^2-1)' ==> -ln(x + 1)/2 + ln(x - 1)/2
+Algebra integrate: '1/(x^2+1)' ==> atan(x)
+Algebra integrate: '1/(x^2+2x+5)' ==> atan((x + 1)/2)/2
+Algebra integrate: '1/(x^2+1)^2' ==> x/(2*(x^2 + 1)) + atan(x)/2
+Algebra integrate: '1/sqrt(1-x^2)' ==> asin(x)
+Algebra integrate: 'tan(x)' ==> -ln(cos(x))
+Algebra integrate: 'x*sqrt(x^2+1)' ==> (x^2 + 1)^(3/2)/3
+Algebra integrate: 'exp(x)/(1+exp(x))' ==> ln(exp(x) + 1)
+Algebra integrate: 'x^2 + y' by: 'y' ==> x^2*y + y^2/2
+Algebra integrate: 'a*x + b' by: 'x' ==> a*x^2/2 + b*x
+Algebra integrate: 'exp(x^2)' ==> ERROR: no antiderivative found for exp(x^2)
+Algebra integrate: 'sin(x)/x' ==> ERROR: no antiderivative found for sin(x)/x
+Algebra integrate: '(x^3+1)/(x^2-1)' ==> x^2/2 + ln(x - 1)
+Algebra integrate: 'x^2' by: 'x' from: 0 to: 3 ==> 9
+Algebra integrate: 'sin(x)' by: 'x' from: 0 to: 'pi' ==> 2
+Algebra integrate: '1/x' by: 'x' from: 1 to: 'e' ==> 1
+Algebra integrate: 'exp(-x)' by: 'x' from: 0 to: 'oo' ==> 1
+Algebra integrate: '1/(1+x^2)' by: 'x' from: '-oo' to: 'oo' ==> pi
+Algebra integrate: 'x^2' by: 'x' from: 'a' to: 'b' ==> -a^3/3 + b^3/3
+Algebra integrate: '3x^2 + 1' by: 'x' from: -1 to: 2 ==> 12
+Algebra isEqual: (Algebra diff: (Algebra integrate: 'x*exp(x)')) to: 'x*exp(x)' ==> true
+Algebra seemsEqual: (Algebra diff: (Algebra integrate: 'x^2*sin(x)')) to: 'x^2*sin(x)' ==> true
+Algebra seemsEqual: (Algebra diff: (Algebra integrate: '1/(x^2+x+1)')) to: '1/(x^2+x+1)' ==> true
+Algebra seemsEqual: (Algebra diff: (Algebra integrate: 'exp(2x)*cos(3x+1)')) to: 'exp(2x)*cos(3x+1)' ==> true
+Algebra seemsEqual: (Algebra diff: (Algebra integrate: '(3x+5)/((x^2+1)(x-2))')) to: '(3x+5)/((x^2+1)(x-2))' ==> true
+Algebra seemsEqual: (Algebra diff: (Algebra integrate: 'sin(x)^4')) to: 'sin(x)^4' ==> true
+Algebra seemsEqual: (Algebra diff: (Algebra integrate: 'ln(x)^2')) to: 'ln(x)^2' ==> true
+Algebra seemsEqual: (Algebra diff: (Algebra integrate: 'x^3*ln(x)')) to: 'x^3*ln(x)' ==> true
+Algebra seemsEqual: (Algebra diff: (Algebra integrate: 'x*atan(x)')) to: 'x*atan(x)' ==> true
+# limits
+Algebra limit: 'sin(x)/x' at: 0 ==> 1
+Algebra limit: '(x^2-1)/(x-1)' at: 1 ==> 2
+Algebra limit: '(1-cos(x))/x^2' at: 0 ==> 1/2
+Algebra limit: '(exp(x)-1)/x' at: 0 ==> 1
+Algebra limit: 'x^2' at: 3 ==> 9
+Algebra limit: '(3x^2+1)/(2x^2-5)' at: 'oo' ==> 3/2
+Algebra limit: '(x^2+1)/(x+3)' at: 'oo' ==> oo
+Algebra limit: '(x+1)/(x^2+1)' at: '-oo' ==> 0
+Algebra limit: '(1+1/x)^x' at: 'oo' ==> e
+Algebra limit: 'x*ln(x)' at: 0 ==> 0
+Algebra limit: 'exp(x)/x^2' at: 'oo' ==> oo
+Algebra limit: 'x*exp(-x)' at: 'oo' ==> 0
+Algebra limit: 'ln(x)/x' at: 'oo' ==> 0
+Algebra limit: 'atan(x)' at: 'oo' ==> pi/2
+Algebra limit: 'atan(x)' at: '-oo' ==> -pi/2
+Algebra limit: 'exp(-x)' at: 'oo' ==> 0
+Algebra limit: 'exp(x)' at: '-oo' ==> 0
+Algebra limit: '1/x^2' at: 0 ==> oo
+Algebra limit: '-1/x^2' at: 0 ==> -oo
+Algebra limit: '1/x' at: 0 ==> ERROR: the limit does not exist: the two sides differ
+Algebra limit: 'tan(x)' at: 0 ==> 0
+Algebra limit: 'sin(3x)/sin(5x)' at: 0 ==> 3/5
+Algebra limit: '(x^3-8)/(x-2)' at: 2 ==> 12
+Algebra limit: 'x' at: 'oo' ==> oo
+Algebra limit: '5' at: 'oo' ==> 5
+Algebra limit: '(2x+1)/(x-1)' of: 'x' at: 'oo' ==> 2
+Algebra limit: 'x^2 - x^3' at: 'oo' ==> -oo
+# series and sums
+Algebra series: 'exp(x)' in: 'x' at: 0 order: 4 ==> x^4/24 + x^3/6 + x^2/2 + x + 1
+Algebra series: 'sin(x)' in: 'x' at: 0 order: 5 ==> x^5/120 - x^3/6 + x
+Algebra series: 'cos(x)' in: 'x' at: 0 order: 4 ==> x^4/24 - x^2/2 + 1
+Algebra series: '1/(1-x)' in: 'x' at: 0 order: 4 ==> x^4 + x^3 + x^2 + x + 1
+Algebra series: 'ln(x)' in: 'x' at: 1 order: 3 ==> x - (x - 1)^2/2 + (x - 1)^3/3 - 1
+Algebra series: 'sqrt(x)' in: 'x' at: 1 order: 2 ==> -(x - 1)^2/8 + (x - 1)/2 + 1
+Algebra series: 'x^3' in: 'x' at: 0 order: 2 ==> 0
+Algebra series: 'atan(x)' in: 'x' at: 0 order: 5 ==> x^5/5 - x^3/3 + x
+Algebra taylor: 'exp(x)' order: 3 ==> x^3/6 + x^2/2 + x + 1
+Algebra taylor: 'sin(x)*cos(x)' order: 3 ==> -2*x^3/3 + x
+Algebra sum: 'k' in: 'k' from: 1 to: 'n' ==> n^2/2 + n/2
+Algebra sum: 'k^2' in: 'k' from: 1 to: 'n' ==> n^3/3 + n^2/2 + n/6
+Algebra sum: 'k^3' in: 'k' from: 1 to: 'n' ==> n^4/4 + n^3/2 + n^2/4
+Algebra sum: '2k+1' in: 'k' from: 0 to: 'n' ==> n^2 + 2*n + 1
+Algebra sum: 'k' in: 'k' from: 1 to: 100 ==> 5050
+Algebra sum: 'k^2' in: 'k' from: 1 to: 10 ==> 385
+Algebra sum: '2^k' in: 'k' from: 0 to: 'n' ==> 2^(n + 1) - 1
+Algebra sum: '1/2^k' in: 'k' from: 1 to: 4 ==> 15/16
+Algebra sum: '3' in: 'k' from: 1 to: 'n' ==> 3*n
+Algebra sum: 'k' in: 'k' from: 5 to: 'n' ==> n^2/2 + n/2 - 10
+Algebra sum: 'a*k + b' in: 'k' from: 1 to: 'n' ==> a*n^2/2 + a*n/2 + b*n
+Algebra product: 'k' in: 'k' from: 1 to: 5 ==> 120
+Algebra product: '2*k' in: 'k' from: 1 to: 3 ==> 48
+# solving
+Algebra solve: 'x^2 - 5x + 6 = 0' ==> #(2 3)
+Algebra solve: 'x^2 - 2 = 0' ==> #(-sqrt(2) sqrt(2))
+Algebra solve: 'x^2 + 1 = 0' ==> #(-i i)
+Algebra solve: 'x^2 + 2x + 5 = 0' ==> #(-2*i - 1 2*i - 1)
+Algebra solve: '2x^2 - 4x + 1 = 0' ==> #(-sqrt(2)/2 + 1 sqrt(2)/2 + 1)
+Algebra solve: '3x + 2 = 11' ==> #(3)
+Algebra solve: '2x + 2 = 2(x+1)' ==> #()
+Algebra solve: 'x^2 = 9' ==> #(-3 3)
+Algebra solve: 'x^2 = 0' ==> #(0)
+Algebra solve: 'x^3 - 6x^2 + 11x - 6 = 0' ==> #(1 2 3)
+Algebra solve: 'x^3 - 2 = 0' ==> #(2^(1/3))
+Algebra solve: 'x^4 - 5x^2 + 4 = 0' ==> #(-2 -1 1 2)
+Algebra solve: 'x^4 - 16 = 0' ==> #(-2 2 -2*i 2*i)
+Algebra solve: 'x^4 + 16 = 0' ==> #()
+Algebra solve: 'x^3 - x = 0' ==> #(-1 0 1)
+Algebra solve: '2x^3 - 3x^2 - 8x + 12 = 0' ==> #(-2 3/2 2)
+Algebra solve: 'a x^2 + b x + c = 0' for: 'x' ==> #((-b - sqrt(-4*a*c + b^2))/(2*a) (-b + sqrt(-4*a*c + b^2))/(2*a))
+Algebra solve: 'a x + b = 0' for: 'x' ==> #(-b/a)
+Algebra solve: 'x*y = 6' for: 'y' ==> #(6/x)
+Algebra solve: 'x + y = 10' for: 'y' ==> #(-x + 10)
+Algebra solve: 'exp(x) = 5' ==> #(ln(5))
+Algebra solve: '2*exp(x) + 1 = 5' ==> #(ln(2))
+Algebra solve: 'ln(x) = 2' ==> #(exp(2))
+Algebra solve: 'sqrt(x+1) = 3' ==> #(8)
+Algebra solve: 'sqrt(x) = -3' ==> #()
+Algebra solve: 'sin(x) = 1/2' ==> #(pi/6 5*pi/6)
+Algebra solve: 'cos(x) = 0' ==> #(-pi/2 pi/2)
+Algebra solve: '2^x = 8' ==> #(3)
+Algebra solve: '3^(2x) = 81' ==> #(2)
+Algebra solve: '1/x + 1/(x+1) = 1' ==> #(-sqrt(5)/2 + 1/2 sqrt(5)/2 + 1/2)
+Algebra solve: '(x^2-1)/(x-1) = 2' ==> #()
+Algebra solve: '1/x = 4' ==> #(1/4)
+Algebra solve: 'x/(x-1) = 2' ==> #(2)
+Algebra solve: 'abs(x) = 3' ==> #(-3 3)
+Algebra solve: 'x^2 + y^2 = 1' for: 'y' ==> #(-sqrt(-x^2 + 1) sqrt(-x^2 + 1))
+Algebra solve: '5 = 6' ==> #()
+Algebra solveSystem: #('x+y=3' 'x-y=1') for: #('x' 'y') ==> #(#('x'->2 'y'->1))
+Algebra solveSystem: #('2x+3y=7' 'x-y=-1') for: #('x' 'y') ==> #(#('x'->4/5 'y'->9/5))
+Algebra solveSystem: #('x+y=a' 'x-y=b') for: #('x' 'y') ==> #(#('x'->a/2 + b/2 'y'->a/2 - b/2))
+Algebra solveSystem: #('x+y+z=6' 'x-y+z=2' '2x+y-z=1') for: #('x' 'y' 'z') ==> #(#('x'->1 'y'->2 'z'->3))
+Algebra solveSystem: #('x+y=3' 'x*y=2') for: #('x' 'y') ==> #(#('x'->2 'y'->1) #('x'->1 'y'->2))
+Algebra solveSystem: #('x^2+y^2=25' 'x-y=1') for: #('x' 'y') ==> #(#('x'->-3 'y'->-4) #('x'->4 'y'->3))
+Algebra solveSystem: #('x+y=1' 'x+y=2') for: #('x' 'y') ==> #()
+Algebra solveSystem: #('x+y=1') for: #('x' 'y') ==> ERROR: the equations do not determine every unknown
+# a few more
+Algebra parse: 'ln(8)' ==> 3*ln(2)
+Algebra parse: 'ln(81)' ==> 4*ln(3)
+Algebra parse: 'ln(1/4)' ==> -2*ln(2)
+Algebra parse: 'log(2, 8)' ==> 3
+Algebra parse: 'log(10, 1000)' ==> 3
+Algebra diff: 'x*y' ==> y
+Algebra solve: 'x*y = 1' ==> #(1/y)
+Algebra parse: 'sqrt(x)^2*sqrt(x)' ==> x^(3/2)
+Algebra parse: 'x^2*y*x^-1' ==> x*y
+Algebra parse: 'a^2*b + a*b^2' ==> a^2*b + a*b^2
+Algebra parse: 'sin(x) + x' ==> x + sin(x)
+Algebra parse: 'x*sin(x) + sin(x)*x^2 + 1' ==> x^2*sin(x) + x*sin(x) + 1
+Algebra parse: 'x^2 + sin(x) + 1/x + 3' ==> x^2 + sin(x) + 1/x + 3
+# polynomials
+Algebra degree: 'x^3 + 2x' in: 'x' ==> 3
+Algebra degree: '5' in: 'x' ==> 0
+Algebra degree: 'a x^2 + b' in: 'x' ==> 2
+Algebra coefficients: '3x^2 + 2x + 1' in: 'x' ==> #(1 2 3)
+Algebra coefficients: 'a x^2 + b x + c' in: 'x' ==> #(c b a)
+Algebra coefficients: '(x+1)^3' in: 'x' ==> #(1 3 3 1)
+Algebra quotient: 'x^3 - 1' by: 'x - 1' in: 'x' ==> x^2 + x + 1
+Algebra remainder: 'x^3 + 2x + 5' by: 'x^2 + 1' in: 'x' ==> x + 5
+Algebra quotient: 'x^3 + 2x + 5' by: 'x^2 + 1' in: 'x' ==> x
+Algebra gcd: 'x^2 - 1' with: 'x^2 + 2x + 1' ==> x + 1
+Algebra gcd: 'x^3 - 1' with: 'x^2 - 1' ==> x - 1
+Algebra gcd: 'x^2 + 1' with: 'x + 1' ==> 1
+Algebra roots: 'x^2 - 3x + 2' ==> #(1.0 2.0)
+Algebra roots: 'x^3 - 6x^2 + 11x - 6' ==> #(1.0 2.0 3.0)
+Algebra roots: 'x^2 + 1' ==> #()
+(Algebra roots: 'x^2 - 2') collect: [:r | (r * 1000000) rounded] ==> #(-1414214 1414214)
+(Algebra roots: 'x^3 + x + 1') collect: [:r | (r * 1000000) rounded] ==> #(-682328)
+(Algebra complexRoots: 'x^2 + 1') size ==> 2
+Algebra horner: '2x^3 - 3x^2 + 5x - 7' in: 'x' ==> x*(x*(2*x - 3) + 5) - 7
+Algebra horner: 'x^2 + 1' in: 'x' ==> x^2 + 1
+Algebra isEqual: (Algebra horner: '2x^3 - 3x^2 + 5x - 7' in: 'x') to: '2x^3 - 3x^2 + 5x - 7' ==> true
+Algebra lagrange: #(#(0 1) #(1 3) #(2 7)) in: 'x' ==> x^2 + x + 1
+Algebra lagrange: #(#(1 1) #(2 4) #(3 9) #(4 16)) in: 'x' ==> x^2
+Algebra lagrange: #(#(0 0) #(1 1) #(2 8) #(3 27)) in: 't' ==> t^3
+Algebra newton: 'x^2 - 2' from: 1 steps: 3 ==> #(1 3/2 17/12 577/408)
+Algebra newton: 'x^2 - 2' from: 1 steps: 0 ==> #(1)
+(Algebra newton: 'x^3 - 2' from: 1 steps: 4) last ==> 2146097524939083451/1703358734191174242
+# the polynomial class
+(SymPoly coefficients: #(-1 0 1)) factor ==> #(1 #(#(SymPoly(#(-1 1)) 1) #(SymPoly(#(1 1)) 1)))
+(SymPoly coefficients: #(1 2 1)) squareFree ==> #(#(SymPoly(#(1 1)) 2))
+(SymPoly coefficients: #(0 0 1)) degree ==> 2
+(SymPoly coefficients: #(1 2 0 0)) degree ==> 1
+SymPoly zero degree ==> -1
+((SymPoly coefficients: #(-1 0 1)) * (SymPoly coefficients: #(1 1))) coeffs ==> #(-1 -1 1 1)
+((SymPoly coefficients: #(-1 0 0 1)) divMod: (SymPoly coefficients: #(-1 1))) first coeffs ==> #(1 1 1)
+(SymPoly coefficients: #(5 2 1)) valueAt: 2 ==> 13
+(SymPoly coefficients: #(3 2 1)) derivative coeffs ==> #(2 2)
+((SymPoly coefficients: #(-4 0 1)) gcd: (SymPoly coefficients: #(2 1))) coeffs ==> #(2 1)
+(SymPoly coefficients: #(2 4 6)) content ==> 2
+(SymPoly coefficients: (Array with: 1/2 with: 1/3)) content ==> (1/6)
+(SymPoly interpolate: #(0 1 2) values: #(1 3 7)) coeffs ==> #(1 1 1)
+(SymPoly coefficients: #(-6 11 -6 1)) rationalRoot ==> 1
+# errors
+[Algebra parse: '1/0'] on: SymError do: [:e | e messageText] ==> 'division by zero'
+[Algebra parse: '2 +'] on: SymError do: [:e | e messageText] ==> 'cannot read ''2 +'': the text ends too soon'
+[Algebra integrate: 'exp(x^2)'] on: SymError do: [:e | e messageText] ==> 'no antiderivative found for exp(x^2)'
+[Algebra solve: '5 = 5'] on: SymError do: [:e | e messageText] ==> 'every value is a solution'
+[Algebra limit: '1/x' at: 0] on: SymError do: [:e | e messageText] ==> 'the limit does not exist: the two sides differ'
+[Algebra numeric: 'x'] on: SymError do: [:e | e messageText] ==> 'x has no value'
+[Algebra degree: 'sin(x)' in: 'x'] on: SymError do: [:e | e messageText] ==> 'not a polynomial in x'
+[Algebra sum: '1/k' in: 'k' from: 1 to: 'n'] on: SymError do: [:e | e messageText] ==> 'cannot find a closed form for this sum'
+[Algebra substitute: 'x' with: 'x'] on: SymError do: [:e | e messageText] ==> 'a binding looks like x=2, not ''x'''
+[Algebra factor: 'x+'] on: SymError do: [:e | e class name] ==> #SymError
+# latex and pretty
+Algebra latex: 'x^2 + 3x - 5' ==> 'x^{2} + 3 x - 5'
+Algebra latex: '(x+1)/(x^2+2)' ==> '\frac{x + 1}{x^{2} + 2}'
+Algebra latex: 'sqrt(x)/2' ==> '\frac{\sqrt{x}}{2}'
+Algebra latex: 'sin(x)^2' ==> '\sin\left(x\right)^{2}'
+Algebra latex: 'pi*r^2' ==> '\pi r^{2}'
+Algebra latex: 'exp(x)' ==> 'e^{x}'
+Algebra latex: '3/4 x' ==> '\frac{3 x}{4}'
+Algebra latex: 'x^(1/3)' ==> 'x^{\frac{1}{3}}'
+Algebra latex: 'abs(x)' ==> '\left|x\right|'
+Algebra latex: 'ln(x)' ==> '\ln\left(x\right)'
+Algebra latex: '1/x^2' ==> '\frac{1}{x^{2}}'
+Algebra latex: '-x/2' ==> '-\frac{x}{2}'
+(Algebra pretty: 'x + 1') lines asArray ==> #('x + 1')
+(Algebra pretty: 'x^2 + 1') lines asArray ==> #(' 2    ' 'x  + 1')
+(Algebra pretty: '(x+1)/(x^2+2)') lines asArray ==> #('x + 1 ' '------' ' 2    ' 'x  + 2')
+(Algebra pretty: 'x/2') lines asArray ==> #('x' '-' '2')
+(Algebra pretty: '1/(x+1)^2') lines asArray ==> #('   1    ' '--------' '       2' '(x + 1) ')
+(Algebra pretty: 'sqrt(x+1)') lines asArray ==> #('sqrt(x + 1)')
+(Algebra pretty: 'sin(x)^2') lines asArray ==> #('      2' 'sin(x) ')
+(Algebra pretty: '(x+1)^2/(x-1)') lines asArray ==> #('       2' '(x + 1) ' '--------' ' x - 1  ')
+(Algebra pretty: '(x+1)/(x^2+2) + 1/x') lines size ==> 4
+# the workspace
+AlgebraTool reset. AlgebraTool evaluate: 'expand (x+1)^2' ==> 'x^2 + 2*x + 1'
+AlgebraTool evaluate: 'factor x^2 - 1' ==> '(x - 1)*(x + 1)'
+AlgebraTool evaluate: 'diff x^3, x' ==> '3*x^2'
+AlgebraTool evaluate: 'diff x^3, x, 2' ==> '6*x'
+AlgebraTool evaluate: 'integrate x^2, x' ==> 'x^3/3'
+AlgebraTool evaluate: 'integrate x^2, x, 0, 3' ==> '9'
+AlgebraTool evaluate: 'limit sin(x)/x, x, 0' ==> '1'
+AlgebraTool evaluate: 'series exp(x), x, 0, 3' ==> 'x^3/6 + x^2/2 + x + 1'
+(AlgebraTool evaluate: 'solve x^2 = 4') lines asArray ==> #('-2' '2')
+(AlgebraTool evaluate: 'solve x^2 = 4, x') lines asArray ==> #('-2' '2')
+AlgebraTool evaluate: 'system x + y = 3 ; x - y = 1 for x y' ==> 'x = 2, y = 1'
+AlgebraTool evaluate: 'sum k, k, 1, 10' ==> '55'
+AlgebraTool evaluate: 'subs x^2 + y, x=3, y=1' ==> '10'
+AlgebraTool evaluate: 'apart 1/(x^2-1)' ==> '-1/(2*(x + 1)) + 1/(2*(x - 1))'
+AlgebraTool evaluate: 'together 1/x + 1/y' ==> '(x + y)/(x*y)'
+AlgebraTool evaluate: 'cancel (x^2-1)/(x-1)' ==> 'x + 1'
+AlgebraTool evaluate: 'simplify sin(x)^2 + cos(x)^2' ==> '1'
+AlgebraTool evaluate: 'latex x/2' ==> '\frac{x}{2}'
+(AlgebraTool evaluate: 'roots x^2 - 1') lines asArray ==> #('-1.0' '1.0')
+AlgebraTool evaluate: 'x + x' ==> '2*x'
+AlgebraTool evaluate: 'let f(x) = x^2 + 1' ==> 'f(x) = x^2 + 1'
+AlgebraTool evaluate: 'f(3)' ==> '10'
+AlgebraTool evaluate: 'f(a+1)' ==> '(a + 1)^2 + 1'
+AlgebraTool evaluate: 'diff f(x), x' ==> '2*x'
+AlgebraTool evaluate: 'let g(x, y) = x*y + 1' ==> 'g(x, y) = x*y + 1'
+AlgebraTool evaluate: 'g(2, 5)' ==> '11'
+AlgebraTool evaluate: 'let p = x^2 - 1' ==> 'p = x^2 - 1'
+AlgebraTool evaluate: 'factor p' ==> '(x - 1)*(x + 1)'
+AlgebraTool evaluate: 'p + 1' ==> 'x^2'
+AlgebraTool evaluate: 'forget p' ==> 'p forgotten'
+AlgebraTool evaluate: 'p + 1' ==> 'p + 1'
+AlgebraTool evaluate: 'forget all' ==> 'everything forgotten'
+AlgebraTool evaluate: 'f(3)' ==> '3*f'
+AlgebraTool evaluate: '1/0' ==> 'error: division by zero'
+AlgebraTool evaluate: 'expand (x+1' ==> 'error: cannot read ''(x+1'': expected ) but found the end of the text'
+AlgebraTool evaluate: 'limit x' ==> 'error: limit takes an expression, a symbol and a value: limit sin(x)/x, x, 0'
+AlgebraTool evaluate: 'let x' ==> 'error: let looks like  let p = x^2 - 1  or  let f(x) = x^2'
+AlgebraTool evaluate: 'solve x*y = 1' ==> '1/y'
+(AlgebraTool evaluate: ('expand (x+1)^2', (String with: Character nl), 'factor x^2 - 1')) lines asArray ==> #('x^2 + 2*x + 1' '(x - 1)*(x + 1)')
+AlgebraTool evaluate: ('"a comment', (String with: Character nl), 'x + 1') ==> 'x + 1'
+AlgebraTool evaluate: 'system x + y = 3 ; x - y = 1' ==> 'error: say which unknowns: system x + y = 3 ; x - y = 1 for x y'
+AlgebraTool evaluate: 'solve 5 = 6' ==> 'no solutions'
+AlgebraTool welcomeText size > 100 ==> true
+AlgebraTool reset ==> AlgebraTool
+Algebra examples size ==> 7
+Algebra version ==> '1.0'
